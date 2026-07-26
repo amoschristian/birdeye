@@ -6,7 +6,7 @@ interface Props {
   events: CalendarEvent[];
 }
 
-const UPCOMING_THRESHOLD = 15 * 60; // 15 minutes in seconds
+const UPCOMING_THRESHOLD = 15 * 60;
 
 function formatParts(start: number, end: number): { dayLabel: string; timeStr: string; highlight: 'now' | 'upcoming' | 'future' | 'none' } {
   const now = Date.now() / 1000;
@@ -15,16 +15,14 @@ function formatParts(start: number, end: number): { dayLabel: string; timeStr: s
 
   const timeStr = startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
 
-  // Currently happening
   if (now >= start && now <= end) {
     const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    return { dayLabel: 'Now', timeStr: `until ${endTime}`, highlight: 'now' };
+    return { dayLabel: 'NOW', timeStr: `↘ ${endTime}`, highlight: 'now' };
   }
 
-  // Starting within 15 minutes — needs attention
   if (start > now && start - now <= UPCOMING_THRESHOLD) {
     const mins = Math.round((start - now) / 60);
-    const dayLabel = mins <= 1 ? 'Imminent' : `${mins}m`;
+    const dayLabel = mins <= 1 ? 'IMMINENT' : `T-${mins}M`;
     return { dayLabel, timeStr, highlight: 'upcoming' };
   }
 
@@ -36,10 +34,10 @@ function formatParts(start: number, end: number): { dayLabel: string; timeStr: s
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   if (startDate.toDateString() === tomorrow.toDateString()) {
-    return { dayLabel: 'Tomorrow', timeStr, highlight: 'future' };
+    return { dayLabel: 'TOMORROW', timeStr, highlight: 'future' };
   }
 
-  const dateLabel = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const dateLabel = startDate.toLocaleDateString([], { month: 'short', day: 'numeric' }).toUpperCase();
   return { dayLabel: dateLabel, timeStr, highlight: 'future' };
 }
 
@@ -47,43 +45,34 @@ function EventChip({ ev }: { ev: CalendarEvent }) {
   const { dayLabel, timeStr, highlight } = formatParts(ev.start, ev.end);
   const isUpcoming = highlight === 'upcoming';
   const isNow = highlight === 'now';
-  const isFuture = highlight === 'future';
   return (
-    <span class={`inline-flex items-center gap-1.5 shrink-0 ${isUpcoming ? 'bg-[#e0af68]/15 rounded-lg px-2 py-0.5 -mx-1' : ''}`}>
-      <span class="text-[#33467c] font-medium">·</span>
-      <span class="text-sm">📅</span>
-      <span class={isUpcoming ? 'text-[#e0af68] font-semibold' : 'text-[#565f89]'}>{ev.summary}</span>
+    <span class={`inline-flex items-center gap-2.5 shrink-0 ${isUpcoming ? 'bg-[#ff8c42]/10 px-3 py-0.5 -mx-1' : ''}`}>
+      <span class="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isNow ? '#2ecc71' : isUpcoming ? '#ff8c42' : '#8a9ba8' }} />
+      <span class="font-mono text-[13px] font-medium" style={{ color: isUpcoming ? '#ff8c42' : '#c8d6e0' }}>{ev.summary}</span>
       {dayLabel && (
-        <span class={
-          isNow ? 'text-[#9ece6a] font-semibold' :
-          isUpcoming ? 'text-[#e0af68] font-bold' :
-          isFuture ? 'text-[#e0af68] font-semibold' :
-          'text-[#565f89]'
-        }>
+        <span class={`font-mono text-[13px] font-semibold uppercase tracking-[0.06em] ${
+          isNow ? 'text-[#2ecc71]' :
+          isUpcoming ? 'text-[#ff8c42]' :
+          'text-[#8a9ba8]'
+        }`}>
           {dayLabel}
         </span>
       )}
-      <span class={
-        isNow ? 'text-[#9ece6a] font-semibold' :
-        isUpcoming ? 'text-[#e0af68] font-bold' :
-        isFuture ? 'text-[#7aa2f7] font-semibold' :
-        'text-[#a9b1d6]'
-      }>
+      <span class={`font-mono text-[13px] ${
+        isNow ? 'text-[#2ecc71]' : 'text-[#8a9ba8]'
+      }`}>
         {timeStr}
       </span>
     </span>
   );
 }
 
-const GRACE_PERIOD = 120; // keep parked event for 2 min after it ends
+const GRACE_PERIOD = 120;
 
 export function CalendarStrip({ events }: Props) {
-  // Sticky parked event — stays visible until its end time passes (+ grace),
-  // even if the server temporarily stops sending it between polls.
   const [stickyParked, setStickyParked] = useState<CalendarEvent | null>(null);
   const stickyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Decide which event should be parked based on server data
   const now = Date.now() / 1000;
   const serverParked = (events || []).find((ev) => {
     if (now >= ev.start && now <= ev.end) return true;
@@ -91,15 +80,12 @@ export function CalendarStrip({ events }: Props) {
     return false;
   }) ?? null;
 
-  // Sync sticky parked event
   const prevId = useRef<string | null>(null);
   useEffect(() => {
     const parkId = serverParked?.id ?? null;
 
     if (serverParked) {
-      // New or changed parked candidate — adopt it
       setStickyParked(serverParked);
-      // Schedule clearing after end + grace
       const remaining = (serverParked.end + GRACE_PERIOD - now) * 1000;
       if (remaining > 0) {
         if (stickyTimer.current) clearTimeout(stickyTimer.current);
@@ -107,12 +93,10 @@ export function CalendarStrip({ events }: Props) {
       }
       prevId.current = parkId;
     } else if (parkId !== prevId.current && stickyParked) {
-      // Server no longer has a parked event (it ended). Check if ours expired.
       if (now > stickyParked.end + GRACE_PERIOD) {
         setStickyParked(null);
         if (stickyTimer.current) clearTimeout(stickyTimer.current);
       }
-      // else: keep showing sticky — the timeout from earlier will clear it
       prevId.current = null;
     }
   }, [serverParked?.id ?? null, serverParked?.end ?? 0]);
@@ -123,12 +107,10 @@ export function CalendarStrip({ events }: Props) {
     ? evList.filter((ev) => ev.id !== parkedEvent.id)
     : evList;
 
-  // Nothing to show — not even a sticky parked event
   if (!parkedEvent && scrollingEvents.length === 0) return null;
 
-  // Render a single copy of events — both copies are identical for seamless loop
   const eventsCopy = scrollingEvents.length > 0 && (
-    <span class="inline-flex items-center gap-3">
+    <span class="inline-flex items-center gap-6">
       {scrollingEvents.map((ev) => (
         <EventChip key={ev.id} ev={ev} />
       ))}
@@ -136,33 +118,31 @@ export function CalendarStrip({ events }: Props) {
   );
 
   return (
-    <div class="shrink-0 border-t border-[#33467c] bg-[#1f2233] py-1.5 text-xs select-none overflow-hidden whitespace-nowrap flex items-center">
-      {/* Parked active event — sits above the marquee with solid background */}
+    <div class="shrink-0 border-b border-[#252d38] bg-[#0a0e14] py-1 select-none overflow-hidden whitespace-nowrap flex items-center">
       {parkedEvent && (() => {
         const { highlight, timeStr } = formatParts(parkedEvent.start, parkedEvent.end);
         const isNow = highlight === 'now';
         const endTime = new Date(parkedEvent.end * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
         return (
-          <div class="shrink-0 z-10 flex items-center gap-1.5 bg-[#1f2233] pl-4 pr-3">
-            <span class="text-sm">📅</span>
-            <span class="text-[#c0caf5] font-semibold max-w-48 truncate">{parkedEvent.summary}</span>
-            <span class={isNow ? 'text-[#9ece6a] font-semibold' : 'text-[#e0af68] font-bold'}>
-              {isNow ? 'Now' : timeStr}
+          <div class="shrink-0 z-10 flex items-center gap-2 bg-[#0a0e14] pl-4 pr-3">
+            <span class={`w-2 h-2 rounded-full ${isNow ? 'bg-[#2ecc71] lamp-glow-green' : 'bg-[#ff8c42] lamp-glow-amber'}`} />
+            <span class="font-mono text-[14px] font-semibold text-[#e8edf2] max-w-48 truncate">{parkedEvent.summary}</span>
+            <span class={`font-mono text-[13px] font-semibold uppercase tracking-[0.06em] ${isNow ? 'text-[#2ecc71]' : 'text-[#ff8c42]'}`}>
+              {isNow ? 'NOW' : timeStr}
             </span>
             {isNow && (
-              <span class="text-[#9ece6a] font-semibold">until {endTime}</span>
+              <span class="font-mono text-[13px] text-[#2ecc71]">↘ {endTime}</span>
             )}
             {scrollingEvents.length > 0 && (
-              <span class="text-[#33467c] font-medium">·</span>
+              <span class="text-[#252d38] font-mono mx-1">|</span>
             )}
           </div>
         );
       })()}
 
-      {/* Marquee — scrolls behind the parked event */}
       <div class="flex-1 overflow-hidden">
         <div
-          class="inline-flex animate-marquee"
+          class="inline-flex gap-6 animate-marquee"
           style={{ animationDuration: '60s', paddingLeft: parkedEvent ? '0' : '16px', paddingRight: '16px' }}
         >
           {eventsCopy}

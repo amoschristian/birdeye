@@ -98,38 +98,38 @@ export function App() {
   };
 
   return (
-    <div class="h-screen w-screen bg-[#1a1b26] text-[#c0caf5] antialiased flex flex-col overflow-hidden">
+    <div class="h-screen w-screen bg-[#0a0e14] text-[#c8d6e0] antialiased flex flex-col overflow-hidden">
       {/* Header: clock + nav tabs + workspace button */}
-      <header class="flex items-center justify-between px-4 border-b border-[#33467c] shrink-0 h-14">
+      <header class="flex items-center justify-between px-4 border-b border-[#252d38] shrink-0 h-12">
         <div class="flex items-center gap-4">
           <Clock />
           <ConnectionStatus connected={connected} />
           <div class="flex gap-1 ml-2">
             <button
               onClick={() => setActiveTab('notifications')}
-              class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              class={`px-4 py-1.5 text-[13px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 border-b-2 ${
                 activeTab === 'notifications'
-                  ? 'bg-[#7aa2f7] text-[#1a1b26]'
-                  : 'bg-[#24283b] text-[#565f89] hover:text-[#c0caf5]'
+                  ? 'bg-[#1c2430] text-[#4da6ff] border-b-[#4da6ff]'
+                  : 'bg-[#141b24] text-[#8a9ba8] border-b-transparent hover:text-[#c8d6e0]'
               }`}
             >
-              Notifications
+              NOTIFICATIONS
             </button>
             <button
               onClick={() => setActiveTab('todos')}
-              class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              class={`px-4 py-1.5 text-[13px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 border-b-2 ${
                 activeTab === 'todos'
-                  ? 'bg-[#7aa2f7] text-[#1a1b26]'
-                  : 'bg-[#24283b] text-[#565f89] hover:text-[#c0caf5]'
+                  ? 'bg-[#1c2430] text-[#4da6ff] border-b-[#4da6ff]'
+                  : 'bg-[#141b24] text-[#8a9ba8] border-b-transparent hover:text-[#c8d6e0]'
               }`}
             >
-              Todos
+              TODOS
             </button>
           </div>
         </div>
         <button
           onClick={() => switchWorkspace(1)}
-          class="px-5 py-2 rounded-xl text-sm font-bold bg-[#7aa2f7] text-[#1a1b26] hover:bg-[#89b4fa] active:scale-95 transition-all select-none"
+          class="px-5 py-2 rounded-sm text-[13px] font-semibold tracking-[0.06em] uppercase bg-[#4da6ff] text-[#0a0e14] hover:bg-[#6bb8ff] active:brightness-125 transition-all select-none focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
           title="Switch to workspace 1 on monitor 1"
         >
           Work
@@ -137,20 +137,20 @@ export function App() {
       </header>
 
       {activeTab === 'notifications' ? (
-        <>
+        <div key="notifications" class="flex flex-col flex-1 overflow-hidden animate-scale-in">
           {/* Calendar strip (next event, if any) */}
           <CalendarStrip events={calendarEvents} />
 
           {/* Two-column notification layout (flex-1) */}
           <div class="flex flex-1 overflow-hidden">
             {/* Left panel: app filter buttons */}
-            <aside class="w-22 shrink-0 overflow-y-auto border-r border-[#33467c] p-2 flex flex-col gap-2 custom-scrollbar items-center">
+            <aside class="w-22 shrink-0 overflow-y-auto border-r border-[#252d38] p-2 flex flex-col gap-2 custom-scrollbar items-center">
               <button
                 onClick={() => setFilterAppId(null)}
-                class={`w-14 h-14 rounded-xl flex items-center justify-center border transition-all duration-150 select-none ${
+                class={`w-14 h-14 rounded-sm flex items-center justify-center border transition-all duration-150 select-none active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 ${
                   filterAppId === null
-                    ? 'bg-[#7aa2f7] text-[#1a1b26] border-[#7aa2f7]'
-                    : 'bg-[#24283b] text-[#c0caf5] border-[#33467c] hover:border-[#7aa2f7]'
+                    ? 'bg-[#4da6ff] text-[#0a0e14] border-[#4da6ff]'
+                    : 'bg-[#141b24] text-[#c8d6e0] border-[#252d38] hover:border-[#4da6ff]'
                 }`}
                 aria-label="All apps"
                 title="All apps"
@@ -161,8 +161,8 @@ export function App() {
                 const list = groupedApps.get(group);
                 if (!list || list.length === 0) return null;
                 return (
-                  <>
-                    <div class="text-[15px] font-bold uppercase tracking-widest text-[#3b4261] text-center pt-1 pb-0 border-t border-[#33467c] mt-0.5 w-full">
+                  <div key={group} class="flex flex-col items-center gap-2 w-full">
+                    <div class="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a9ba8] text-left pt-2 pb-1 border-t border-[#252d38] mt-1 w-full">
                       {GROUP_LABELS[group] || group}
                     </div>
                     {list.map((app) => (
@@ -173,13 +173,13 @@ export function App() {
                         onFilter={handleFilterClick}
                       />
                     ))}
-                  </>
+                  </div>
                 );
               })}
               {ungrouped.length > 0 && (
                 <>
-                  <div class="text-[9px] font-bold uppercase tracking-widest text-[#3b4261] text-center pt-1 pb-0 border-t border-[#33467c] mt-0.5 w-full">
-                    Other
+                  <div class="text-[13px] font-semibold uppercase tracking-[0.08em] text-[#8a9ba8] text-left pt-2 pb-1 border-t border-[#252d38] mt-1 w-full">
+                    OTHER
                   </div>
                   {ungrouped.map((app) => (
                     <AppButton
@@ -198,50 +198,50 @@ export function App() {
               <div class="flex gap-1 mb-3 shrink-0 items-center">
                 <button
                   onClick={() => setNotifSubTab('active')}
-                  class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  class={`px-4 py-1.5 rounded-sm text-sm font-medium transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 ${
                     notifSubTab === 'active'
-                      ? 'bg-[#7aa2f7] text-[#1a1b26]'
-                      : 'bg-[#24283b] text-[#565f89] hover:text-[#c0caf5]'
+                      ? 'bg-[#4da6ff] text-[#0a0e14]'
+                      : 'bg-[#141b24] text-[#8a9ba8] hover:text-[#c8d6e0]'
                   }`}
                 >
-                  Active{activeCount > 0 && ` (${activeCount})`}
+                  ACTIVE{activeCount > 0 && ` (${activeCount})`}
                 </button>
                 <button
                   onClick={() => setNotifSubTab('all')}
-                  class={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  class={`px-4 py-1.5 rounded-sm text-[13px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 ${
                     notifSubTab === 'all'
-                      ? 'bg-[#7aa2f7] text-[#1a1b26]'
-                      : 'bg-[#24283b] text-[#565f89] hover:text-[#c0caf5]'
+                      ? 'bg-[#4da6ff] text-[#0a0e14]'
+                      : 'bg-[#141b24] text-[#8a9ba8] hover:text-[#c8d6e0]'
                   }`}
                 >
-                  All{allCount > 0 && ` (${allCount})`}
+                  ALL{allCount > 0 && ` (${allCount})`}
                 </button>
                 <div class="flex-1" />
                 {notifSubTab === 'active' && activeCount > 0 && (
                   <button
                     onClick={() => markAllRead(filterAppId || undefined)}
-                    class="px-3 py-1.5 rounded-lg text-sm font-medium bg-[#9ece6a] text-[#1a1b26] hover:bg-[#7eb854] active:scale-95 transition-all"
+                    class="px-3 py-1.5 rounded-sm text-[13px] font-semibold tracking-[0.06em] uppercase bg-[#2ecc71] text-[#0a0e14] hover:bg-[#3dd87e] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#2ecc71] focus-visible:outline-offset-2"
                   >
-                    Read All
+                    READ ALL
                   </button>
                 )}
                 {notifSubTab === 'all' && notifications.some((n) => n.is_read) && (
                   <button
                     onClick={clearRead}
-                    class="px-3 py-1.5 rounded-lg text-sm font-medium bg-[#f7768e] text-white hover:bg-[#e0607a] active:scale-95 transition-all"
+                    class="px-3 py-1.5 rounded-sm text-[13px] font-semibold tracking-[0.06em] uppercase bg-[#ff4d4d] text-white hover:bg-[#ff6666] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#ff4d4d] focus-visible:outline-offset-2"
                   >
-                    Clear
+                    CLEAR
                   </button>
                 )}
               </div>
 
               {!connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center flex-1 text-[#565f89] text-base">
+                <div class="flex items-center justify-center flex-1 text-[#8a9ba8] text-base">
                   Connecting...
                 </div>
               )}
               {connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center flex-1 text-[#565f89] text-base">
+                <div class="flex items-center justify-center flex-1 text-[#8a9ba8] text-base">
                   {notifSubTab === 'active' ? 'No active notifications' : 'No notifications yet'}
                 </div>
               )}
@@ -271,8 +271,9 @@ export function App() {
               )}
             </main>
           </div>
-        </>
+        </div>
       ) : (
+        <div key="todos" class="flex flex-col flex-1 overflow-hidden animate-scale-in">
         <TodoPage
           todos={todos}
           onAdd={addTodo}
@@ -283,6 +284,7 @@ export function App() {
           onSetDueDate={setDueDate}
           onReorder={reorderTodo}
         />
+        </div>
       )}
 
       {/* Persistent bottom bar: Spotify + CPU/RAM */}

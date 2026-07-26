@@ -8,3 +8,8 @@ birdeye.db
 server/birdeye.db
 server/birdeye.db-shm
 server/birdeye.db-wal
+
+# Impeccable design artifacts
+.pi/
+.impeccable/
+.agents/

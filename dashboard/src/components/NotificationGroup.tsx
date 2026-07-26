@@ -16,19 +16,26 @@ interface Props {
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() / 1000 - ts;
   if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
 }
 
 export function NotificationGroup({ appId, label, app, notifications, onMarkRead, onFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [translateX, setTranslateX] = useState(0);
   const [dismissing, setDismissing] = useState(false);
+  const [entering, setEntering] = useState(true);
   const startX = useRef(0);
   const startY = useRef(0);
   const captured = useRef(false);
   const currentTranslateX = useRef(0);
+
+  // One-shot entry animation on mount
+  useEffect(() => {
+    const id = setTimeout(() => setEntering(false), 250);
+    return () => clearTimeout(id);
+  }, []);
 
   const appName = label;
   const appDisplay = app?.name || appId;
@@ -37,12 +44,11 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
   const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
 
   const handleToggle = () => {
-    // Don't toggle if we just completed a swipe
     if (didSwipe.current) return;
     setExpanded((prev) => !prev);
   };
 
-  // Reset swipe state when notifications change (new arrivals or read-ack from server)
+  // Reset swipe state when notifications change
   const notifIdsKey = notifications.map((n) => `${n.id}:${n.is_read}`).join(',');
   useEffect(() => {
     setTranslateX(0);
@@ -53,11 +59,11 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
     for (const id of unreadIds) onMarkRead(id);
   };
 
-  // ── Swipe detection (pointer events) — separate from tap (onClick) ──
+  // ── Swipe detection ──────────────────────────────────
   const didSwipe = useRef(false);
 
   const handlePointerDown = (e: PointerEvent) => {
-    if (unreadCount === 0) return; // nothing to swipe, let onClick handle tap
+    if (unreadCount === 0) return;
     startX.current = e.clientX;
     startY.current = e.clientY;
     didSwipe.current = false;
@@ -69,7 +75,6 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
       const deltaX = ev.clientX - startX.current;
       const deltaY = ev.clientY - startY.current;
 
-      // Only horizontal, leftward swipes
       if (Math.abs(deltaX) < Math.abs(deltaY)) return;
       if (deltaX > 0) return;
 
@@ -102,7 +107,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
     handlePointerDown(e as unknown as PointerEvent);
   };
 
-  // ── Collapsed view ────────────────────────────────────────────
+  // ── Collapsed view ──────────────────────────────────
   if (!expanded) {
     const cardClass = dismissing
       ? 'transition-transform duration-300 ease-in'
@@ -110,15 +115,15 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
 
     return (
       <div
-        class={`relative overflow-hidden rounded-xl mb-2 select-none touch-pan-y ${cardClass}`}
+        class={`relative overflow-hidden mb-px select-none touch-pan-y ${cardClass} ${entering ? 'animate-row-enter' : ''}`}
         style={{
           transform: dismissing ? 'translateX(-100%)' : `translateX(${translateX}px)`,
         }}
       >
-        {/* Swipe reveal background — only visible while swiping */}
+        {/* Swipe reveal background */}
         {unreadCount > 0 && translateX < 0 && (
-          <div class="absolute inset-0 rounded-xl bg-[#9ece6a] flex items-center justify-end pr-4">
-            <span class="text-[#1a1b26] font-bold text-sm">Mark all read ✓</span>
+          <div class="absolute inset-0 bg-[#2ecc71] flex items-center justify-end pr-4">
+            <span class="text-[#0a0e14] font-semibold text-[13px] uppercase tracking-[0.08em]">READ ALL</span>
           </div>
         )}
         <div
@@ -132,39 +137,31 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
               handleToggle();
             }
           }}
-          class="relative flex items-center gap-3 p-3 rounded-xl bg-[#24283b] border border-[#33467c] hover:border-[#7aa2f7] cursor-pointer transition-colors"
+          class="relative flex items-center gap-3 px-2 py-1.5 min-h-[44px] bg-[#141b24] border-b border-[#252d38] hover:bg-[#1c2430] cursor-pointer transition-colors active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2"
+          aria-expanded={false}
         >
           <div class="shrink-0">
-            <AppIcon appId={appId} class="text-[#7aa2f7] w-6 h-6" />
+            <AppIcon appId={appId} class="text-[#4da6ff] w-5 h-5" />
           </div>
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-              <span class="text-xs text-[#565f89]">{appDisplay}</span>
-              <span class="text-sm font-semibold text-[#c0caf5]">{appName}</span>
-              {unreadCount > 0 && (
-                <span class="text-xs font-bold text-[#f7768e]">{unreadCount} new</span>
-              )}
-            </div>
-            <p class="text-xs text-[#a9b1d6] truncate">{latest.summary}</p>
-          </div>
-          <div class="shrink-0 flex items-center gap-2">
-            <span class="text-[11px] text-[#565f89]">{formatRelativeTime(latest.created_at)}</span>
-          </div>
+          <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#8a9ba8]">{appDisplay}</span>
+          <span class="text-[14px] font-medium text-[#c8d6e0]">{appName}</span>
+          {unreadCount > 0 && (
+            <span class="font-mono text-[13px] font-bold text-[#ff8c42]">{unreadCount}</span>
+          )}
+          <div class="flex-1" />
+          <span class="text-[14px] text-[#c8d6e0] truncate max-w-48">{latest.summary}</span>
+          <span class="font-mono text-[13px] text-[#8a9ba8] tabular-nums shrink-0">
+            {formatRelativeTime(latest.created_at)}
+          </span>
         </div>
-        {/* Swipe hint */}
-        {unreadCount > 0 && translateX === 0 && (
-          <p class="text-[10px] text-[#3b4261] mt-1 ml-2 select-none">
-            ◄◄◄ swipe left to mark all read &middot; tap to expand
-          </p>
-        )}
       </div>
     );
   }
 
-  // Expanded: show individual cards
+  // ── Expanded view ──────────────────────────────────
   return (
-    <div class="mb-2">
-      {/* Collapse header */}
+    <div class="mb-1">
+      {/* Panel header */}
       <div
         role="button"
         tabIndex={0}
@@ -175,19 +172,20 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
             handleToggle();
           }
         }}
-        class="flex items-center gap-3 p-2 rounded-xl bg-[#1f2233] border border-[#7aa2f7] cursor-pointer select-none mb-1"
+        class="flex items-center gap-2 px-2 py-1.5 bg-[#1c2430] border-b-2 border-[#4da6ff] cursor-pointer select-none active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2"
+        aria-expanded={true}
       >
         <div class="shrink-0">
-          <AppIcon appId={appId} class="text-[#7aa2f7] w-5 h-5" />
+          <AppIcon appId={appId} class="text-[#4da6ff] w-5 h-5" />
         </div>
-        <span class="text-sm font-semibold text-[#7aa2f7]">{appName}</span>
-        <span class="text-xs text-[#565f89]">{notifications.length} notifications</span>
+        <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#4da6ff]">{appName}</span>
+        <span class="font-mono text-[13px] text-[#8a9ba8]">{notifications.length}</span>
         <div class="flex-1" />
-        <span class="text-xs text-[#565f89]">▲ collapse</span>
+        <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#8a9ba8]">▲ COLLAPSE</span>
       </div>
 
-      {/* Individual cards with full swipe support */}
-      <div class="ml-2">
+      {/* Individual cards with staggered entry */}
+      <div class="animate-stagger">
         {notifications.map((n) => (
           <NotificationCard
             key={n.id}
@@ -197,7 +195,6 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
           />
         ))}
       </div>
-
     </div>
   );
 }

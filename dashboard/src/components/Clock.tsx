@@ -5,7 +5,7 @@ export function Clock() {
   const [time, setTime] = useState(formatTime());
 
   useEffect(() => {
-    const interval = setInterval(() => setTime(formatTime()), 30000);
+    const interval = setInterval(() => setTime(formatTime()), 10000);
     return () => clearInterval(interval);
   }, []);
 
@@ -15,6 +15,6 @@ export function Clock() {
   }
 
   return (
-    <span class="text-lg font-bold text-[#c0caf5] tabular-nums select-none">{time}</span>
+    <span class="text-xl font-bold text-[#e8edf2] tabular-nums select-none tracking-tight">{time}</span>
   );
 }

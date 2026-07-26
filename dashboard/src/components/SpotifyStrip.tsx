@@ -18,24 +18,24 @@ function formatDuration(ms: number): string {
 export function SpotifyStrip({ data, onCommand }: SpotifyStripProps) {
   if (!data) {
     return (
-      <div class="h-16 shrink-0 border-t border-[#33467c] bg-[#1a1b26] flex items-center justify-center">
-        <span class="text-xs text-[#565f89]">🎵 Connecting...</span>
+      <div class="h-14 shrink-0 border-t border-[#252d38] bg-[#0a0e14] flex items-center px-3">
+        <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#8a9ba8]">AUDIO —</span>
       </div>
     );
   }
 
   if (!data.available) {
     return (
-      <div class="h-16 shrink-0 border-t border-[#33467c] bg-[#1a1b26] flex items-center justify-center">
-        <span class="text-xs text-[#565f89]">🎵 Spotify not running</span>
+      <div class="h-14 shrink-0 border-t border-[#252d38] bg-[#0a0e14] flex items-center px-3">
+        <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#8a9ba8]">AUDIO OFFLINE</span>
       </div>
     );
   }
 
   if (!data.title) {
     return (
-      <div class="h-16 shrink-0 border-t border-[#33467c] bg-[#1a1b26] flex items-center justify-center">
-        <span class="text-xs text-[#565f89]">🎵 Nothing playing</span>
+      <div class="h-14 shrink-0 border-t border-[#252d38] bg-[#0a0e14] flex items-center px-3">
+        <span class="text-[13px] font-semibold uppercase tracking-[0.06em] text-[#8a9ba8]">AUDIO IDLE</span>
       </div>
     );
   }
@@ -43,71 +43,66 @@ export function SpotifyStrip({ data, onCommand }: SpotifyStripProps) {
   const isAd = !data.album && !data.artUrl;
 
   return (
-    <div class="h-16 shrink-0 border-t border-[#33467c] bg-[#1a1b26] flex items-center px-3 gap-3">
-      {/* Album art or fallback icon */}
+    <div class="h-14 shrink-0 border-t border-[#252d38] bg-[#0a0e14] flex items-center px-3 gap-3">
+      {/* Album art */}
       {data.artUrl ? (
-        <img
-          src={data.artUrl}
-          alt=""
-          class="w-12 h-12 rounded-lg object-cover shrink-0"
-          loading="lazy"
-        />
+        <img src={data.artUrl} alt="" class="w-10 h-10 object-cover shrink-0" loading="lazy" />
       ) : (
-        <div class="w-12 h-12 rounded-lg bg-[#24283b] flex items-center justify-center shrink-0">
-          <span class="text-lg text-[#565f89]">♪</span>
+        <div class="w-10 h-10 bg-[#141b24] flex items-center justify-center shrink-0">
+          <span class="text-lg text-[#8a9ba8]">♪</span>
         </div>
       )}
 
-      {/* Track info + thin progress bar */}
+      {/* Track info */}
       <div class="flex-1 min-w-0 flex flex-col justify-center gap-0.5">
         {isAd ? (
-          <span class="text-sm text-[#e0af68] truncate">{data.title} — Advertisement</span>
+          <span class="text-[14px] text-[#ff8c42] truncate font-mono">{data.title}</span>
         ) : (
           <>
-            <span class="text-sm font-medium text-[#c0caf5] truncate">{data.title}</span>
-            <span class="text-xs text-[#565f89] truncate">{data.artist}</span>
+            <span class="text-[14px] font-medium text-[#c8d6e0] truncate">{data.title}</span>
+            <span class="font-mono text-[13px] text-[#8a9ba8] truncate">{data.artist}</span>
           </>
         )}
         {!isAd && data.duration > 0 && (
-          <div class="w-full h-0.5 bg-[#33467c] rounded-full overflow-hidden">
+          <div class="w-full h-[2px] bg-[#252d38] overflow-hidden">
             <div
-              class="h-full bg-[#7aa2f7] rounded-full transition-all duration-1000"
+              class="h-full bg-[#4da6ff] transition-all duration-1000"
               style={{ width: `${Math.min((data.position / data.duration) * 100, 100)}%` }}
             />
           </div>
         )}
       </div>
 
-      {/* Control buttons — plain white icons, more space */}
+      {/* Controls */}
       {!isAd && (
         <div class="flex items-center gap-5 shrink-0">
           <button
             onClick={() => onCommand('previous')}
-            class="text-white hover:text-[#7aa2f7] active:scale-90 transition-all select-none"
+            class="text-[#c8d6e0] hover:text-[#4da6ff] active:brightness-125 transition-all select-none focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 rounded-sm"
             aria-label="Previous track"
           >
-            <SkipBack size={26} />
+            <SkipBack size={24} />
           </button>
           <button
             onClick={() => onCommand('play_pause')}
-            class="text-white hover:text-[#7aa2f7] active:scale-90 transition-all select-none"
+            class="text-[#c8d6e0] hover:text-[#4da6ff] active:brightness-125 transition-all select-none focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 rounded-sm"
             aria-label={data.playing ? 'Pause' : 'Play'}
           >
-            {data.playing ? <Pause size={30} /> : <Play size={30} />}
+            {data.playing ? <Pause size={28} /> : <Play size={28} />}
           </button>
           <button
             onClick={() => onCommand('next')}
-            class="text-white hover:text-[#7aa2f7] active:scale-90 transition-all select-none"
+            class="text-[#c8d6e0] hover:text-[#4da6ff] active:brightness-125 transition-all select-none focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 rounded-sm"
             aria-label="Next track"
           >
-            <SkipForward size={26} />
+            <SkipForward size={24} />
           </button>
         </div>
       )}
 
-      {/* Duration (compact) */}
+      {/* Duration */}
       {!isAd && data.duration > 0 && (
-        <span class="text-sm text-[#565f89] tabular-nums shrink-0">
+        <span class="font-mono text-[14px] text-[#8a9ba8] tabular-nums shrink-0">
           {formatDuration(data.position)}/{formatDuration(data.duration)}
         </span>
       )}

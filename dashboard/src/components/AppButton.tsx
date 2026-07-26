@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function AppButton({ app, active, onFilter }: Props) {
-  const iconColor = active ? 'text-[#1a1b26]' : 'text-[#7aa2f7]';
+  const iconColor = active ? 'text-[#4da6ff]' : 'text-[#c8d6e0]';
   return (
     <div
       role="button"
@@ -21,10 +21,10 @@ export function AppButton({ app, active, onFilter }: Props) {
           onFilter(app.id);
         }
       }}
-      class={`relative w-12 h-14 flex items-center justify-center rounded-xl border cursor-pointer active:scale-95 transition-all duration-150 select-none ${
+      class={`relative w-16 h-12 flex items-center justify-center rounded-sm border cursor-pointer active:brightness-125 transition-all duration-100 select-none focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 ${
         active
-          ? 'bg-[#7aa2f7] text-[#1a1b26] border-[#7aa2f7]'
-          : 'bg-[#24283b] text-[#c0caf5] border-[#33467c] hover:border-[#7aa2f7]'
+          ? 'bg-[#1c2430] text-[#4da6ff] border-[#4da6ff]'
+          : 'bg-[#141b24] text-[#c8d6e0] border-[#252d38] hover:border-[#4da6ff]'
       }`}
       aria-label={`${app.name}${app.unread > 0 ? ` - ${app.unread} unread` : ''}`}
       title={app.name}
@@ -33,7 +33,7 @@ export function AppButton({ app, active, onFilter }: Props) {
 
       {app.unread > 0 && (
         <span
-          class="absolute -top-1.5 -right-1.5 min-w-[22px] h-[22px] flex items-center justify-center px-1 text-xs font-bold text-white bg-[#f7768e] rounded-full shadow-sm"
+          class="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center px-1 text-[11px] font-bold text-[#0a0e14] bg-[#ff8c42] rounded-full border-2 border-[#141b24] font-mono"
           aria-label={`${app.unread} unread`}
         >
           {app.unread > 99 ? '99+' : app.unread}

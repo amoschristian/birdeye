@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useRef, useState, useEffect } from 'preact/hooks';
 import type { Notification } from '../types';
 import { AppIcon } from './AppIcon';
 
@@ -12,9 +12,9 @@ interface Props {
 function formatRelativeTime(ts: number): string {
   const diff = Date.now() / 1000 - ts;
   if (diff < 60) return 'just now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  return `${Math.floor(diff / 86400)}d`;
 }
 
 export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
@@ -47,7 +47,6 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
       const deltaX = ev.clientX - startX.current;
       const deltaY = ev.clientY - startY.current;
 
-      // Only horizontal swipes, leftward only
       if (Math.abs(deltaX) < Math.abs(deltaY)) return;
       if (deltaX > 0) return;
 
@@ -88,6 +87,13 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
     ? 'transition-transform duration-300 ease-in'
     : 'transition-transform duration-200 ease-out';
 
+  // One-shot entry animation on mount
+  const [entering, setEntering] = useState(true);
+  useEffect(() => {
+    const id = setTimeout(() => setEntering(false), 250);
+    return () => clearTimeout(id);
+  }, []);
+
   return (
     <div
       role="listitem"
@@ -96,60 +102,68 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
           ? `Notification from ${notification.app_name}: ${notification.summary}`
           : `Unread notification from ${notification.app_name}: ${notification.summary}`
       }
-      class={`relative overflow-hidden rounded-xl mb-2 select-none touch-pan-y ${cardClass}`}
+      class={`relative overflow-hidden mb-px select-none touch-pan-y ${cardClass} ${entering ? 'animate-row-enter' : ''}`}
       style={{
         transform: dismissing ? 'translateX(-100%)' : `translateX(${translateX}px)`,
       }}
     >
+      {/* Swipe reveal background */}
+      {!notification.is_read && translateX < 0 && (
+        <div class="absolute inset-0 bg-[#4da6ff] flex items-center justify-end pr-4">
+          <span class="text-[#0a0e14] font-semibold text-[13px] uppercase tracking-[0.08em]">MARK READ</span>
+        </div>
+      )}
       <div
         onPointerDown={handlePointerDownProxy}
         onClick={handleTap}
-        class={`relative p-3 min-h-16 rounded-xl border-l-[4px] cursor-pointer ${
+        class={`relative flex items-center gap-3 px-2 py-1.5 min-h-[44px] cursor-pointer border-l-[2px] transition-all duration-300 ${
           notification.is_read
-            ? 'bg-[#1f2233] opacity-60 border-l-transparent'
-            : 'bg-[#24283b] border-l-[#7aa2f7]'
+            ? 'bg-[#141b24] opacity-60 border-l-transparent'
+            : 'bg-[#1c2430] border-l-[#4da6ff]'
         }`}
       >
-        {/* Top row: icon + app name + timestamp */}
-        <div class="flex items-center justify-between mb-1">
-          <div class="flex items-center gap-1.5">
-            <AppIcon appId={notification.app_id} class="text-[#7aa2f7] w-5 h-5" />
-            <span class={`text-sm font-medium ${notification.is_read ? 'text-[#565f89]' : 'text-[#7aa2f7]'}`}>
-              {notification.app_name}
-            </span>
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="text-[11px] text-[#565f89]">
-              {formatRelativeTime(notification.created_at)}
-            </span>
-            {!notification.is_read && (
-              <button
-                onClick={handleMarkReadClick}
-                class="w-6 h-6 flex items-center justify-center rounded-full bg-[#3b4261] text-[#9ece6a] hover:bg-[#4c5a9a] active:scale-90 transition-all text-sm"
-                aria-label="Mark as read"
-              >
-                ✓
-              </button>
-            )}
-          </div>
+        {/* App icon */}
+        <div class="shrink-0">
+          <AppIcon appId={notification.app_id} class="text-[#4da6ff] w-5 h-5" />
         </div>
 
-        {/* Summary */}
-        <p class={`text-sm font-medium leading-tight ${notification.is_read ? 'text-[#565f89]' : 'text-[#c0caf5]'}`}>
-          {notification.summary}
-        </p>
+        {/* Summary + body */}
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-2">
+            <span class={`text-[13px] font-semibold uppercase tracking-[0.06em] ${notification.is_read ? 'text-[#8a9ba8]' : 'text-[#4da6ff]'}`}>
+              {notification.app_name}
+            </span>
+            <p class={`text-[14px] font-medium leading-tight truncate ${notification.is_read ? 'text-[#8a9ba8]' : 'text-[#e8edf2]'}`}>
+              {notification.summary}
+            </p>
+          </div>
+          {notification.body && (
+            <p class="text-[14px] text-[#8a9ba8] leading-snug mt-0.5 line-clamp-2 font-mono">
+              {notification.body}
+            </p>
+          )}
+        </div>
 
-        {/* Body (truncated to 2 lines) */}
-        {notification.body && (
-          <p class="text-[13px] text-[#565f89] leading-snug mt-0.5 line-clamp-2">
-            {notification.body}
-          </p>
-        )}
+        {/* Timestamp + mark-read */}
+        <div class="shrink-0 flex items-center gap-2">
+          <span class="font-mono text-[13px] text-[#8a9ba8] tabular-nums">
+            {formatRelativeTime(notification.created_at)}
+          </span>
+          {!notification.is_read && (
+            <button
+              onClick={handleMarkReadClick}
+              class="w-6 h-6 flex items-center justify-center rounded-sm bg-[#252d38] text-[#2ecc71] hover:bg-[#2a4066] active:brightness-125 transition-all text-sm focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2"
+              aria-label="Mark as read"
+            >
+              ✓
+            </button>
+          )}
+        </div>
 
-        {/* Tap to focus, swipe left to dismiss */}
+        {/* Swipe hint — only on first few cards */}
         {!notification.is_read && translateX === 0 && (
-          <p class="text-[10px] text-[#3b4261] mt-1 select-none">
-            ◄◄◄ swipe left to mark read &middot; tap to focus & mark read
+          <p class="absolute bottom-0.5 right-2 text-[11px] text-[#8a9ba8] font-mono select-none opacity-40">
+            ← swipe
           </p>
         )}
       </div>
