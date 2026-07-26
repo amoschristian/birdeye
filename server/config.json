@@ -1,0 +1,94 @@
+{
+  "apps": {
+    "calendar": {
+      "name": "Calendar",
+      "type": "native",
+      "group": "work",
+      "urlPattern": null,
+      "domain": null,
+      "windowClass": null,
+      "icon": "\ud83d\udcc5",
+      "enabled": true,
+      "matchKeywords": [
+        "evolution-alarm-notify",
+        "gnome-calendar",
+        "calendar reminder",
+        "calendar event"
+      ],
+      "sound": "kalert"
+    },
+    "discord-work": {
+      "name": "Discord Work",
+      "type": "browser",
+      "group": "work",
+      "urlPattern": "discord.com/channels/",
+      "domain": "discord.com",
+      "windowClass": null,
+      "icon": "\ud83d\udcbc",
+      "enabled": true,
+      "matchKeywords": [],
+      "sound": "default"
+    },
+    "google-chat": {
+      "name": "Google Chat",
+      "type": "browser",
+      "group": "work",
+      "urlPattern": "chat.google.com",
+      "domain": "chat.google.com",
+      "windowClass": null,
+      "icon": "\u2709\ufe0f",
+      "enabled": true,
+      "matchKeywords": [
+        "google chat",
+        "chat.google",
+        "notification - chat",
+        "chat"
+      ],
+      "sound": "default"
+    },
+    "telegram-desktop": {
+      "name": "Telegram",
+      "type": "native",
+      "group": "personal",
+      "urlPattern": null,
+      "domain": "telegram.org",
+      "windowClass": "TelegramDesktop",
+      "desktopId": "telegram-desktop_telegram-desktop.desktop",
+      "icon": "\ud83d\udcf1",
+      "enabled": true,
+      "matchKeywords": [
+        "telegram"
+      ],
+      "sound": "default"
+    },
+    "whatsapp": {
+      "name": "WhatsApp",
+      "type": "browser",
+      "group": "personal",
+      "urlPattern": "web.whatsapp.com",
+      "domain": "web.whatsapp.com",
+      "windowClass": null,
+      "icon": "\ud83d\udcac",
+      "enabled": true,
+      "matchKeywords": [
+        "whatsapp"
+      ],
+      "sound": "default"
+    },
+    "discord-personal": {
+      "name": "Discord Personal",
+      "type": "native",
+      "group": "personal",
+      "urlPattern": null,
+      "domain": "discord.com",
+      "windowClass": "discord",
+      "desktopId": "discord.desktop",
+      "icon": "\ud83d\udc64",
+      "enabled": true,
+      "matchKeywords": [
+        "discord"
+      ],
+      "sound": "default"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "Birdeye Bridge",
+  "version": "0.2.0",
+  "permissions": ["tabs", "storage", "scripting", "alarms"],
+  "host_permissions": ["*://discord.com/*", "*://mail.google.com/*", "*://chat.google.com/*", "*://web.whatsapp.com/*", "http://localhost:9732/*"],
+  "background": { "service_worker": "background.js" },
+"content_security_policy": {
+  "extension_pages": "script-src 'self'; object-src 'self'; connect-src 'self' ws://localhost:9732 http://localhost:9732"
+},
+  "content_scripts": []
+}

@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+websockets
+dbus-python  # python3-dbus apt package (sudo apt install python3-dbus)
+psutil
+dateparser

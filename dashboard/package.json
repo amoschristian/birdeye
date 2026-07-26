@@ -1,0 +1,24 @@
+{
+  "name": "birdeye-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "lucide-preact": "^1.25.0",
+    "preact": "^10.25.0",
+    "sortablejs": "^1.15.7"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.0",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/sortablejs": "^1.15.9",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^5.4.0"
+  }
+}
