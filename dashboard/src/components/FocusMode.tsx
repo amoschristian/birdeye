@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useState, useEffect } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import type { Notification, TodoItem, AppConfig } from '../types';
 import { AppIcon } from './AppIcon';
 
@@ -57,24 +57,7 @@ export function FocusMode({
 }: Props) {
   const [animating, setAnimating] = useState<'left' | 'right' | null>(null);
   const [todoDoneAnimating, setTodoDoneAnimating] = useState(false);
-  const [allClearPulse, setAllClearPulse] = useState(false);
   const [todoSkipKey, setTodoSkipKey] = useState(0);
-
-  const prevUnreadLen = useRef(unreadNotifications.length);
-  const prevDoFirstLen = useRef(doFirstTodos.length);
-
-  // Track when lists empty out — trigger the all-clear celebration
-  useEffect(() => {
-    const wasNotEmpty = prevUnreadLen.current > 0 || prevDoFirstLen.current > 0;
-    const isEmpty = unreadNotifications.length === 0 && doFirstTodos.length === 0;
-    if (wasNotEmpty && isEmpty) {
-      setAllClearPulse(true);
-      const timer = setTimeout(() => setAllClearPulse(false), 900);
-      return () => clearTimeout(timer);
-    }
-    prevUnreadLen.current = unreadNotifications.length;
-    prevDoFirstLen.current = doFirstTodos.length;
-  }, [unreadNotifications.length, doFirstTodos.length]);
 
   const hasUnread = unreadNotifications.length > 0;
   const hasDoFirst = doFirstTodos.length > 0;
@@ -118,13 +101,7 @@ export function FocusMode({
 
   const handleTodoSkip = () => {
     if (doFirstTodos.length <= 1) return;
-    // Cycle by incrementing the skip key — the first item changes because
-    // we toggle an already-done todo and then toggle it back? No, that's hacky.
-    // Instead, we bump a key so the todo list re-renders with the "next" item.
-    // Actually, the simplest approach: toggle and immediately untoggle the
-    // first todo, which moves it out of doFirstTodos momentarily.
-    // No — that would mess with persistence. Let's use a different approach:
-    // we track a "skip offset" and rotate through the list.
+    // Rotate the list so the next item becomes visible
     setTodoSkipKey((k) => k + 1);
   };
 
@@ -156,7 +133,7 @@ export function FocusMode({
       const deltaX = ev.clientX - startX.current;
       const deltaY = ev.clientY - startY.current;
 
-      // Only capture horizontal swipes
+      // Diagonal moves: defer to vertical vs horizontal dominance
       if (Math.abs(deltaX) < Math.abs(deltaY) && Math.abs(deltaX) < 10) return;
 
       const clamped = Math.max(-200, Math.min(200, deltaX));
@@ -170,14 +147,22 @@ export function FocusMode({
       document.removeEventListener('pointermove', handleMove);
       document.removeEventListener('pointerup', handleUp);
 
-      if (currentTranslateX.current < -100) {
-        // Swipe left = dismiss
+      const finalX = currentTranslateX.current;
+      if (finalX < -80) {
+        // Swipe left past threshold = dismiss
         handleDismiss();
-      } else if (currentTranslateX.current > 100) {
-        // Swipe right = open
+      } else if (finalX > 80) {
+        // Swipe right past threshold = open/focus
         handleOpen();
+      } else {
+        // Snap back (partial swipe or tap — treat as tap)
+        if (Math.abs(finalX) < 20) {
+          // Genuine tap — open/focus
+          handleOpen();
+        }
+        // Partial swipe: snap back with no action
+        setSwipeTranslate(0);
       }
-      setSwipeTranslate(0);
     };
 
     document.addEventListener('pointermove', handleMove);
@@ -188,27 +173,12 @@ export function FocusMode({
     handlePointerDown(e as unknown as PointerEvent);
   };
 
-  // ── Body marquee ref ──────────────────────────────────────
-  const bodyContainerRef = useRef<HTMLDivElement>(null);
-  const bodyTextRef = useRef<HTMLDivElement>(null);
-  const [bodyOverflows, setBodyOverflows] = useState(false);
-
-  useEffect(() => {
-    const container = bodyContainerRef.current;
-    const text = bodyTextRef.current;
-    if (container && text) {
-      setBodyOverflows(text.scrollHeight > container.clientHeight + 4);
-    } else {
-      setBodyOverflows(false);
-    }
-  }, [currentNotif?.body, currentNotif?.id]);
-
   return (
-    <div class={`flex-1 flex items-center justify-center bg-[#0B1120] ${allClearPulse ? 'animate-allclear-pulse' : ''}`}>
+    <div class='flex-1 flex items-center justify-center bg-[#0B1120]'>
       {/* ── ALL CLEAR ─────────────────────────────────────────── */}
       {allClear && (
-        <div class="flex flex-col items-center gap-6 text-center px-8">
-          <span class="text-[36px] font-bold text-[#FFB800] font-mono leading-none">ALL CLEAR</span>
+        <div class="flex flex-col items-center gap-6 text-center px-8 animate-fade-in">
+          <span class="text-[28px] font-bold text-[#FFB800] font-mono leading-none">ALL CLEAR</span>
           <div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-[18px] text-[#8BA3C7] font-mono">
             {sessionCleared > 0 && <span>{sessionCleared} cleared</span>}
             {sessionFocused > 0 && <span>{sessionFocused} focused</span>}
@@ -226,11 +196,9 @@ export function FocusMode({
           <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">
             NO NOTIFICATIONS
           </span>
-          <span class="text-[18px] text-[#8BA3C7]">Your top priority:</span>
-
           <div
             class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col shrink-0 transition-all duration-200 ${
-              todoDoneAnimating ? 'opacity-0 scale-95' : ''
+              todoDoneAnimating ? 'opacity-0 -translate-y-2' : ''
             }`}
           >
             <div class="flex items-start gap-3 px-5 pt-4 pb-2">
@@ -241,11 +209,11 @@ export function FocusMode({
             </div>
 
             <div class="flex items-center gap-3 ml-9 pb-4 px-5">
-              <span class="font-mono text-[16px] font-semibold uppercase tracking-[0.06em] text-[#FF4757]">
+              <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#FFB800]">
                 HIGH
               </span>
               {dateBadge?.text && (
-                <span class={`font-mono text-[16px] font-semibold uppercase tracking-[0.06em] ${
+                <span class={`text-[16px] font-semibold uppercase tracking-[0.06em] ${
                   dateBadge.isOverdue ? 'text-[#FF4757]' : dateBadge.isToday ? 'text-[#FF9F43]' : 'text-[#8BA3C7]'
                 }`}>
                   · {dateBadge.text}
@@ -257,14 +225,14 @@ export function FocusMode({
           <div class="flex gap-4 w-full justify-center shrink-0">
             <button
               onClick={handleTodoDone}
-              class="px-8 py-3 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
+              class="px-8 py-3 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
             >
               DONE
             </button>
             {doFirstTodos.length > 1 && (
               <button
                 onClick={handleTodoSkip}
-                class="px-8 py-3 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#8BA3C7] hover:bg-[#1A2535] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
+                class="px-8 py-3 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#8BA3C7] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
               >
                 SKIP
               </button>
@@ -293,14 +261,13 @@ export function FocusMode({
         <div class="flex flex-col items-center gap-3 px-6 w-full max-w-lg">
           {/* Swipe hint row */}
           <div class="flex items-center justify-between w-full shrink-0">
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#1E3A5F]">◄ DISMISS</span>
-            <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">FOCUS</span>
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#1E3A5F]">OPEN ►</span>
+            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">◄ DISMISS</span>
+            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">OPEN ►</span>
           </div>
 
           <div
             onPointerDown={handlePointerDownProxy}
-            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none touch-pan-y cursor-grab ${
+            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab ${
               animating === 'left' ? '-translate-x-full opacity-0' :
               animating === 'right' ? 'translate-x-full opacity-0' : ''
             }`}
@@ -329,24 +296,12 @@ export function FocusMode({
               {currentNotif.summary}
             </p>
 
-            {/* Body — scrollable if it overflows */}
+            {/* Body — scrollable with system thin scrollbar */}
             {currentNotif.body && (
-              <div class="relative flex-1 min-h-0 mx-5 mb-4">
-                <div
-                  ref={bodyContainerRef}
-                  class="overflow-y-auto max-h-[160px] scrollbar-hide touch-pan-y"
-                >
-                  <p
-                    ref={bodyTextRef}
-                    class="text-[18px] text-[#8BA3C7] leading-relaxed pb-2"
-                  >
-                    {currentNotif.body}
-                  </p>
-                </div>
-                {/* Fade at bottom when content overflows */}
-                {bodyOverflows && (
-                  <div class="absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t from-[#111827] to-transparent pointer-events-none" />
-                )}
+              <div class="flex-1 min-h-0 mx-5 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar">
+                <p class="text-[16px] text-[#8BA3C7] leading-relaxed pb-2">
+                  {currentNotif.body}
+                </p>
               </div>
             )}
           </div>
@@ -363,11 +318,11 @@ export function FocusMode({
                 ))}
               </div>
             ) : (
-              <span class="font-mono text-[16px] text-[#4A6080]">
+              <span class="font-mono text-[14px] text-[#4A6080]">
                 Last one
               </span>
             )}
-            <span class="font-mono text-[16px] text-[#4A6080]">
+            <span class="font-mono text-[14px] text-[#4A6080]">
               {unreadNotifications.length > 1
                 ? `${unreadNotifications.length} remaining`
                 : ''}

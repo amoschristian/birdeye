@@ -85,3 +85,32 @@ def invoke_action_sync(notif_id: int, action_key: str = "default") -> bool:
     except Exception as e:
         logger.warning(f"ActionInvoked (sync) failed: {e}")
         return False
+
+
+def close_notification_sync(notif_id: int) -> bool:
+    """Close a notification in the GNOME notification daemon.
+
+    Removes the notification from the notification center/tray.
+    After closing, ActionInvoked will no longer work for this ID.
+    Should be called after ActionInvoked to keep Birdeye and GNOME in sync.
+    """
+    if not _HAS_GIO:
+        return False
+
+    try:
+        connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+        connection.call_sync(
+            'org.freedesktop.Notifications',
+            '/org/freedesktop/Notifications',
+            'org.freedesktop.Notifications',
+            'CloseNotification',
+            GLib.Variant('(u)', [notif_id]),
+            None,
+            Gio.DBusCallFlags.NONE,
+            2000,
+            None,
+        )
+        return True
+    except Exception as e:
+        logger.warning(f"CloseNotification failed for ID {notif_id}: {e}")
+        return False

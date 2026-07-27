@@ -197,11 +197,16 @@ async def ws_dashboard(websocket: WebSocket):
             action = data.get("action")
 
             if action == "mark_read":
-                notif_id = data.get("id")
-                if notif_id is not None:
-                    ok = db.mark_read(notif_id)
+                row_id = data.get("id")
+                if row_id is not None:
+                    # Close GNOME notification before marking read
+                    from action_invoker import close_notification_sync
+                    notif = db.get_notification(row_id)
+                    ok = db.mark_read(row_id)
                     if ok:
-                        await broadcast_notification_read(notif_id)
+                        if notif and notif.notif_id is not None:
+                            close_notification_sync(notif.notif_id)
+                        await broadcast_notification_read(row_id)
 
             elif action == "mark_all_read":
                 app_id = data.get("appId")
@@ -305,8 +310,9 @@ async def ws_dashboard(websocket: WebSocket):
                             }
                             await _broadcast(_extension_conns, focus_msg)
 
-                        # Always also try to focus the browser window
-                        wm.focus_browser()
+                    # Always focus the browser window — ActionInvoked is fire-and-forget
+                    # on D-Bus and always returns true even for stale notification IDs.
+                    wm.focus_browser()
 
                     await _send(websocket, {
                         "type": "focus_ack",
@@ -314,17 +320,19 @@ async def ws_dashboard(websocket: WebSocket):
                         "success": True,
                     })
                 else:
-                    # Native app: try action invocation first, then fall back to wm
-                    if not action_invoked:
-                        wm_class = app_config.windowClass
-                        desktop_id = app_config.desktopId
-                        if wm_class:
-                            success = wm.focus_window_by_class(wm_class, desktop_id)
-                        else:
-                            success = False
+                    # Native app: try action invocation first, then focus window
+                    wm_class = app_config.windowClass
+                    desktop_id = app_config.desktopId
+                    if wm_class:
+                        success = wm.focus_window_by_class(wm_class, desktop_id)
                     else:
-                        success = True
+                        success = False
                     await _send(websocket, {"type": "focus_ack", "appId": app_id, "success": success})
+
+                # Close GNOME notification to keep 1:1 sync with Birdeye
+                if notif_id is not None:
+                    from action_invoker import close_notification_sync
+                    close_notification_sync(notif_id)
 
     except WebSocketDisconnect:
         pass

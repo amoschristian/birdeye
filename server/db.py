@@ -131,6 +131,36 @@ class Database:
             self._usable = False
             return None
 
+    def get_notification(self, notification_id: int) -> Notification | None:
+        """Get a single notification by its SQLite row ID."""
+        if not self._usable:
+            return None
+        try:
+            conn = self._connect()
+            row = conn.execute(
+                "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
+                "COALESCE(notif_id, NULL) AS notif_id, "
+                "COALESCE(x_shell_sender, '') AS x_shell_sender "
+                "FROM notifications WHERE id=?",
+                (notification_id,),
+            ).fetchone()
+            if not row:
+                return None
+            return Notification(
+                id=row["id"],
+                app_id=row["app_id"],
+                app_name=row["app_name"],
+                summary=row["summary"],
+                body=row["body"],
+                is_read=bool(row["is_read"]),
+                created_at=row["created_at"],
+                notif_id=row["notif_id"],
+                x_shell_sender=row["x_shell_sender"] or "",
+            )
+        except sqlite3.Error as e:
+            logger.error(f"get_notification({notification_id}) failed: {e}")
+            return None
+
     def mark_read(self, notification_id: int) -> bool:
         if not self._usable:
             return False

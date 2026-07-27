@@ -26,31 +26,43 @@ Server binds `0.0.0.0:9732`. Dashboard at `http://<ip>:9732` on LAN (1024×600 t
 
 ## Quick start
 
-```
-./run.sh   # builds dashboard + starts server
-```
-
-Or manually:
+The server runs as a **systemd user service** (`birdeye.service`):
 
 ```
-cd dashboard && npm run build     # must build BEFORE starting server
-cd server && uvicorn main:app --host 0.0.0.0 --port 9732
+systemctl --user restart birdeye   # restart after changes
+systemctl --user start birdeye     # start
+systemctl --user stop birdeye      # stop
+systemctl --user status birdeye    # check status
+journalctl --user -u birdeye -f    # follow logs
+```
+
+Build the dashboard before restarting:
+
+```
+cd dashboard && npm run build
+systemctl --user restart birdeye
+```
+
+Or for development with hot reload:
+
+```
+cd dashboard && npm run dev        # Vite dev server on :5173, proxies /ws + /api to server
 ```
 
 Load the Chrome extension unpacked from `extension/`. Extension connects to `ws://localhost:9732/ws/extension`.
 
-Vite dev server (`npm run dev` in dashboard/) proxies `/ws` and `/api` to `localhost:9732` — useful for local UI iteration.
+Server unit: `~/.config/systemd/user/birdeye.service`.
 
 ## Commands
 
 | Task | Command |
 |------|---------|
-| Build + start (one command) | `./run.sh` |
 | Build dashboard | `cd dashboard && npm run build` |
 | Dev dashboard (hot reload) | `cd dashboard && npm run dev` |
-| Start server | `cd server && uvicorn main:app --host 0.0.0.0 --port 9732` |
+| Restart service | `systemctl --user restart birdeye` |
+| Follow logs | `journalctl --user -u birdeye -f` |
 | Type-check dashboard | `cd dashboard && npx tsc --noEmit` |
-| Syntax-check Python | `cd server && python3 -c "import py_compile; py_compile.compile('state.py', doraise=True)"` |
+| Syntax-check Python | `cd server && python3 -c "import py_compile; py_compile.compile('cal_listener.py', doraise=True)"` |
 
 There are **no tests, no linter, no CI**. Verification is manual.
 

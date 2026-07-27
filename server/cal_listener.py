@@ -208,11 +208,16 @@ class CalendarListener:
                     forceset=True,
                 )
 
+                duration = end_ts - start_ts
+                now_ts = now.timestamp()
                 events: list[dict] = []
                 count = 0
                 for occ in rule:
                     occ_ts = occ.timestamp()
-                    if occ_ts <= now.timestamp():
+                    occ_end = occ_ts + duration
+
+                    # Include: still in progress OR future within lookahead
+                    if occ_end <= now_ts:
                         continue
                     if occ_ts > until_ts or count >= 50:
                         break
@@ -221,7 +226,7 @@ class CalendarListener:
                         "id": f"{uid}_occ{count}",
                         "summary": summary,
                         "start": occ_ts,
-                        "end": occ_ts + (end_ts - start_ts),
+                        "end": occ_end,
                         "description": desc,
                         "location": loc,
                         "has_alarm": has_alarm,
