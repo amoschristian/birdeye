@@ -36,9 +36,9 @@ function GaugeBar({ percent }: { percent: number }) {
 
 export function BottomBar({ spotifyData, onSpotifyCommand, monitorData }: BottomBarProps) {
   return (
-    <div class="h-12 shrink-0 border-t border-[#1E3A5F] bg-[#0B1120] flex">
+    <div class="h-14 shrink-0 border-t border-[#1E3A5F] bg-[#0B1120] flex">
       {/* Spotify — left */}
-      <div class="flex-1 min-w-0 flex items-center px-3 border-r border-[#1E3A5F]">
+      <div class="flex-1 min-w-0 flex items-center px-3 py-1 border-r border-[#1E3A5F]">
         <SpotifySection data={spotifyData} onCommand={onSpotifyCommand} />
       </div>
 
@@ -52,15 +52,15 @@ export function BottomBar({ spotifyData, onSpotifyCommand, monitorData }: Bottom
 
 function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onCommand: (command: 'play_pause' | 'previous' | 'next') => void }) {
   if (!data) {
-    return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO —</span>;
+    return <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO —</span>;
   }
 
   if (!data.available) {
-    return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO OFFLINE</span>;
+    return <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO OFFLINE</span>;
   }
 
   if (!data.title) {
-    return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO IDLE</span>;
+    return <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO IDLE</span>;
   }
 
   const isAd = !data.album && !data.artUrl;
@@ -69,21 +69,21 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
     <div class="flex items-center gap-2 min-w-0 flex-1">
       {/* Album art */}
       {data.artUrl ? (
-        <img src={data.artUrl} alt="" class="w-8 h-8 object-cover shrink-0" loading="lazy" />
+        <img src={data.artUrl} alt="" class="w-9 h-9 object-cover shrink-0" loading="lazy" />
       ) : (
-        <div class="w-8 h-8 bg-[#111827] flex items-center justify-center shrink-0">
-          <span class="text-[16px] text-[#4A6080]">♪</span>
+        <div class="w-9 h-9 bg-[#111827] flex items-center justify-center shrink-0">
+          <span class="text-[18px] text-[#4A6080]">♪</span>
         </div>
       )}
 
       {/* Track info */}
       <div class="min-w-0 flex flex-col justify-center flex-1">
         {isAd ? (
-          <span class="text-[18px] text-[#FF9F43] truncate font-mono">{data.title}</span>
+          <span class="text-[20px] text-[#FF9F43] truncate font-mono">{data.title}</span>
         ) : (
           <>
-            <span class="text-[18px] font-medium text-[#E8F0FE] truncate font-mono">{data.title}</span>
-            <span class="text-[14px] text-[#8BA3C7] truncate">{data.artist}</span>
+            <span class="text-[20px] font-medium text-[#E8F0FE] truncate font-mono">{data.title}</span>
+            <span class="text-[16px] text-[#8BA3C7] truncate">{data.artist}</span>
           </>
         )}
         {!isAd && data.duration > 0 && (
@@ -125,7 +125,7 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
 
       {/* Duration */}
       {!isAd && data.duration > 0 && (
-        <span class="font-mono text-[14px] text-[#4A6080] tabular-nums shrink-0 ml-1">
+        <span class="font-mono text-[16px] text-[#4A6080] tabular-nums shrink-0 ml-1">
           {formatDuration(data.position)}
         </span>
       )}
@@ -137,8 +137,8 @@ function MonitorSection({ data }: { data: MonitorData | null }) {
   if (!data) {
     return (
       <div class="flex items-center gap-6">
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">CPU —</span>
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">RAM —</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">CPU —</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">RAM —</span>
       </div>
     );
   }
@@ -149,10 +149,10 @@ function MonitorSection({ data }: { data: MonitorData | null }) {
   return (
     <div class={`flex items-center gap-6 ${opacity}`}>
       <span class="flex items-center gap-2">
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">CPU</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">CPU</span>
         <GaugeBar percent={data.cpu} />
         <span
-          class="font-mono text-[18px] font-medium tabular-nums w-16 text-right"
+          class="font-mono text-[20px] font-medium tabular-nums w-16 text-right"
           style={{ color: thresholdColor(data.cpu) }}
         >
           {data.cpu.toFixed(1)}%
@@ -162,10 +162,10 @@ function MonitorSection({ data }: { data: MonitorData | null }) {
       <span class="w-px h-4 bg-[#1E3A5F]" />
 
       <span class="flex items-center gap-2">
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">RAM</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">RAM</span>
         <GaugeBar percent={data.ram.percent} />
         <span
-          class="font-mono text-[18px] font-medium tabular-nums w-16 text-right"
+          class="font-mono text-[20px] font-medium tabular-nums w-16 text-right"
           style={{ color: thresholdColor(data.ram.percent) }}
         >
           {data.ram.percent.toFixed(1)}%

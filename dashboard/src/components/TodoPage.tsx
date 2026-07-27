@@ -190,7 +190,7 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
                 onDropToQuadrant={handleDropToQuadrant}
               >
                 {items.length === 0 ? (
-                  <p class="text-[14px] text-[#4A6080] text-center mt-8 select-none uppercase tracking-[0.06em] font-semibold">
+                  <p class="text-[16px] text-[#4A6080] text-center mt-8 select-none uppercase tracking-[0.06em] font-semibold">
                     NO ITEMS
                   </p>
                 ) : (
@@ -233,7 +233,7 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
             class="bg-[#111827] border border-[#1E3A5F] p-5 w-[440px] max-w-[92vw] flex flex-col gap-3"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] border-b border-[#1E3A5F] pb-2">
+            <h3 class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] border-b border-[#1E3A5F] pb-2">
               NEW TASK
             </h3>
             <input
@@ -243,9 +243,9 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
               onInput={(e) => setText((e.target as HTMLInputElement).value)}
               onKeyDown={handleKeyDown}
               placeholder="Enter command…"
-              class="flex-1 bg-[#0B1120] text-[#E8F0FE] text-[16px] px-3 py-2 border border-[#1E3A5F] placeholder-[#4A6080] outline-none focus:border-[#00D4FF] transition-colors min-h-[44px]"
+              class="flex-1 bg-[#0B1120] text-[#E8F0FE] text-[18px] px-3 py-2 border border-[#1E3A5F] placeholder-[#4A6080] outline-none focus:border-[#00D4FF] transition-colors min-h-[48px]"
             />
-            <p class="text-[14px] text-[#8BA3C7] -mt-1 leading-snug">
+            <p class="text-[16px] text-[#8BA3C7] -mt-1 leading-snug">
               <span class="text-[#FF4757] font-semibold">!high</span>{' '}
               <span class="text-[#8BA3C7] font-semibold">!medium</span>{' '}
               <span class="text-[#00D4FF] font-semibold">!low</span>
@@ -254,14 +254,14 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
             <div class="flex gap-2 justify-end">
               <button
                 onClick={closeAddModal}
-                class="px-4 py-2 text-[14px] font-semibold uppercase tracking-[0.06em] bg-[#0B1120] text-[#8BA3C7] hover:bg-[#1E3A5F] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
+                class="px-4 py-2 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#0B1120] text-[#8BA3C7] hover:bg-[#1E3A5F] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
               >
                 CANCEL
               </button>
               <button
                 onClick={handleAdd}
                 disabled={!text.trim()}
-                class="px-4 py-2 text-[14px] font-semibold uppercase tracking-[0.06em] bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+                class="px-4 py-2 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
               >
                 EXECUTE
               </button>
@@ -423,7 +423,7 @@ function TodoRow({
       {/* Priority glyph */}
       <button
         onClick={cyclePriority}
-        class="font-mono text-[14px] font-bold shrink-0 hover:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-offset-1 px-0.5 mt-0.5"
+        class="font-mono text-[16px] font-bold shrink-0 hover:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-offset-1 px-0.5 mt-0.5"
         style={{ color: pGlyph.color }}
         aria-label={`Priority: ${todo.priority}`}
         title={todo.priority}
@@ -441,12 +441,12 @@ function TodoRow({
           onKeyDown={handleEditKeyDown}
           onBlur={commitEdit}
           onClick={(e) => e.stopPropagation()}
-          class="flex-1 bg-[#111827] text-[#E8F0FE] text-[16px] px-1.5 py-0.5 border border-[#00D4FF] outline-none min-w-0 font-mono"
+          class="flex-1 bg-[#111827] text-[#E8F0FE] text-[18px] px-1.5 py-0.5 border border-[#00D4FF] outline-none min-w-0 font-mono"
         />
       ) : (
         <span class="flex-1 min-w-0 py-0.5">
           <span
-            class={`text-[16px] leading-snug break-words select-none ${
+            class={`text-[18px] leading-snug break-words select-none ${
               todo.completed
                 ? 'text-[#4A6080] line-through'
                 : 'text-[#E8F0FE]'
@@ -462,7 +462,7 @@ function TodoRow({
         {dateBadge.text ? (
           <button
             onClick={handleDatePickerToggle}
-            class={`font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 mt-0.5 ${
+            class={`font-mono text-[14px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 mt-0.5 ${
               dateBadge.isOverdue
                 ? 'bg-[#FF4757]/15 text-[#FF4757]'
                 : dateBadge.isToday
@@ -475,7 +475,7 @@ function TodoRow({
         ) : (
           <button
             onClick={handleDatePickerToggle}
-            class="font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] bg-[#111827] text-[#4A6080] active:bg-[#1E3A5F] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 mt-0.5"
+            class="font-mono text-[14px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] bg-[#111827] text-[#4A6080] active:bg-[#1E3A5F] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 mt-0.5"
           >
             +DATE
           </button>
@@ -483,9 +483,9 @@ function TodoRow({
 
         {showDatePicker && (
           <div class="absolute right-0 top-full mt-1 z-20 bg-[#111827] border border-[#1E3A5F] p-1.5 flex flex-col gap-1 min-w-[130px]">
-            <button onClick={() => applyQuickDate(today)} class="text-[14px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TODAY</button>
-            <button onClick={() => applyQuickDate(tomorrow)} class="text-[14px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TOMORROW</button>
-            <button onClick={() => applyQuickDate(nextWeek)} class="text-[14px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">NEXT WEEK</button>
+            <button onClick={() => applyQuickDate(today)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TODAY</button>
+            <button onClick={() => applyQuickDate(tomorrow)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TOMORROW</button>
+            <button onClick={() => applyQuickDate(nextWeek)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">NEXT WEEK</button>
             <div class="px-2 py-1">
               <input
                 type="date"
@@ -493,11 +493,11 @@ function TodoRow({
                   const val = (e.target as HTMLInputElement).value;
                   if (val) applyQuickDate(val);
                 }}
-                class="font-mono text-[14px] bg-[#0B1120] text-[#E8F0FE] border border-[#1E3A5F] px-1 py-0.5 outline-none w-full"
+                class="font-mono text-[16px] bg-[#0B1120] text-[#E8F0FE] border border-[#1E3A5F] px-1 py-0.5 outline-none w-full"
               />
             </div>
             {todo.due_date && (
-              <button onClick={() => applyQuickDate(null)} class="text-[14px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
+              <button onClick={() => applyQuickDate(null)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
             )}
           </div>
         )}
@@ -506,7 +506,7 @@ function TodoRow({
       {/* Edit */}
       <button
         onClick={startEdit}
-        class="text-[#4A6080] active:text-[#00D4FF] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 text-[16px] mt-0.5"
+        class="text-[#4A6080] active:text-[#00D4FF] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 text-[18px] mt-0.5"
         aria-label="Edit todo"
       >
         ✎
@@ -515,7 +515,7 @@ function TodoRow({
       {/* Delete */}
       <button
         onClick={(e) => { e.stopPropagation(); onDelete(todo.id); }}
-        class="text-[#4A6080] active:text-[#FF4757] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-1 text-[16px] mt-0.5"
+        class="text-[#4A6080] active:text-[#FF4757] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-1 text-[18px] mt-0.5"
         aria-label="Delete todo"
       >
         ✕

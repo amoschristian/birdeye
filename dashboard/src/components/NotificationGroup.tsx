@@ -114,7 +114,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
       >
         {unreadCount > 0 && translateX < 0 && (
           <div class="absolute inset-0 bg-[#26DE81] flex items-center justify-end pr-4">
-            <span class="text-[#0B1120] font-semibold text-[14px] uppercase tracking-[0.06em]">READ ALL</span>
+            <span class="text-[#0B1120] font-semibold text-[16px] uppercase tracking-[0.06em]">READ ALL</span>
           </div>
         )}
         <div
@@ -128,20 +128,20 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
               handleToggle();
             }
           }}
-          class="relative flex items-center gap-3 px-3 py-2.5 min-h-[52px] bg-[#111827] hover:bg-[#1A2535] cursor-pointer transition-colors active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
+          class="relative flex items-center gap-3 px-4 py-3 min-h-[56px] bg-[#111827] hover:bg-[#1A2535] cursor-pointer transition-colors active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
           aria-expanded={false}
         >
           <div class="shrink-0 text-[#8BA3C7]">
-            <AppIcon appId={appId} class="w-6 h-6" />
+            <AppIcon appId={appId} class="w-7 h-7" />
           </div>
-          <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#E8F0FE]">{appDisplay}</span>
-          <span class="text-[18px] font-medium text-[#FFB800] font-mono">{label}</span>
+          <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#E8F0FE]">{appDisplay}</span>
+          <span class="text-[20px] font-medium text-[#FFB800] font-mono">{label}</span>
           {unreadCount > 0 && (
-            <span class="font-mono text-[18px] font-bold text-[#FFB800] tabular-nums">{unreadCount}</span>
+            <span class="font-mono text-[20px] font-bold text-[#FFB800] tabular-nums">{unreadCount}</span>
           )}
           <div class="flex-1" />
-          <span class="text-[18px] text-[#8BA3C7] truncate max-w-52 font-mono">{latest.summary}</span>
-          <span class="font-mono text-[14px] text-[#4A6080] tabular-nums shrink-0">
+          <span class="text-[20px] text-[#8BA3C7] truncate max-w-52 font-mono">{latest.summary}</span>
+          <span class="font-mono text-[16px] text-[#4A6080] tabular-nums shrink-0">
             {formatRelativeTime(latest.created_at)}
           </span>
         </div>
@@ -166,12 +166,12 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
         aria-expanded={true}
       >
         <div class="shrink-0 text-[#00D4FF]">
-          <AppIcon appId={appId} class="w-6 h-6" />
+          <AppIcon appId={appId} class="w-7 h-7" />
         </div>
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF]">{label}</span>
-        <span class="font-mono text-[14px] text-[#8BA3C7]">{notifications.length}</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF]">{label}</span>
+        <span class="font-mono text-[16px] text-[#8BA3C7]">{notifications.length}</span>
         <div class="flex-1" />
-        <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">COLLAPSE</span>
+        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">COLLAPSE</span>
       </div>
 
       {notifications.map((n) => (

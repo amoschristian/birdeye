@@ -56,17 +56,17 @@ function EventChip({ ev }: { ev: CalendarEvent }) {
         style={{ backgroundColor: statusColor }}
       />
       <span
-        class="font-mono text-[14px] font-medium"
+        class="font-mono text-[16px] font-medium"
         style={{ color: isUpcoming || isNow ? textColor : '#E8F0FE' }}
       >
         {ev.summary}
       </span>
       {dayLabel && (
-        <span class="font-mono text-[14px] font-semibold uppercase tracking-[0.06em]" style={{ color: textColor }}>
+        <span class="font-mono text-[16px] font-semibold uppercase tracking-[0.06em]" style={{ color: textColor }}>
           {dayLabel}
         </span>
       )}
-      <span class="font-mono text-[14px]" style={{ color: statusColor }}>
+      <span class="font-mono text-[16px]" style={{ color: statusColor }}>
         {timeStr}
       </span>
     </span>
@@ -134,14 +134,14 @@ export function CalendarStrip({ events }: Props) {
         return (
           <div class="shrink-0 z-10 flex items-center gap-2 bg-[#0B1120] pl-4 pr-3">
             <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: accentColor }} />
-            <span class="font-mono text-[14px] font-semibold text-[#E8F0FE] max-w-48 truncate">
+            <span class="font-mono text-[16px] font-semibold text-[#E8F0FE] max-w-48 truncate">
               {parkedEvent.summary}
             </span>
-            <span class="font-mono text-[14px] font-semibold uppercase tracking-[0.06em]" style={{ color: accentColor }}>
+            <span class="font-mono text-[16px] font-semibold uppercase tracking-[0.06em]" style={{ color: accentColor }}>
               {isNow ? 'NOW' : timeStr}
             </span>
             {isNow && (
-              <span class="font-mono text-[14px]" style={{ color: accentColor }}>
+              <span class="font-mono text-[16px]" style={{ color: accentColor }}>
                 → {endTime}
               </span>
             )}

@@ -104,13 +104,13 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
       {/* Swipe reveal background */}
       {!notification.is_read && translateX < 0 && (
         <div class="absolute inset-0 bg-[#26DE81] flex items-center justify-end pr-4">
-          <span class="text-[#0B1120] font-semibold text-[14px] uppercase tracking-[0.06em]">READ</span>
+          <span class="text-[#0B1120] font-semibold text-[16px] uppercase tracking-[0.06em]">READ</span>
         </div>
       )}
 
       <div
         onPointerDown={handlePointerDownProxy}
-        class={`relative flex items-center gap-3 px-3 py-2.5 min-h-[52px] cursor-pointer transition-all duration-150 ${
+        class={`relative flex items-center gap-3 px-4 py-3 min-h-[56px] cursor-pointer transition-all duration-150 ${
           notification.is_read
             ? 'bg-[#0B1120] opacity-50'
             : flashFocus
@@ -120,23 +120,23 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
       >
         {/* App icon */}
         <div class="shrink-0 text-[#8BA3C7]">
-          <AppIcon appId={notification.app_id} class="w-6 h-6" />
+          <AppIcon appId={notification.app_id} class="w-7 h-7" />
         </div>
 
         {/* Content */}
         <div class="flex-1 min-w-0">
           <div class="flex items-baseline gap-2">
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7] shrink-0">
+            <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7] shrink-0">
               {notification.app_name}
             </span>
-            <p class={`text-[18px] font-medium leading-tight truncate font-mono ${
+            <p class={`text-[20px] font-medium leading-tight truncate font-mono ${
               notification.is_read ? 'text-[#8BA3C7]' : 'text-[#FFB800]'
             }`}>
               {notification.summary}
             </p>
           </div>
           {notification.body && (
-            <p class="text-[16px] text-[#8BA3C7] leading-snug mt-0.5 line-clamp-2">
+            <p class="text-[18px] text-[#8BA3C7] leading-snug mt-0.5 line-clamp-2">
               {notification.body}
             </p>
           )}
@@ -144,13 +144,13 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
 
         {/* Timestamp + mark-read */}
         <div class="shrink-0 flex items-center gap-3">
-          <span class="font-mono text-[14px] text-[#4A6080] tabular-nums">
+          <span class="font-mono text-[16px] text-[#4A6080] tabular-nums">
             {formatRelativeTime(notification.created_at)}
           </span>
           {!notification.is_read && (
             <button
               onClick={handleMarkReadClick}
-              class="w-7 h-7 flex items-center justify-center bg-[#1E3A5F] text-[#26DE81] hover:bg-[#1A2535] active:brightness-125 transition-all text-[16px] focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
+              class="w-8 h-8 flex items-center justify-center bg-[#1E3A5F] text-[#26DE81] hover:bg-[#1A2535] active:brightness-125 transition-all text-[18px] focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
               aria-label="Mark as read"
             >
               ✓

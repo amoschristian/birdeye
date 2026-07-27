@@ -15,7 +15,7 @@ export function ConnectionStatus({ connected }: Props) {
         aria-label={connected ? 'Connected' : 'Reconnecting'}
         title={connected ? 'Connected' : 'Reconnecting'}
       />
-      <span class={`text-[14px] font-semibold uppercase tracking-[0.06em] transition-colors duration-200 ${
+      <span class={`text-[16px] font-semibold uppercase tracking-[0.06em] transition-colors duration-200 ${
         connected ? 'text-[#26DE81]' : 'text-[#FF9F43]'
       }`}>
         {connected ? 'ONLINE' : 'NO SIGNAL'}

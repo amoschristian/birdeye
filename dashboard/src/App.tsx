@@ -164,14 +164,14 @@ export function App() {
   return (
     <div class="h-screen w-screen bg-[#0B1120] text-[#E8F0FE] antialiased flex flex-col overflow-hidden select-none">
       {/* ── Status bar (48px) ────────────────────────────────── */}
-      <header class="flex items-center justify-between px-4 h-12 shrink-0 border-b border-[#1E3A5F] bg-[#0B1120]">
+      <header class="flex items-center justify-between px-4 h-14 shrink-0 border-b border-[#1E3A5F] bg-[#0B1120]">
         <div class="flex items-center gap-4">
           <Clock />
           <ConnectionStatus connected={connected} />
           <div class="flex gap-1 ml-2">
             <button
               onClick={() => setActiveTab('notifications')}
-              class={`px-4 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                 activeTab === 'notifications'
                   ? 'bg-[#1E3A5F] text-[#00D4FF]'
                   : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
@@ -181,7 +181,7 @@ export function App() {
             </button>
             <button
               onClick={() => setActiveTab('todos')}
-              class={`px-4 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                 activeTab === 'todos'
                   ? 'bg-[#1E3A5F] text-[#00D4FF]'
                   : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
@@ -193,7 +193,7 @@ export function App() {
         </div>
         <button
           onClick={() => switchWorkspace(1)}
-          class="px-5 py-2 text-[14px] font-semibold tracking-[0.06em] uppercase bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+          class="px-5 py-2 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
           title="Switch to workspace 1"
         >
           WORKSPACE
@@ -207,11 +207,11 @@ export function App() {
       {activeTab === 'notifications' ? (
         <div class="flex flex-1 overflow-hidden">
           {/* Channel selector sidebar (80px) */}
-          <aside class="w-20 shrink-0 overflow-y-auto border-r border-[#1E3A5F] bg-[#0B1120] p-2 flex flex-col gap-1 items-center custom-scrollbar">
+          <aside class="w-[88px] shrink-0 overflow-y-auto border-r border-[#1E3A5F] bg-[#0B1120] p-2 flex flex-col gap-1 items-center custom-scrollbar">
             {/* All channels button */}
             <button
               onClick={() => setFilterAppId(null)}
-              class={`w-16 h-14 flex flex-col items-center justify-center gap-0.5 border transition-all duration-150 active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+              class={`w-[72px] h-[60px] flex flex-col items-center justify-center gap-0.5 border transition-all duration-150 active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                 filterAppId === null
                   ? 'bg-[#1E3A5F] border-[#00D4FF] text-[#00D4FF]'
                   : 'bg-[#111827] border-[#1E3A5F] text-[#8BA3C7] hover:border-[#00D4FF]'
@@ -219,7 +219,7 @@ export function App() {
               aria-label="All channels"
               title="All channels"
             >
-              <svg viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+              <svg viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7">
                 <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
               </svg>
             </button>
@@ -229,7 +229,7 @@ export function App() {
               if (!list || list.length === 0) return null;
               return (
                 <div key={group} class="flex flex-col items-center gap-1 w-full">
-                  <div class="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
+                  <div class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
                     {GROUP_LABELS[group] || group}
                   </div>
                   {list.map((app) => (
@@ -245,7 +245,7 @@ export function App() {
             })}
             {ungrouped.length > 0 && (
               <>
-                <div class="text-[12px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
+                <div class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
                   OTHER
                 </div>
                 {ungrouped.map((app) => (
@@ -266,7 +266,7 @@ export function App() {
             <div class="flex gap-1 px-3 py-2 shrink-0 items-center border-b border-[#162035]">
               <button
                 onClick={() => setNotifSubTab('active')}
-                class={`px-4 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                   notifSubTab === 'active'
                     ? 'bg-[#00D4FF] text-[#0B1120]'
                     : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
@@ -276,7 +276,7 @@ export function App() {
               </button>
               <button
                 onClick={() => setNotifSubTab('all')}
-                class={`px-4 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                   notifSubTab === 'all'
                     ? 'bg-[#00D4FF] text-[#0B1120]'
                     : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
@@ -288,7 +288,7 @@ export function App() {
               {notifSubTab === 'active' && activeCount > 0 && (
                 <button
                   onClick={() => markAllRead(filterAppId || undefined)}
-                  class="px-3 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
+                  class="px-3 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
                 >
                   READ ALL
                 </button>
@@ -296,7 +296,7 @@ export function App() {
               {notifSubTab === 'all' && notifications.some((n) => n.is_read) && (
                 <button
                   onClick={handleClearRead}
-                  class={`px-3 py-1.5 text-[14px] font-semibold tracking-[0.06em] uppercase transition-all focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-2 ${
+                  class={`px-3 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-2 ${
                     clearConfirm
                       ? 'bg-[#FF4757] text-white animate-pulse'
                       : 'bg-[#FF4757] text-white hover:brightness-110 active:brightness-125'
@@ -310,12 +310,12 @@ export function App() {
             {/* Notification feed */}
             <div class="flex-1 overflow-y-auto custom-scrollbar">
               {!connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[16px]">
+                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[18px]">
                   Connecting…
                 </div>
               )}
               {connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[16px]">
+                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[18px]">
                   {notifSubTab === 'active' ? 'No active notifications' : 'No notifications'}
                 </div>
               )}
@@ -346,10 +346,10 @@ export function App() {
               {/* Undo toast */}
               {undoState.ids.length > 0 && (
                 <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-[#1E3A5F] border border-[#00D4FF] px-4 py-2 flex items-center gap-3 shadow-lg">
-                  <span class="text-[14px] text-[#E8F0FE]">Marked as read</span>
+                  <span class="text-[16px] text-[#E8F0FE]">Marked as read</span>
                   <button
                     onClick={handleUndo}
-                    class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] hover:brightness-125"
+                    class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] hover:brightness-125"
                   >
                     UNDO
                   </button>
@@ -360,13 +360,13 @@ export function App() {
 
           {/* Do First side panel */}
           {doFirstTodos.length > 0 && (
-            <aside class="w-48 shrink-0 overflow-y-auto border-l border-[#1E3A5F] bg-[#0B1120] flex flex-col custom-scrollbar">
+            <aside class="w-56 shrink-0 overflow-y-auto border-l border-[#1E3A5F] bg-[#0B1120] flex flex-col custom-scrollbar">
               <div
                 class="px-3 py-2 shrink-0 border-b border-[#1E3A5F] flex items-center gap-2 cursor-pointer hover:bg-[#111827] transition-colors"
                 onClick={() => setActiveTab('todos')}
               >
                 <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: '#FF4757' }} />
-                <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#FF4757]">DO FIRST</span>
+                <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#FF4757]">DO FIRST</span>
               </div>
               <div class="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar">
                 {doFirstTodos.map((todo) => (
@@ -388,7 +388,7 @@ export function App() {
                         </svg>
                       )}
                     </span>
-                    <span class={`flex-1 text-[16px] leading-snug ${todo.completed ? 'text-[#4A6080] line-through' : 'text-[#E8F0FE]'}`}>
+                    <span class={`flex-1 text-[18px] leading-snug ${todo.completed ? 'text-[#4A6080] line-through' : 'text-[#E8F0FE]'}`}>
                       {todo.text}
                     </span>
                   </div>

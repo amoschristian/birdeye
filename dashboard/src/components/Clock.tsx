@@ -23,8 +23,8 @@ export function Clock() {
 
   return (
     <span class="flex items-baseline gap-3 select-none">
-      <span class="text-[28px] font-bold text-[#FFB800] tabular-nums font-mono leading-none">{time}</span>
-      <span class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080]">{formatDate()}</span>
+      <span class="text-[32px] font-bold text-[#FFB800] tabular-nums font-mono leading-none">{time}</span>
+      <span class="text-[16px] font-semibold uppercase tracking-[0.08em] text-[#4A6080]">{formatDate()}</span>
     </span>
   );
 }
