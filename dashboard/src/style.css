@@ -11,103 +11,15 @@ html {
   100% { transform: translateX(-50%); }
 }
 
-@keyframes row-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes lamp-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: 0.3; }
-}
-
-@keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-@keyframes scale-in {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
 .animate-marquee {
   animation: marquee 30s linear infinite;
-}
-
-.animate-row-enter {
-  animation: row-enter 200ms ease-out both;
-}
-
-.animate-lamp-pulse {
-  animation: lamp-pulse 1.2s ease-in-out infinite;
-}
-
-.animate-fade-in {
-  animation: fade-in 150ms ease-out both;
-}
-
-.animate-scale-in {
-  animation: scale-in 200ms ease-out both;
-}
-
-/* Stagger delay for cascading children */
-.animate-stagger > *:nth-child(1) { animation-delay: 0ms; }
-.animate-stagger > *:nth-child(2) { animation-delay: 40ms; }
-.animate-stagger > *:nth-child(3) { animation-delay: 80ms; }
-.animate-stagger > *:nth-child(4) { animation-delay: 120ms; }
-.animate-stagger > *:nth-child(5) { animation-delay: 160ms; }
-.animate-stagger > *:nth-child(6) { animation-delay: 200ms; }
-.animate-stagger > *:nth-child(7) { animation-delay: 240ms; }
-.animate-stagger > *:nth-child(8) { animation-delay: 280ms; }
-.animate-stagger > *:nth-child(9) { animation-delay: 320ms; }
-.animate-stagger > *:nth-child(10){ animation-delay: 360ms; }
-
-/* ── Lamp glow ──────────────────────────────────────────────── */
-
-.lamp-glow-green {
-  box-shadow: 0 0 6px rgba(46, 204, 113, 0.5);
-}
-
-.lamp-glow-amber {
-  box-shadow: 0 0 6px rgba(255, 140, 66, 0.5);
-}
-
-.lamp-glow-red {
-  box-shadow: 0 0 6px rgba(255, 77, 77, 0.5);
-}
-
-.lamp-glow-blue {
-  box-shadow: 0 0 6px rgba(77, 166, 255, 0.5);
-}
-
-/* ── Alternating rows ──────────────────────────────────────── */
-
-.data-row-odd {
-  background: #141b24;
-}
-
-.data-row-even {
-  background: #1c2430;
 }
 
 /* ── Scrollbar ──────────────────────────────────────────────── */
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #252d38 #0a0e14;
+  scrollbar-color: #1E3A5F #0B1120;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -115,14 +27,13 @@ html {
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: #0a0e14;
+  background: #0B1120;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #252d38;
-  border-radius: 2px;
+  background: #1E3A5F;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #4da6ff;
+  background: #00D4FF;
 }

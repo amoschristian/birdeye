@@ -17,7 +17,7 @@ function formatParts(start: number, end: number): { dayLabel: string; timeStr: s
 
   if (now >= start && now <= end) {
     const endTime = endDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    return { dayLabel: 'NOW', timeStr: `↘ ${endTime}`, highlight: 'now' };
+    return { dayLabel: 'NOW', timeStr: `${endTime}`, highlight: 'now' };
   }
 
   if (start > now && start - now <= UPCOMING_THRESHOLD) {
@@ -45,22 +45,28 @@ function EventChip({ ev }: { ev: CalendarEvent }) {
   const { dayLabel, timeStr, highlight } = formatParts(ev.start, ev.end);
   const isUpcoming = highlight === 'upcoming';
   const isNow = highlight === 'now';
+
+  const statusColor = isNow ? '#26DE81' : isUpcoming ? '#FF9F43' : '#4A6080';
+  const textColor = isUpcoming ? '#FF9F43' : isNow ? '#26DE81' : '#8BA3C7';
+
   return (
-    <span class={`inline-flex items-center gap-2.5 shrink-0 ${isUpcoming ? 'bg-[#ff8c42]/10 px-3 py-0.5 -mx-1' : ''}`}>
-      <span class="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: isNow ? '#2ecc71' : isUpcoming ? '#ff8c42' : '#8a9ba8' }} />
-      <span class="font-mono text-[13px] font-medium" style={{ color: isUpcoming ? '#ff8c42' : '#c8d6e0' }}>{ev.summary}</span>
+    <span class="inline-flex items-center gap-2 shrink-0">
+      <span
+        class="w-1.5 h-1.5 shrink-0"
+        style={{ backgroundColor: statusColor }}
+      />
+      <span
+        class="font-mono text-[14px] font-medium"
+        style={{ color: isUpcoming || isNow ? textColor : '#E8F0FE' }}
+      >
+        {ev.summary}
+      </span>
       {dayLabel && (
-        <span class={`font-mono text-[13px] font-semibold uppercase tracking-[0.06em] ${
-          isNow ? 'text-[#2ecc71]' :
-          isUpcoming ? 'text-[#ff8c42]' :
-          'text-[#8a9ba8]'
-        }`}>
+        <span class="font-mono text-[14px] font-semibold uppercase tracking-[0.06em]" style={{ color: textColor }}>
           {dayLabel}
         </span>
       )}
-      <span class={`font-mono text-[13px] ${
-        isNow ? 'text-[#2ecc71]' : 'text-[#8a9ba8]'
-      }`}>
+      <span class="font-mono text-[14px]" style={{ color: statusColor }}>
         {timeStr}
       </span>
     </span>
@@ -109,7 +115,7 @@ export function CalendarStrip({ events }: Props) {
 
   if (!parkedEvent && scrollingEvents.length === 0) return null;
 
-  const eventsCopy = scrollingEvents.length > 0 && (
+  const tickerContent = scrollingEvents.length > 0 && (
     <span class="inline-flex items-center gap-6">
       {scrollingEvents.map((ev) => (
         <EventChip key={ev.id} ev={ev} />
@@ -118,23 +124,29 @@ export function CalendarStrip({ events }: Props) {
   );
 
   return (
-    <div class="shrink-0 border-b border-[#252d38] bg-[#0a0e14] py-1 select-none overflow-hidden whitespace-nowrap flex items-center">
+    <div class="shrink-0 border-b border-[#1E3A5F] bg-[#0B1120] py-1 select-none overflow-hidden whitespace-nowrap flex items-center h-6">
       {parkedEvent && (() => {
         const { highlight, timeStr } = formatParts(parkedEvent.start, parkedEvent.end);
         const isNow = highlight === 'now';
         const endTime = new Date(parkedEvent.end * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        const accentColor = isNow ? '#26DE81' : '#FF9F43';
+
         return (
-          <div class="shrink-0 z-10 flex items-center gap-2 bg-[#0a0e14] pl-4 pr-3">
-            <span class={`w-2 h-2 rounded-full ${isNow ? 'bg-[#2ecc71] lamp-glow-green' : 'bg-[#ff8c42] lamp-glow-amber'}`} />
-            <span class="font-mono text-[14px] font-semibold text-[#e8edf2] max-w-48 truncate">{parkedEvent.summary}</span>
-            <span class={`font-mono text-[13px] font-semibold uppercase tracking-[0.06em] ${isNow ? 'text-[#2ecc71]' : 'text-[#ff8c42]'}`}>
+          <div class="shrink-0 z-10 flex items-center gap-2 bg-[#0B1120] pl-4 pr-3">
+            <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: accentColor }} />
+            <span class="font-mono text-[14px] font-semibold text-[#E8F0FE] max-w-48 truncate">
+              {parkedEvent.summary}
+            </span>
+            <span class="font-mono text-[14px] font-semibold uppercase tracking-[0.06em]" style={{ color: accentColor }}>
               {isNow ? 'NOW' : timeStr}
             </span>
             {isNow && (
-              <span class="font-mono text-[13px] text-[#2ecc71]">↘ {endTime}</span>
+              <span class="font-mono text-[14px]" style={{ color: accentColor }}>
+                → {endTime}
+              </span>
             )}
             {scrollingEvents.length > 0 && (
-              <span class="text-[#252d38] font-mono mx-1">|</span>
+              <span class="text-[#1E3A5F] font-mono mx-1">|</span>
             )}
           </div>
         );
@@ -145,8 +157,8 @@ export function CalendarStrip({ events }: Props) {
           class="inline-flex gap-6 animate-marquee"
           style={{ animationDuration: '60s', paddingLeft: parkedEvent ? '0' : '16px', paddingRight: '16px' }}
         >
-          {eventsCopy}
-          {eventsCopy}
+          {tickerContent}
+          {tickerContent}
         </div>
       </div>
     </div>

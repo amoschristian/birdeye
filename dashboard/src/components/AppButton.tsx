@@ -9,7 +9,8 @@ interface Props {
 }
 
 export function AppButton({ app, active, onFilter }: Props) {
-  const iconColor = active ? 'text-[#4da6ff]' : 'text-[#c8d6e0]';
+  const iconEmoji = app.icon || undefined;
+
   return (
     <div
       role="button"
@@ -21,19 +22,19 @@ export function AppButton({ app, active, onFilter }: Props) {
           onFilter(app.id);
         }
       }}
-      class={`relative w-16 h-12 flex items-center justify-center rounded-sm border cursor-pointer active:brightness-125 transition-all duration-100 select-none focus-visible:outline-2 focus-visible:outline-[#4da6ff] focus-visible:outline-offset-2 ${
+      class={`relative w-16 h-14 flex flex-col items-center justify-center gap-0.5 border transition-all duration-150 active:brightness-125 select-none focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
         active
-          ? 'bg-[#1c2430] text-[#4da6ff] border-[#4da6ff]'
-          : 'bg-[#141b24] text-[#c8d6e0] border-[#252d38] hover:border-[#4da6ff]'
+          ? 'bg-[#1E3A5F] border-[#00D4FF] text-[#00D4FF]'
+          : 'bg-[#111827] border-[#1E3A5F] text-[#8BA3C7] hover:border-[#00D4FF]'
       }`}
-      aria-label={`${app.name}${app.unread > 0 ? ` - ${app.unread} unread` : ''}`}
+      aria-label={`${app.name}${app.unread > 0 ? ` — ${app.unread} unread` : ''}`}
       title={app.name}
     >
-      <AppIcon appId={app.id} class={iconColor} />
+      <AppIcon appId={app.id} class="w-7 h-7" emoji={iconEmoji} />
 
       {app.unread > 0 && (
         <span
-          class="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center px-1 text-[11px] font-bold text-[#0a0e14] bg-[#ff8c42] rounded-full border-2 border-[#141b24] font-mono"
+          class="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] flex items-center justify-center px-1 text-[12px] font-bold text-[#0B1120] bg-[#FFB800] border-2 border-[#0B1120] font-mono tabular-nums"
           aria-label={`${app.unread} unread`}
         >
           {app.unread > 99 ? '99+' : app.unread}

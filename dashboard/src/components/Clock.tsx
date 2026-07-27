@@ -14,7 +14,17 @@ export function Clock() {
     return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
   }
 
+  function formatDate(): string {
+    const now = new Date();
+    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+    return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]}`;
+  }
+
   return (
-    <span class="text-xl font-bold text-[#e8edf2] tabular-nums select-none tracking-tight">{time}</span>
+    <span class="flex items-baseline gap-3 select-none">
+      <span class="text-[28px] font-bold text-[#FFB800] tabular-nums font-mono leading-none">{time}</span>
+      <span class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080]">{formatDate()}</span>
+    </span>
   );
 }
