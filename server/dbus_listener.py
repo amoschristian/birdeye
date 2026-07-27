@@ -138,38 +138,64 @@ def _parse_method_call_block(block: str) -> dict | None:
         if app_name is None:
             return None
 
-        # Extract x-shell-sender and desktop-entry from hints
+        # Extract x-shell-sender and desktop-entry from hints dict.
+        # dbus-monitor splits dict entries across multiple lines:
+        #   dict entry(
+        #      string "key"
+        #      variant  string "value"
+        #   )
+        # The Notify call has TWO arrays: first is actions (skip), second is hints.
         x_shell_sender = ""
         desktop_entry = ""
-        in_hints = False
+        arrays_seen = 0
+        in_dict_entry = False
         current_hint_key = None
 
         for ln in lines:
             stripped = ln.strip()
+
             if stripped.startswith("array ["):
-                # Check if this follows the actions array — it's the hints array
-                # Simple heuristic: look for dict entries with variant
-                in_hints = True
+                arrays_seen += 1
                 continue
-            if in_hints and stripped.startswith("]"):
-                in_hints = False
+
+            if stripped == "]":
+                in_dict_entry = False
+                current_hint_key = None
                 continue
-            if in_hints:
-                # Match dict entry key
-                key_m = re.match(r'dict entry\(\s*string\s+"([^"]+)"', stripped)
-                if key_m:
-                    current_hint_key = key_m.group(1)
-                    continue
-                # Match variant value (string variant)
-                if current_hint_key:
-                    val_m = re.search(r'variant\s+string\s+"([^"]*)"', stripped)
-                    if val_m:
-                        val = val_m.group(1)
-                        if current_hint_key == "x-shell-sender":
-                            x_shell_sender = val
-                        elif current_hint_key == "desktop-entry":
-                            desktop_entry = val
-                        current_hint_key = None
+
+            # Only parse inside the second array (hints)
+            if arrays_seen != 2:
+                continue
+
+            if stripped.startswith("dict entry("):
+                in_dict_entry = True
+                current_hint_key = None
+                continue
+
+            if stripped == ")":
+                in_dict_entry = False
+                current_hint_key = None
+                continue
+
+            if not in_dict_entry:
+                continue
+
+            # Try key line: string "keyname"
+            key_m = re.match(r'^string\s+"([^"]+)"$', stripped)
+            if key_m:
+                current_hint_key = key_m.group(1)
+                continue
+
+            # Try value line: variant  type  value
+            if current_hint_key:
+                val_m = re.search(r'variant\s+string\s+"([^"]*)"', stripped)
+                if val_m:
+                    val = val_m.group(1)
+                    if current_hint_key == "x-shell-sender":
+                        x_shell_sender = val
+                    elif current_hint_key == "desktop-entry":
+                        desktop_entry = val
+                    current_hint_key = None
 
         return {
             "app_name": app_name,
@@ -341,12 +367,12 @@ class DBusListener:
         if is_call:
             notif = _parse_method_call_block("".join(buffer))
             if notif:
-                # Check if this is a forwarded call (from daemon to gnome-shell)
-                # The daemon has unique name :1.44 (owned by org.gnome.Shell.Notifications)
-                # but this can change. We check: does this call have x_shell_sender?
-                # Only forwarded calls have this hint.
+                # Only process forwarded calls (daemon→gnome-shell) which have
+                # x_shell_sender. These get paired with method_return to capture
+                # the notification ID needed for deep-linking.
+                # Original calls (app→daemon) have no x_shell_sender and are
+                # skipped — they'd create duplicate notifications without IDs.
                 if notif.get("x_shell_sender"):
-                    # This is a forwarded call — store pending for return match
                     serial = notif["shell_serial"]
                     self._pending[serial] = notif
                     # Clean old pending entries (older than 10s)
@@ -357,11 +383,6 @@ class DBusListener:
                     ]
                     for s in stale:
                         del self._pending[s]
-                else:
-                    # Original call (no x_shell_sender yet) — process immediately
-                    # but we won't have notification ID. Still useful for
-                    # notifications from apps that talk directly to the daemon.
-                    self._process_notification(notif)
         else:
             result = _parse_method_return_block("".join(buffer))
             if result:
@@ -396,11 +417,15 @@ class DBusListener:
         if _is_browser_notification(app_name, desktop_entry):
             logger.debug(f"D-Bus browser notification: {app_name} — «{summary[:50]}»")
 
-        # Deduplicate
+        # Deduplicate: GNOME Shell forwards every Notify call, so dbus-monitor
+        # sees it twice. Skip duplicates within 2s BUT let through the version
+        # that has notif_id (the forwarded call), even if the original was seen first.
         now = time.time()
         key = f"{app_name}|{summary}|{body}"
+        has_notif_id = notif.get("notif_id") is not None
         if key in self._seen_keys:
-            if now - self._seen_keys[key] < 2.0:
+            age = now - self._seen_keys[key]
+            if age < 2.0 and not has_notif_id:
                 return
         self._seen_keys[key] = now
 

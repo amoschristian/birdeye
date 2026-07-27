@@ -39,7 +39,7 @@ async def invoke_action(notif_id: int, action_key: str = "default") -> bool:
         connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
         result = connection.call_sync(
-            'org.birdeye.ActionInvoker',
+            'org.gnome.Shell',  # extension exports on gnome-shell's connection
             '/org/birdeye/ActionInvoker',
             'org.birdeye.ActionInvoker',
             'InvokeAction',
@@ -71,7 +71,7 @@ def invoke_action_sync(notif_id: int, action_key: str = "default") -> bool:
         connection = Gio.bus_get_sync(Gio.BusType.SESSION, None)
 
         result = connection.call_sync(
-            'org.birdeye.ActionInvoker',
+            'org.gnome.Shell',  # extension exports on gnome-shell's connection
             '/org/birdeye/ActionInvoker',
             'org.birdeye.ActionInvoker',
             'InvokeAction',

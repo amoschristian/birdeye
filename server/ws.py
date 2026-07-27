@@ -285,30 +285,29 @@ async def ws_dashboard(websocket: WebSocket):
 
                 # Try D-Bus action invocation first (deep-link to specific chat)
                 action_invoked = False
-                if notif_id is not None and app_config.type == "native":
+                if notif_id is not None:
                     from action_invoker import invoke_action_sync
                     action_invoked = invoke_action_sync(notif_id, "default")
                     if action_invoked:
                         logger.info(f"Deep-linked via ActionInvoked: app={app_id} notif_id={notif_id}")
 
                 if app_config.type == "browser":
-                    # Find most recent tab for this app, send focus to extension
-                    tabs = [t for t in state.get_all() if t.app_id == app_id]
-                    if tabs:
-                        tab = max(tabs, key=lambda t: t.last_time)
-                        focus_msg = {
-                            "type": "focus",
-                            "appId": app_id,
-                            "tabId": tab.tab_id,
-                            "windowId": tab.window_id,
-                        }
-                        await _broadcast(_extension_conns, focus_msg)
+                    if not action_invoked:
+                        # Fallback: find most recent tab for this app, send focus to extension
+                        tabs = [t for t in state.get_all() if t.app_id == app_id]
+                        if tabs:
+                            tab = max(tabs, key=lambda t: t.last_time)
+                            focus_msg = {
+                                "type": "focus",
+                                "appId": app_id,
+                                "tabId": tab.tab_id,
+                                "windowId": tab.window_id,
+                            }
+                            await _broadcast(_extension_conns, focus_msg)
 
-                    # Always also try to focus the browser window directly.
-                    # The extension handles tab-level focus; wm handles
-                    # bringing the browser window to the foreground, which
-                    # is essential on multi-monitor and Wayland setups.
-                    wm_success = wm.focus_browser()
+                        # Always also try to focus the browser window
+                        wm.focus_browser()
+
                     await _send(websocket, {
                         "type": "focus_ack",
                         "appId": app_id,
