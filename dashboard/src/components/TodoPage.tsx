@@ -343,8 +343,22 @@ function TodoRow({
   const [editText, setEditText] = useState(todo.text);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const datePickerRef = useRef<HTMLDivElement>(null);
 
-  const startEdit = () => {
+  // Dismiss date picker on outside click
+  useEffect(() => {
+    if (!showDatePicker) return;
+    const handler = (e: MouseEvent) => {
+      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
+        setShowDatePicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showDatePicker]);
+
+  const startEdit = (e: Event) => {
+    e.stopPropagation();
     setEditText(todo.text);
     setEditing(true);
     requestAnimationFrame(() => editInputRef.current?.focus());
@@ -365,7 +379,8 @@ function TodoRow({
     if (e.key === 'Escape') cancelEdit();
   };
 
-  const cyclePriority = () => {
+  const cyclePriority = (e: Event) => {
+    e.stopPropagation();
     const order: Array<'high' | 'medium' | 'low'> = ['medium', 'high', 'low'];
     const idx = order.indexOf(todo.priority);
     onSetPriority(todo.id, order[(idx + 1) % order.length]);
@@ -376,6 +391,11 @@ function TodoRow({
   const applyQuickDate = (dateStr: string | null) => {
     onSetDueDate(todo.id, dateStr);
     setShowDatePicker(false);
+  };
+
+  const handleDatePickerToggle = (e: Event) => {
+    e.stopPropagation();
+    setShowDatePicker(!showDatePicker);
   };
 
   const today = todayStr();
@@ -395,35 +415,15 @@ function TodoRow({
   return (
     <div
       data-todo-id={todo.id}
-      class={`flex items-center gap-1.5 py-1.5 px-1 border-b border-[#162035] group transition-opacity duration-300 min-h-[44px] ${todo.completed ? 'opacity-50' : ''}`}
+      onClick={() => onToggle(todo.id)}
+      class={`flex items-start gap-1.5 py-2 px-1 border-b border-[#162035] group transition-opacity duration-300 min-h-[44px] cursor-pointer ${
+        todo.completed ? 'opacity-50' : ''
+      }`}
     >
-      {/* Checkbox */}
-      <button
-        onClick={() => onToggle(todo.id)}
-        class={`w-[18px] h-[18px] border-2 shrink-0 flex items-center justify-center transition-all duration-150 active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-          todo.completed
-            ? 'bg-[#26DE81] border-[#26DE81]'
-            : 'border-[#1E3A5F] hover:border-[#00D4FF]'
-        }`}
-        aria-label={todo.completed ? 'Uncomplete' : 'Complete'}
-      >
-        {todo.completed && (
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-            <path
-              d="M2 5L4 7L8 3"
-              stroke="#0B1120"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
-        )}
-      </button>
-
       {/* Priority glyph */}
       <button
         onClick={cyclePriority}
-        class="font-mono text-[14px] font-bold shrink-0 hover:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-offset-1 px-0.5"
+        class="font-mono text-[14px] font-bold shrink-0 hover:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-offset-1 px-0.5 mt-0.5"
         style={{ color: pGlyph.color }}
         aria-label={`Priority: ${todo.priority}`}
         title={todo.priority}
@@ -440,15 +440,13 @@ function TodoRow({
           onInput={(e) => setEditText((e.target as HTMLInputElement).value)}
           onKeyDown={handleEditKeyDown}
           onBlur={commitEdit}
+          onClick={(e) => e.stopPropagation()}
           class="flex-1 bg-[#111827] text-[#E8F0FE] text-[16px] px-1.5 py-0.5 border border-[#00D4FF] outline-none min-w-0 font-mono"
         />
       ) : (
-        <span
-          onClick={startEdit}
-          class="overflow-hidden min-w-0 flex-1 cursor-text"
-        >
+        <span class="flex-1 min-w-0 py-0.5">
           <span
-            class={`text-[16px] whitespace-nowrap inline-block max-w-full select-none ${
+            class={`text-[16px] leading-snug break-words select-none ${
               todo.completed
                 ? 'text-[#4A6080] line-through'
                 : 'text-[#E8F0FE]'
@@ -460,24 +458,24 @@ function TodoRow({
       )}
 
       {/* Due date badge */}
-      <div class="relative shrink-0">
+      <div class="relative shrink-0" ref={datePickerRef}>
         {dateBadge.text ? (
           <button
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            class={`font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
+            onClick={handleDatePickerToggle}
+            class={`font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 mt-0.5 ${
               dateBadge.isOverdue
                 ? 'bg-[#FF4757]/15 text-[#FF4757]'
                 : dateBadge.isToday
                 ? 'bg-[#FF9F43]/15 text-[#FF9F43]'
-                : 'bg-[#111827] text-[#8BA3C7] hover:bg-[#1E3A5F]'
+                : 'bg-[#111827] text-[#8BA3C7] active:bg-[#1E3A5F]'
             }`}
           >
             {dateBadge.text}
           </button>
         ) : (
           <button
-            onClick={() => setShowDatePicker(!showDatePicker)}
-            class="font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] bg-[#111827] text-[#4A6080] hover:bg-[#1E3A5F] opacity-0 group-hover:opacity-100 transition-opacity focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1"
+            onClick={handleDatePickerToggle}
+            class="font-mono text-[12px] px-1.5 py-0.5 font-semibold uppercase tracking-[0.06em] bg-[#111827] text-[#4A6080] active:bg-[#1E3A5F] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 mt-0.5"
           >
             +DATE
           </button>
@@ -505,10 +503,19 @@ function TodoRow({
         )}
       </div>
 
+      {/* Edit */}
+      <button
+        onClick={startEdit}
+        class="text-[#4A6080] active:text-[#00D4FF] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1 text-[16px] mt-0.5"
+        aria-label="Edit todo"
+      >
+        ✎
+      </button>
+
       {/* Delete */}
       <button
-        onClick={() => onDelete(todo.id)}
-        class="text-[#8BA3C7] hover:text-[#FF4757] opacity-0 group-hover:opacity-100 transition-all px-1 shrink-0 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-1 font-mono text-[16px]"
+        onClick={(e) => { e.stopPropagation(); onDelete(todo.id); }}
+        class="text-[#4A6080] active:text-[#FF4757] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-1 text-[16px] mt-0.5"
         aria-label="Delete todo"
       >
         ✕
