@@ -297,22 +297,19 @@ async def ws_dashboard(websocket: WebSocket):
                         logger.info(f"Deep-linked via ActionInvoked: app={app_id} notif_id={notif_id}")
 
                 if app_config.type == "browser":
-                    if not action_invoked:
-                        # Fallback: find most recent tab for this app, send focus to extension
-                        tabs = [t for t in state.get_all() if t.app_id == app_id]
-                        if tabs:
-                            tab = max(tabs, key=lambda t: t.last_time)
-                            focus_msg = {
-                                "type": "focus",
-                                "appId": app_id,
-                                "tabId": tab.tab_id,
-                                "windowId": tab.window_id,
-                            }
-                            await _broadcast(_extension_conns, focus_msg)
-
-                    # Always focus the browser window — ActionInvoked is fire-and-forget
-                    # on D-Bus and always returns true even for stale notification IDs.
-                    wm.focus_browser()
+                    # Always send extension tab focus — ActionInvoked handles deep-linking
+                    # (opening the specific channel), while the extension tab focus handles
+                    # switching to the correct tab and window. They complement each other.
+                    tabs = [t for t in state.get_all() if t.app_id == app_id]
+                    if tabs:
+                        tab = max(tabs, key=lambda t: t.last_time)
+                        focus_msg = {
+                            "type": "focus",
+                            "appId": app_id,
+                            "tabId": tab.tab_id,
+                            "windowId": tab.window_id,
+                        }
+                        await _broadcast(_extension_conns, focus_msg)
 
                     await _send(websocket, {
                         "type": "focus_ack",

@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useRef, useState, useEffect } from 'preact/hooks';
 import type { Notification, TodoItem, AppConfig } from '../types';
 import { AppIcon } from './AppIcon';
 
@@ -71,6 +71,7 @@ export function FocusMode({
     if (!currentNotif) return;
     const id = currentNotif.id;
     setAnimating('left');
+    setSwipeTranslate(0);
     setTimeout(() => {
       onMarkRead(id);
       setAnimating(null);
@@ -82,6 +83,7 @@ export function FocusMode({
     const id = currentNotif.id;
     const appId = currentNotif.app_id;
     setAnimating('right');
+    setSwipeTranslate(0);
     setTimeout(() => {
       onMarkRead(id);
       onFocus(appId, currentNotif.notif_id ?? undefined);
@@ -104,6 +106,11 @@ export function FocusMode({
     // Rotate the list so the next item becomes visible
     setTodoSkipKey((k) => k + 1);
   };
+
+  // Reset swipe translate when the current notification changes
+  useEffect(() => {
+    setSwipeTranslate(0);
+  }, [currentNotif?.id]);
 
   // Rotate: apply skip offset to doFirstTodos
   const rotatedTodos = todoSkipKey > 0 && doFirstTodos.length > 1
@@ -165,8 +172,9 @@ export function FocusMode({
       }
     };
 
-    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointermove', handleMove, { passive: false });
     document.addEventListener('pointerup', handleUp);
+    document.addEventListener('pointercancel', handleUp);
   };
 
   const handlePointerDownProxy = (e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
@@ -267,7 +275,7 @@ export function FocusMode({
 
           <div
             onPointerDown={handlePointerDownProxy}
-            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab ${
+            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab touch-pan-y ${
               animating === 'left' ? '-translate-x-full opacity-0' :
               animating === 'right' ? 'translate-x-full opacity-0' : ''
             }`}

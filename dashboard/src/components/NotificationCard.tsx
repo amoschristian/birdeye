@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useState } from 'preact/hooks';
+import { useRef, useState, useEffect } from 'preact/hooks';
 import type { Notification } from '../types';
 import { AppIcon } from './AppIcon';
 
@@ -20,6 +20,7 @@ function formatRelativeTime(ts: number): string {
 
 export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: Props) {
   const [translateX, setTranslateX] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const [dismissing, setDismissing] = useState(false);
   const [flashFocus, setFlashFocus] = useState(false);
   const startX = useRef(0);
@@ -28,52 +29,99 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
   const currentTranslateX = useRef(0);
   const didSwipe = useRef(false);
 
-  const handlePointerDown = (e: PointerEvent) => {
-    if (notification.is_read) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
+  // Reset swipe state when notification becomes read (e.g. external mark-read)
+  useEffect(() => {
+    if (notification.is_read) {
+      setTranslateX(0);
+      setDismissing(false);
+      setDragging(false);
+      captured.current = false;
+    }
+  }, [notification.is_read]);
+
+  const cleanup = () => {
+    captured.current = false;
+    setDragging(false);
+  };
+
+  const handleDragStart = (clientX: number, clientY: number) => {
+    if (notification.is_read) return false;
+    startX.current = clientX;
+    startY.current = clientY;
     didSwipe.current = false;
     captured.current = true;
     currentTranslateX.current = 0;
+    setTranslateX(0);
+    return true;
+  };
+
+  const handleDragMove = (clientX: number, clientY: number): boolean => {
+    if (!captured.current) return false;
+    const deltaX = clientX - startX.current;
+    const deltaY = clientY - startY.current;
+
+    // Ignore gestures more vertical than horizontal (let browser scroll)
+    if (Math.abs(deltaX) < Math.abs(deltaY)) return false;
+
+    // Only left-swipes
+    if (deltaX > 0) return false;
+
+    if (Math.abs(deltaX) > 10) {
+      didSwipe.current = true;
+      setDragging(true);
+    }
+
+    const clamped = Math.max(deltaX, -120);
+    currentTranslateX.current = clamped;
+    setTranslateX(clamped);
+    return true;
+  };
+
+  const handleDragEnd = () => {
+    if (!captured.current) return;
+    cleanup();
+
+    if (didSwipe.current && currentTranslateX.current < -80) {
+      setDismissing(true);
+      setTimeout(() => onMarkRead(notification.id), 200);
+    } else if (!didSwipe.current) {
+      // Tap — mark read, focus, and flash feedback
+      setTranslateX(0);
+      onMarkRead(notification.id);
+      onFocus(notification.app_id, notification.notif_id ?? undefined);
+      setFlashFocus(true);
+      setTimeout(() => setFlashFocus(false), 400);
+    } else {
+      setTranslateX(0);
+    }
+  };
+
+  // ── Unified pointer events (mouse + touch via pointer API) ──
+
+  const handlePointerDown = (e: PointerEvent) => {
+    if (!handleDragStart(e.clientX, e.clientY)) return;
+
+    // Prevent default on touch to stop browser scroll during horizontal swipe.
+    // We conditionally allow vertical scrolling via handleDragMove checks.
+    // For mouse, preventDefault on pointerdown stops text selection during drag.
+    e.preventDefault();
 
     const handleMove = (ev: PointerEvent) => {
-      if (!captured.current) return;
-      const deltaX = ev.clientX - startX.current;
-      const deltaY = ev.clientY - startY.current;
-
-      if (Math.abs(deltaX) < Math.abs(deltaY)) return;
-      if (deltaX > 0) return;
-
-      if (Math.abs(deltaX) > 10) didSwipe.current = true;
-
-      const clamped = Math.max(deltaX, -120);
-      currentTranslateX.current = clamped;
-      setTranslateX(clamped);
+      const handled = handleDragMove(ev.clientX, ev.clientY);
+      // Prevent scroll when handling a horizontal swipe
+      if (handled) ev.preventDefault();
     };
 
-    const handleUp = () => {
-      if (!captured.current) return;
-      captured.current = false;
+    const handleEnd = () => {
       document.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerup', handleUp);
-
-      if (didSwipe.current && currentTranslateX.current < -80) {
-        setDismissing(true);
-        setTimeout(() => onMarkRead(notification.id), 200);
-      } else if (!didSwipe.current) {
-        // Tap — mark read, focus, and flash feedback
-        setTranslateX(0);
-        onMarkRead(notification.id);
-        onFocus(notification.app_id, notification.notif_id ?? undefined);
-        setFlashFocus(true);
-        setTimeout(() => setFlashFocus(false), 400);
-      } else {
-        setTranslateX(0);
-      }
+      document.removeEventListener('pointerup', handleEnd);
+      document.removeEventListener('pointercancel', handleEnd);
+      handleDragEnd();
     };
 
     document.addEventListener('pointermove', handleMove);
-    document.addEventListener('pointerup', handleUp);
+    document.addEventListener('pointerup', handleEnd);
+    document.addEventListener('pointercancel', handleEnd);
   };
 
   const handlePointerDownProxy = (e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
@@ -87,6 +135,8 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
 
   const cardClass = dismissing
     ? 'transition-transform duration-200 ease-in'
+    : dragging
+    ? ''
     : 'transition-transform duration-150 ease-out';
 
   return (

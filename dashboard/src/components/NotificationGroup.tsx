@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useRef, useState, useEffect } from 'preact/hooks';
+import { useRef, useState, useEffect, useCallback } from 'preact/hooks';
 import type { Notification, AppConfig } from '../types';
 import { AppIcon } from './AppIcon';
 import { NotificationCard } from './NotificationCard';
@@ -41,24 +41,27 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
     setExpanded((prev) => !prev);
   };
 
-  // Reset swipe state when notifications change
+  // Reset swipe state when notifications change or all become read
   const notifIdsKey = notifications.map((n) => `${n.id}:${n.is_read}`).join(',');
   useEffect(() => {
     setTranslateX(0);
     setDismissing(false);
-  }, [notifIdsKey]);
+    captured.current = false;
+  }, [notifIdsKey, unreadCount]);
 
   const markAllRead = () => {
     for (const id of unreadIds) onMarkRead(id);
   };
 
-  const handlePointerDown = (e: PointerEvent) => {
+  const handlePointerDown = useCallback((e: PointerEvent) => {
     if (unreadCount === 0) return;
     startX.current = e.clientX;
     startY.current = e.clientY;
     didSwipe.current = false;
     captured.current = true;
     currentTranslateX.current = 0;
+
+    e.preventDefault();
 
     const handleMove = (ev: PointerEvent) => {
       if (!captured.current) return;
@@ -67,6 +70,8 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
 
       if (Math.abs(deltaX) < Math.abs(deltaY)) return;
       if (deltaX > 0) return;
+
+      ev.preventDefault();
 
       if (Math.abs(deltaX) > 10) didSwipe.current = true;
 
@@ -80,6 +85,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
       captured.current = false;
       document.removeEventListener('pointermove', handleMove);
       document.removeEventListener('pointerup', handleUp);
+      document.removeEventListener('pointercancel', handleUp);
 
       if (didSwipe.current && currentTranslateX.current < -80) {
         setDismissing(true);
@@ -91,13 +97,14 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
       }
     };
 
-    document.addEventListener('pointermove', handleMove);
+    document.addEventListener('pointermove', handleMove, { passive: false });
     document.addEventListener('pointerup', handleUp);
-  };
+    document.addEventListener('pointercancel', handleUp);
+  }, [unreadCount, markAllRead]);
 
-  const handlePointerDownProxy = (e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
+  const handlePointerDownProxy = useCallback((e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
     handlePointerDown(e as unknown as PointerEvent);
-  };
+  }, [handlePointerDown]);
 
   // ── Collapsed ──────────────────────────────────────────
   if (!expanded) {
