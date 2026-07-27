@@ -334,7 +334,7 @@ export function FocusMode({
               <div class="relative flex-1 min-h-0 mx-5 mb-4">
                 <div
                   ref={bodyContainerRef}
-                  class="overflow-y-auto max-h-[160px] scrollbar-hide"
+                  class="overflow-y-auto max-h-[160px] scrollbar-hide touch-pan-y"
                 >
                   <p
                     ref={bodyTextRef}
