@@ -1,0 +1,8 @@
+{
+  "uuid": "birdeye-action-invoker@blackhawk",
+  "name": "Birdeye Action Invoker",
+  "description": "Exposes a D-Bus method to invoke notification actions — enables Birdeye dashboard to deep-link into specific chats",
+  "version": 1,
+  "shell-version": ["45", "46", "47", "48", "49", "50"],
+  "url": ""
+}
