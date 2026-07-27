@@ -27,6 +27,8 @@ export interface Notification {
   body: string;
   is_read: boolean;
   created_at: number;
+  notif_id: number | null;
+  x_shell_sender: string;
 }
 
 export interface ServerStateMessage {
@@ -72,6 +74,7 @@ export type ServerMessage =
 export interface ClientFocusAction {
   action: 'focus';
   appId: string;
+  notifId?: number;
 }
 
 export interface ClientMarkReadAction {

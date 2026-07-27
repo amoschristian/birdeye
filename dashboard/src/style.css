@@ -37,3 +37,24 @@ html {
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #00D4FF;
 }
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── All Clear celebration ─────────────────────────────────── */
+
+@keyframes allclear-pulse {
+  0%   { background-color: rgba(38, 222, 129, 0.00); }
+  30%  { background-color: rgba(38, 222, 129, 0.10); }
+  100% { background-color: rgba(38, 222, 129, 0.00); }
+}
+
+.animate-allclear-pulse {
+  animation: allclear-pulse 900ms ease-out;
+}

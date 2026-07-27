@@ -15,6 +15,9 @@ interface UseWebSocketReturn {
   spotifyData: SpotifyState | null;
   calendarEvents: CalendarEvent[];
   connected: boolean;
+  sessionCleared: number;
+  sessionFocused: number;
+  sessionCompleted: number;
   markRead: (id: number) => void;
   markAllRead: (appId?: string) => void;
   clearRead: () => void;
@@ -49,6 +52,9 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [connected, setConnected] = useState(false);
+  const [sessionCleared, setSessionCleared] = useState(0);
+  const [sessionFocused, setSessionFocused] = useState(0);
+  const [sessionCompleted, setSessionCompleted] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
@@ -168,6 +174,7 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
+    setSessionCleared((prev) => prev + 1);
   }, [sendMessage]);
 
   const clearRead = useCallback(() => {
@@ -196,8 +203,9 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     sendMessage({ action: 'spotify', command });
   }, [sendMessage]);
 
-  const focusApp = useCallback((appId: string) => {
-    sendMessage({ action: 'focus', appId });
+  const focusApp = useCallback((appId: string, notifId?: number) => {
+    sendMessage({ action: 'focus', appId, ...(notifId ? { notifId } : {}) });
+    setSessionFocused((prev) => prev + 1);
   }, [sendMessage]);
 
   const addTodo = useCallback((text: string) => {
@@ -213,9 +221,13 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const toggleTodo = useCallback((id: number) => {
     sendMessage({ action: 'todo_toggle', id });
     // Optimistic toggle
-    setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t))
-    );
+    setTodos((prev) => {
+      const todo = prev.find((t) => t.id === id);
+      if (todo && !todo.completed) {
+        setSessionCompleted((prevC) => prevC + 1);
+      }
+      return prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
+    });
   }, [sendMessage]);
 
   const deleteTodo = useCallback((id: number) => {
@@ -256,5 +268,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     );
   }, [sendMessage]);
 
-  return { apps, tabs, notifications, todos, monitorData, spotifyData, calendarEvents, connected, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo };
+  return { apps, tabs, notifications, todos, monitorData, spotifyData, calendarEvents, connected, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo };
 }

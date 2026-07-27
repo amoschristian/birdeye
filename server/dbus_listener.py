@@ -1,9 +1,14 @@
 """
 D-Bus notification listener.
 
-Watches org.freedesktop.Notifications.Notify method calls via dbus-monitor
-subprocess. This is completely passive — it parses dbus-monitor output and
-does not interfere with notification delivery to GNOME Shell.
+Watches org.freedesktop.Notifications.Notify method calls AND their
+method_return values via dbus-monitor subprocess. This is completely
+passive — it parses dbus-monitor output and does not interfere with
+notification delivery to GNOME Shell.
+
+Also captures the notification ID (return value) and the original sender's
+D-Bus unique name (from x-shell-sender hint) so Birdeye can later invoke
+notification actions via the GNOME Shell extension.
 """
 
 import asyncio
@@ -23,19 +28,24 @@ _BROWSER_NAMES = {
 }
 
 # Regexes for parsing dbus-monitor output
-_RE_METHOD_CALL = re.compile(r"method call .+ member=Notify")
+_RE_METHOD_CALL = re.compile(
+    r"method call time=\S+ sender=(\S+) -> destination=(\S+) "
+    r"serial=(\d+) path=\S+; interface=\S+; member=(\S+)"
+)
+_RE_METHOD_RETURN = re.compile(
+    r"method return time=\S+ sender=(\S+) -> destination=(\S+) "
+    r"serial=\d+ reply_serial=(\d+)"
+)
+_RE_UINT32 = re.compile(r"^\s*uint32 (\d+)")
 _RE_STRING = re.compile(r'^\s*string\s+"(.*)"$')
 _RE_STRING_START = re.compile(r'^\s*string\s+"(.*)$')
 _RE_STRING_END = re.compile(r'^(.*)"$')
-_RE_DICT_ENTRY = re.compile(r'^\s*dict entry\(\s*string\s+"([^"]+)"\s*\n?\s*variant\s+(.*)$', re.MULTILINE)
 
 
 def _is_browser_notification(app_name: str, desktop_entry: str) -> bool:
     """Check if the notification comes from a browser."""
-    # Check by app_name first (Brave, Chrome, etc.)
     if app_name.lower() in _BROWSER_NAMES:
         return True
-    # Check by desktop-entry hint
     if desktop_entry:
         entry_lower = desktop_entry.lower().replace(".desktop", "")
         if any(b in entry_lower for b in _BROWSER_NAMES):
@@ -43,48 +53,54 @@ def _is_browser_notification(app_name: str, desktop_entry: str) -> bool:
     return False
 
 
-def _parse_monitor_line(line: str) -> dict | None:
+def _parse_method_call_block(block: str) -> dict | None:
     """
-    Parse a dbus-monitor Notify method call block.
+    Parse a dbus-monitor Notify method call block from the FORWARDED call
+    (sender=:1.44 → destination=:1.36). This is the GNOME Shell→main call
+    that includes x-shell-sender hint.
 
-    Notify signature: STRING app_name, UINT32 replaces_id, STRING app_icon,
-                      STRING summary, STRING body, ARRAY actions, ARRAY hints,
-                      INT32 expire_timeout
-
-    Must parse by structure — not just count first 4 strings — because the
-    body can be empty "" and then strings from the actions array would be
-    mistaken for body (e.g. Telegram's action key "default").
+    Returns a dict with notification content + x_shell_sender + shell_serial,
+    or None if parsing fails.
     """
     try:
-        lines = line.strip().split("\n")
+        lines = block.strip().split("\n")
 
-        # Step through lines following the Notify call structure.
-        # State machine: looking for app_name → uint32 → app_icon → summary → body
+        # Parse header line to get serial and senders
+        header = lines[0]
+        hdr_match = _RE_METHOD_CALL.search(header)
+        if not hdr_match:
+            return None
+        sender = hdr_match.group(1)
+        destination = hdr_match.group(2)
+        serial = int(hdr_match.group(3))
+
+        # We only care about the forwarded call: daemon (:1.44) → gnome-shell (:1.36)
+        # The daemon's unique name changes but the well-known name is
+        # org.gnome.Shell.Notifications. We match by destination being
+        # the main gnome-shell.
+        # Actually, we capture ALL Notify calls and let main.py sort them out.
+
+        # Parse body using state machine
         app_name = None
         summary = None
         body = None
         seen_uint32_after_app = False
         string_count = 0
 
-        i = 0
+        i = 1  # skip header line
         while i < len(lines):
             ln = lines[i]
             stripped = ln.strip()
 
-            # Stop at actions array — body is the last field before arrays
             if stripped.startswith("array "):
                 break
-
-            # Stop at int32 expire_timeout
             if stripped.startswith("int32 ") or stripped.startswith("int64 "):
                 break
 
-            # Try single-line string first
             m = _RE_STRING.match(ln)
             if m:
                 val = m.group(1)
             else:
-                # Maybe a multi-line string — starts with string "... but no closing "
                 m_start = _RE_STRING_START.match(ln)
                 if m_start:
                     parts = [m_start.group(1)]
@@ -94,12 +110,10 @@ def _parse_monitor_line(line: str) -> dict | None:
                         if end_m:
                             parts.append(end_m.group(1))
                             break
-                        # Preserve continuation lines, stripping dbus-monitor indentation
                         parts.append(lines[i].strip())
                         i += 1
                     val = "\n".join(parts)
                 else:
-                    # Not a string line — check for uint32 separator and continue
                     if app_name is not None and not seen_uint32_after_app:
                         if "uint32" in stripped:
                             seen_uint32_after_app = True
@@ -110,40 +124,91 @@ def _parse_monitor_line(line: str) -> dict | None:
             string_count += 1
 
             if not seen_uint32_after_app:
-                # Before uint32: first string is app_name
                 if string_count == 1:
                     app_name = val
             else:
-                # After uint32: string #1 = app_icon (skip), #2 = summary, #3 = body
                 if string_count == 2:
                     summary = val
                 elif string_count == 3:
                     body = val
-                    break  # we have everything we need
+                    break
 
             i += 1
 
         if app_name is None:
             return None
 
-        # Extract desktop-entry from hints dict
+        # Extract x-shell-sender and desktop-entry from hints
+        x_shell_sender = ""
         desktop_entry = ""
-        for i, ln in enumerate(lines):
-            if "desktop-entry" in ln:
-                for j in range(i + 1, min(i + 4, len(lines))):
-                    m = _RE_STRING.match(lines[j])
-                    if m:
-                        desktop_entry = m.group(1)
-                        break
-                break
+        in_hints = False
+        current_hint_key = None
+
+        for ln in lines:
+            stripped = ln.strip()
+            if stripped.startswith("array ["):
+                # Check if this follows the actions array — it's the hints array
+                # Simple heuristic: look for dict entries with variant
+                in_hints = True
+                continue
+            if in_hints and stripped.startswith("]"):
+                in_hints = False
+                continue
+            if in_hints:
+                # Match dict entry key
+                key_m = re.match(r'dict entry\(\s*string\s+"([^"]+)"', stripped)
+                if key_m:
+                    current_hint_key = key_m.group(1)
+                    continue
+                # Match variant value (string variant)
+                if current_hint_key:
+                    val_m = re.search(r'variant\s+string\s+"([^"]*)"', stripped)
+                    if val_m:
+                        val = val_m.group(1)
+                        if current_hint_key == "x-shell-sender":
+                            x_shell_sender = val
+                        elif current_hint_key == "desktop-entry":
+                            desktop_entry = val
+                        current_hint_key = None
 
         return {
             "app_name": app_name,
             "summary": summary or "",
             "body": body or "",
             "desktop_entry": desktop_entry,
+            "x_shell_sender": x_shell_sender,
+            "sender": sender,
+            "destination": destination,
+            "shell_serial": serial,
             "timestamp": time.time(),
         }
+    except Exception:
+        return None
+
+
+def _parse_method_return_block(block: str) -> tuple[int, int] | None:
+    """
+    Parse a method_return block from the main gnome-shell (sender=:1.36)
+    to the daemon (destination=:1.44). Returns (reply_serial, notification_id)
+    or None.
+    """
+    try:
+        lines = block.strip().split("\n")
+        header = lines[0]
+
+        hdr_match = _RE_METHOD_RETURN.search(header)
+        if not hdr_match:
+            return None
+
+        reply_serial = int(hdr_match.group(3))
+
+        # Find uint32 value in the body
+        for ln in lines[1:]:
+            m = _RE_UINT32.match(ln)
+            if m:
+                return (reply_serial, int(m.group(1)))
+
+        return None
     except Exception:
         return None
 
@@ -160,6 +225,8 @@ class DBusListener:
         self._started = False
         self._process: Optional[subprocess.Popen] = None
         self._seen_keys: dict[str, float] = {}
+        # Map shell_serial → notification dict (populated when return arrives)
+        self._pending: dict[int, dict] = {}
 
     def set_loop(self, loop: asyncio.AbstractEventLoop):
         self._loop = loop
@@ -210,6 +277,7 @@ class DBusListener:
                     "type='method_call',"
                     "interface='org.freedesktop.Notifications',"
                     "member='Notify'",
+                    "type='method_return'",
                 ],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -220,11 +288,11 @@ class DBusListener:
             logger.warning(f"Cannot start dbus-monitor: {e}")
             return
 
-        logger.info("D-Bus monitor active (dbus-monitor subprocess)...")
+        logger.info("D-Bus monitor active (calls + returns)...")
 
-        # Accumulate lines for one Notify call
         buffer: list[str] = []
-        in_notify = False
+        in_block = False
+        block_is_call = False
 
         try:
             while not self._stop_event.is_set():
@@ -232,33 +300,76 @@ class DBusListener:
                 if not line:
                     break
 
-                if _RE_METHOD_CALL.search(line):
-                    # Start of a new Notify call — flush previous
+                # Detect start of a method_call or method_return block
+                if line.startswith("method call "):
                     if buffer:
-                        notif = _parse_monitor_line("".join(buffer))
-                        if notif:
-                            self._process_notification(notif)
+                        self._flush_buffer(buffer, block_is_call)
                     buffer = [line]
-                    in_notify = True
-                elif in_notify:
+                    in_block = True
+                    block_is_call = True
+                elif line.startswith("method return "):
+                    if buffer:
+                        self._flush_buffer(buffer, block_is_call)
+                    buffer = [line]
+                    in_block = True
+                    block_is_call = False
+                elif line.startswith("signal "):
+                    # Flush any pending block, skip signals
+                    if buffer:
+                        self._flush_buffer(buffer, block_is_call)
+                    buffer = []
+                    in_block = False
+                elif in_block:
                     buffer.append(line)
-                    # Check if this is the last line of the call
-                    # (int32 expire_timeout — or end of array)
-                    stripped = line.strip()
-                    if stripped.startswith("int32 ") or stripped.startswith("int64 "):
-                        notif = _parse_monitor_line("".join(buffer))
-                        if notif:
-                            self._process_notification(notif)
-                        buffer = []
-                        in_notify = False
+
         except Exception as e:
             logger.error(f"dbus-monitor read error: {e}")
         finally:
+            if buffer:
+                self._flush_buffer(buffer, block_is_call)
             if self._process:
                 try:
                     self._process.terminate()
                 except Exception:
                     pass
+
+    def _flush_buffer(self, buffer: list[str], is_call: bool):
+        """Process a complete method_call or method_return block."""
+        if not buffer:
+            return
+
+        if is_call:
+            notif = _parse_method_call_block("".join(buffer))
+            if notif:
+                # Check if this is a forwarded call (from daemon to gnome-shell)
+                # The daemon has unique name :1.44 (owned by org.gnome.Shell.Notifications)
+                # but this can change. We check: does this call have x_shell_sender?
+                # Only forwarded calls have this hint.
+                if notif.get("x_shell_sender"):
+                    # This is a forwarded call — store pending for return match
+                    serial = notif["shell_serial"]
+                    self._pending[serial] = notif
+                    # Clean old pending entries (older than 10s)
+                    now = time.time()
+                    stale = [
+                        s for s, n in self._pending.items()
+                        if now - n.get("timestamp", 0) > 10.0
+                    ]
+                    for s in stale:
+                        del self._pending[s]
+                else:
+                    # Original call (no x_shell_sender yet) — process immediately
+                    # but we won't have notification ID. Still useful for
+                    # notifications from apps that talk directly to the daemon.
+                    self._process_notification(notif)
+        else:
+            result = _parse_method_return_block("".join(buffer))
+            if result:
+                reply_serial, notif_id = result
+                if reply_serial in self._pending:
+                    notif = self._pending.pop(reply_serial)
+                    notif["notif_id"] = notif_id
+                    self._process_notification(notif)
 
     def _check_dbus_monitor(self) -> bool:
         """Verify dbus-monitor is available."""
@@ -282,16 +393,10 @@ class DBusListener:
         body = notif.get("body", "")
         desktop_entry = notif.get("desktop_entry", "")
 
-        # Browser notifications are no longer filtered here.
-        # The extension intercepts page-level Notification() calls, but some
-        # (e.g. service worker showNotification) bypass JS interception.
-        # Let them through — main.py will attempt keyword matching against
-        # config.json and drop only truly unmatched browser notifications.
         if _is_browser_notification(app_name, desktop_entry):
             logger.debug(f"D-Bus browser notification: {app_name} — «{summary[:50]}»")
 
-        # Deduplicate: GNOME Shell forwards every Notify call, so
-        # dbus-monitor sees it twice within ~1ms. Skip duplicates.
+        # Deduplicate
         now = time.time()
         key = f"{app_name}|{summary}|{body}"
         if key in self._seen_keys:
@@ -299,7 +404,7 @@ class DBusListener:
                 return
         self._seen_keys[key] = now
 
-        # Purge stale keys (older than 5 seconds)
+        # Purge stale keys
         cutoff = now - 5.0
         self._seen_keys = {
             k: v for k, v in self._seen_keys.items() if v > cutoff
@@ -310,6 +415,11 @@ class DBusListener:
             "summary": summary,
             "body": body,
             "desktop_entry": desktop_entry,
+            "x_shell_sender": notif.get("x_shell_sender", ""),
+            "notif_id": notif.get("notif_id"),  # may be None for original calls
             "timestamp": now,
         })
-        logger.info(f"D-Bus notification from {app_name}: {summary[:60]}")
+        logger.info(
+            f"D-Bus notification from {app_name}: {summary[:60]}"
+            + (f" (id={notif.get('notif_id')})" if notif.get('notif_id') else "")
+        )

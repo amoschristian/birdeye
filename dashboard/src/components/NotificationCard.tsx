@@ -6,7 +6,8 @@ import { AppIcon } from './AppIcon';
 interface Props {
   notification: Notification;
   onMarkRead: (id: number) => void;
-  onFocus: (appId: string) => void;
+  onFocus: (appId: string, notifId?: number) => void;
+  emoji?: string;
 }
 
 function formatRelativeTime(ts: number): string {
@@ -17,7 +18,7 @@ function formatRelativeTime(ts: number): string {
   return `${Math.floor(diff / 86400)}d`;
 }
 
-export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
+export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: Props) {
   const [translateX, setTranslateX] = useState(0);
   const [dismissing, setDismissing] = useState(false);
   const [flashFocus, setFlashFocus] = useState(false);
@@ -63,7 +64,7 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
         // Tap — mark read, focus, and flash feedback
         setTranslateX(0);
         onMarkRead(notification.id);
-        onFocus(notification.app_id);
+        onFocus(notification.app_id, notification.notif_id ?? undefined);
         setFlashFocus(true);
         setTimeout(() => setFlashFocus(false), 400);
       } else {
@@ -120,7 +121,7 @@ export function NotificationCard({ notification, onMarkRead, onFocus }: Props) {
       >
         {/* App icon */}
         <div class="shrink-0 text-[#8BA3C7]">
-          <AppIcon appId={notification.app_id} class="w-7 h-7" />
+          <AppIcon appId={notification.app_id} class="w-7 h-7" emoji={emoji} />
         </div>
 
         {/* Content */}

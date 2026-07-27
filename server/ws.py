@@ -277,10 +277,19 @@ async def ws_dashboard(websocket: WebSocket):
 
             elif action == "focus":
                 app_id = data.get("appId", "")
+                notif_id = data.get("notifId")  # D-Bus notification ID for deep-linking
                 app_config = config.get(app_id)
                 if app_config is None:
                     await _send(websocket, {"type": "focus_ack", "appId": app_id, "success": False})
                     continue
+
+                # Try D-Bus action invocation first (deep-link to specific chat)
+                action_invoked = False
+                if notif_id is not None and app_config.type == "native":
+                    from action_invoker import invoke_action_sync
+                    action_invoked = invoke_action_sync(notif_id, "default")
+                    if action_invoked:
+                        logger.info(f"Deep-linked via ActionInvoked: app={app_id} notif_id={notif_id}")
 
                 if app_config.type == "browser":
                     # Find most recent tab for this app, send focus to extension
@@ -306,13 +315,16 @@ async def ws_dashboard(websocket: WebSocket):
                         "success": True,
                     })
                 else:
-                    # Native app: use wm to focus by window class
-                    wm_class = app_config.windowClass
-                    desktop_id = app_config.desktopId
-                    if wm_class:
-                        success = wm.focus_window_by_class(wm_class, desktop_id)
+                    # Native app: try action invocation first, then fall back to wm
+                    if not action_invoked:
+                        wm_class = app_config.windowClass
+                        desktop_id = app_config.desktopId
+                        if wm_class:
+                            success = wm.focus_window_by_class(wm_class, desktop_id)
+                        else:
+                            success = False
                     else:
-                        success = False
+                        success = True
                     await _send(websocket, {"type": "focus_ack", "appId": app_id, "success": success})
 
     except WebSocketDisconnect:

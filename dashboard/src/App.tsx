@@ -33,11 +33,12 @@ import { Clock } from './components/Clock';
 import { CalendarStrip } from './components/CalendarStrip';
 import { TodoPage } from './components/TodoPage';
 import { NotificationGroup } from './components/NotificationGroup';
+import { FocusMode } from './components/FocusMode';
 import type { Notification, AppConfig } from './types';
 import { parseGroupKey } from './utils/groupKey';
 
 type ActiveAllTab = 'active' | 'all';
-type MainTab = 'notifications' | 'todos';
+type MainTab = 'notifications' | 'todos' | 'focus';
 
 interface NotificationGroupData {
   key: string;
@@ -77,6 +78,7 @@ export function App() {
   const host = window.location.host;
   const {
     apps, notifications, todos, monitorData, spotifyData, calendarEvents, connected,
+    sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
   } = useWebSocket(host);
@@ -180,6 +182,16 @@ export function App() {
               HOME
             </button>
             <button
+              onClick={() => setActiveTab('focus')}
+              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                activeTab === 'focus'
+                  ? 'bg-[#1E3A5F] text-[#00D4FF]'
+                  : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
+              }`}
+            >
+              FOCUS
+            </button>
+            <button
               onClick={() => setActiveTab('todos')}
               class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
                 activeTab === 'todos'
@@ -203,8 +215,23 @@ export function App() {
       {/* ── Calendar ticker (24px, conditional) ──────────────── */}
       <CalendarStrip events={calendarEvents} />
 
-      {/* ── Main console ─────────────────────────────────────── */}
-      {activeTab === 'notifications' ? (
+      {/* ── Focus Mode (full-width, replaces sidebar+feed+todos) ─── */}
+      {activeTab === 'focus' && (
+        <FocusMode
+          unreadNotifications={notifications.filter((n) => !n.is_read)}
+          doFirstTodos={doFirstTodos}
+          apps={apps}
+          onMarkRead={markRead}
+          onFocus={focusApp}
+          onToggleTodo={toggleTodo}
+          sessionCleared={sessionCleared}
+          sessionFocused={sessionFocused}
+          sessionCompleted={sessionCompleted}
+        />
+      )}
+
+      {/* ── Home (notifications + do-first side panel) ─────────── */}
+      {activeTab === 'notifications' && (
         <div class="flex flex-1 overflow-hidden">
           {/* Channel selector sidebar (80px) */}
           <aside class="w-[88px] shrink-0 overflow-y-auto border-r border-[#1E3A5F] bg-[#0B1120] p-2 flex flex-col gap-1 items-center custom-scrollbar">
@@ -339,6 +366,7 @@ export function App() {
                           notification={n}
                           onMarkRead={handleMarkReadWithUndo}
                           onFocus={focusApp}
+                          emoji={apps.find((a) => a.id === n.app_id)?.icon}
                         />
                       ))}
                 </div>
@@ -397,7 +425,10 @@ export function App() {
             </aside>
           )}
         </div>
-      ) : (
+      )}
+
+      {/* ── Todos page ─────────────────────────────────────────── */}
+      {activeTab === 'todos' && (
         <div class="flex flex-col flex-1 overflow-hidden">
           <TodoPage
             todos={todos}

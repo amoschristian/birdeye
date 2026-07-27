@@ -21,6 +21,8 @@ class Notification:
     body: str
     is_read: bool
     created_at: float
+    notif_id: int | None = None
+    x_shell_sender: str = ""
 
 
 @dataclass
@@ -64,7 +66,9 @@ class Database:
                 summary TEXT NOT NULL DEFAULT '',
                 body TEXT DEFAULT '',
                 is_read INTEGER NOT NULL DEFAULT 0,
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                notif_id INTEGER,
+                x_shell_sender TEXT DEFAULT ''
             );
             CREATE INDEX IF NOT EXISTS idx_notifications_app_id
                 ON notifications(app_id);
@@ -86,17 +90,27 @@ class Database:
         return self._usable
 
     def create_notification(
-        self, app_id: str, app_name: str, summary: str = "", body: str = ""
+        self, app_id: str, app_name: str, summary: str = "", body: str = "",
+        notif_id: int | None = None, x_shell_sender: str = ""
     ) -> Notification | None:
         if not self._usable:
             return None
         try:
+            # Migrate: add columns if they don't exist yet
+            for col, col_type in [("notif_id", "INTEGER"), ("x_shell_sender", "TEXT DEFAULT ''")]:
+                try:
+                    conn = self._connect()
+                    conn.execute(f"ALTER TABLE notifications ADD COLUMN {col} {col_type}")
+                    conn.commit()
+                except sqlite3.OperationalError:
+                    pass
+
             conn = self._connect()
             now = time.time()
             cur = conn.execute(
-                "INSERT INTO notifications (app_id, app_name, summary, body, created_at) "
-                "VALUES (?, ?, ?, ?, ?)",
-                (app_id, app_name, summary, body, now),
+                "INSERT INTO notifications (app_id, app_name, summary, body, created_at, notif_id, x_shell_sender) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (app_id, app_name, summary, body, now, notif_id, x_shell_sender),
             )
             row_id = cur.lastrowid
             self._cleanup_old(conn)
@@ -109,6 +123,8 @@ class Database:
                 body=body,
                 is_read=False,
                 created_at=now,
+                notif_id=notif_id,
+                x_shell_sender=x_shell_sender,
             )
         except sqlite3.Error as e:
             logger.error(f"create_notification failed: {e}")
@@ -136,7 +152,9 @@ class Database:
         try:
             conn = self._connect()
             rows = conn.execute(
-                "SELECT id, app_id, app_name, summary, body, is_read, created_at "
+                "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
+                "COALESCE(notif_id, NULL) AS notif_id, "
+                "COALESCE(x_shell_sender, '') AS x_shell_sender "
                 "FROM notifications ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
@@ -149,6 +167,8 @@ class Database:
                     body=r["body"],
                     is_read=bool(r["is_read"]),
                     created_at=r["created_at"],
+                    notif_id=r["notif_id"],
+                    x_shell_sender=r["x_shell_sender"] or "",
                 )
                 for r in rows
             ]

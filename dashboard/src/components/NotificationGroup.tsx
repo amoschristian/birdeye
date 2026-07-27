@@ -132,7 +132,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
           aria-expanded={false}
         >
           <div class="shrink-0 text-[#8BA3C7]">
-            <AppIcon appId={appId} class="w-7 h-7" />
+            <AppIcon appId={appId} class="w-7 h-7" emoji={app?.icon} />
           </div>
           <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#E8F0FE]">{appDisplay}</span>
           <span class="text-[20px] font-medium text-[#FFB800] font-mono">{label}</span>
@@ -166,7 +166,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
         aria-expanded={true}
       >
         <div class="shrink-0 text-[#00D4FF]">
-          <AppIcon appId={appId} class="w-7 h-7" />
+          <AppIcon appId={appId} class="w-7 h-7" emoji={app?.icon} />
         </div>
         <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF]">{label}</span>
         <span class="font-mono text-[16px] text-[#8BA3C7]">{notifications.length}</span>
@@ -180,6 +180,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
           notification={n}
           onMarkRead={onMarkRead}
           onFocus={onFocus}
+          emoji={app?.icon}
         />
       ))}
     </div>
