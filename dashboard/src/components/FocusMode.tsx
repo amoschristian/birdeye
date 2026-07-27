@@ -8,7 +8,7 @@ interface Props {
   doFirstTodos: TodoItem[];
   apps: AppConfig[];
   onMarkRead: (id: number) => void;
-  onFocus: (appId: string) => void;
+  onFocus: (appId: string, notifId?: number) => void;
   onToggleTodo: (id: number) => void;
   sessionCleared: number;
   sessionFocused: number;
@@ -101,7 +101,7 @@ export function FocusMode({
     setAnimating('right');
     setTimeout(() => {
       onMarkRead(id);
-      onFocus(appId);
+      onFocus(appId, currentNotif.notif_id ?? undefined);
       setAnimating(null);
     }, 200);
   };
