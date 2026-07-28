@@ -63,7 +63,9 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
     return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO IDLE</span>;
   }
 
-  const isAd = !data.album && !data.artUrl;
+  // Only treat as ad if everything is missing (no album, no art, AND no artist)
+  // Spotify ads have nothing but a title like "Advertisement"
+  const isAd = !data.album && !data.artUrl && !data.artist;
 
   return (
     <div class="flex items-center gap-2 min-w-0 flex-1">

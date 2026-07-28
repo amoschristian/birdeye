@@ -157,7 +157,11 @@ async def ws_extension(websocket: WebSocket):
                 state.update_tab(data)
                 await broadcast_tabs()
             elif msg_type == "remove":
-                state.remove_tab(data.get("appId", ""), data.get("tabId", 0))
+                app_id = data.get("appId", "")
+                state.remove_tab(app_id, data.get("tabId", 0))
+                if app_id == "spotify-web":
+                    spotify_listener.set_unavailable()
+                    await broadcast_spotify()
                 await broadcast_tabs()
 
             elif msg_type == "focus_ack":
@@ -168,6 +172,16 @@ async def ws_extension(websocket: WebSocket):
                     "success": data.get("success", False),
                 }
                 await _broadcast(_dashboard_conns, payload)
+
+            elif msg_type == "spotify_state":
+                # Spotify web player state from extension content script
+                state_data = data.get("state", {})
+                spotify_listener.update_state(state_data)
+                await broadcast_spotify()
+
+            elif msg_type == "ping":
+                # Keepalive — no action needed
+                pass
 
     except WebSocketDisconnect:
         pass
@@ -232,7 +246,11 @@ async def ws_dashboard(websocket: WebSocket):
             elif action == "spotify":
                 command = data.get("command", "")
                 if command in ("play_pause", "next", "previous"):
-                    spotify_listener.send_command(command)
+                    # Forward to extension for execution in web player
+                    await _broadcast(_extension_conns, {
+                        "type": "spotify_command",
+                        "command": command,
+                    })
 
             elif action == "todo_add":
                 text = data.get("text", "").strip()
