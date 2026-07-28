@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -283,6 +284,7 @@ async def ws_dashboard(websocket: WebSocket):
             elif action == "focus":
                 app_id = data.get("appId", "")
                 notif_id = data.get("notifId")  # D-Bus notification ID for deep-linking
+                logger.info(f"Dashboard → focus: app={app_id} notif_id={notif_id}")
                 app_config = config.get(app_id)
                 if app_config is None:
                     await _send(websocket, {"type": "focus_ack", "appId": app_id, "success": False})
@@ -310,6 +312,11 @@ async def ws_dashboard(websocket: WebSocket):
                             "windowId": tab.window_id,
                         }
                         await _broadcast(_extension_conns, focus_msg)
+                        # Wait a beat for the extension to focus the window,
+                        # then also switch workspace — Chrome's focus may not
+                        # trigger workspace switch on all Wayland compositors.
+                        await asyncio.sleep(0.3)
+                        wm.focus_browser()
 
                     await _send(websocket, {
                         "type": "focus_ack",
@@ -318,10 +325,11 @@ async def ws_dashboard(websocket: WebSocket):
                     })
                 else:
                     # Native app: try action invocation first, then focus window
+                    # and switch to its workspace so the user lands on the right desktop
                     wm_class = app_config.windowClass
                     desktop_id = app_config.desktopId
                     if wm_class:
-                        success = wm.focus_window_by_class(wm_class, desktop_id)
+                        success = wm.focus_window_by_class_and_switch(wm_class, desktop_id)
                     else:
                         success = False
                     await _send(websocket, {"type": "focus_ack", "appId": app_id, "success": success})

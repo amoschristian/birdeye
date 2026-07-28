@@ -160,41 +160,68 @@ def _run(args: list[str], timeout: int = 3) -> bool:
 
 
 def _focus_via_gnome_extension(wm_class: str) -> bool:
-    """Focus a window by WM_CLASS using the activate-window-by-title GNOME extension."""
+    """Focus a window by WM_CLASS using the activate-window-by-title GNOME extension.
+
+    Tries multiple strategies since Wayland-native windows often have different
+    WM_CLASS values than expected:
+    1. Exact WM_CLASS match
+    2. Substring match with the raw class
+    3. Substring match with the class stripped of common suffixes (Desktop, Chat, etc.)
+    4. Substring match with just the first word
+    """
     if not shutil.which("gdbus"):
         return False
-    try:
-        result = subprocess.run(
-            [
-                "gdbus", "call", "--session",
-                "--dest", "org.gnome.Shell",
-                "--object-path", "/de/lucaswerkmeister/ActivateWindowByTitle",
-                "--method", "de.lucaswerkmeister.ActivateWindowByTitle.activateByWmClass",
-                wm_class,
-            ],
-            capture_output=True, text=True, timeout=3,
-        )
-        if "true" in result.stdout.lower():
-            logger.info(f"GNOME extension focused {wm_class}")
+
+    def _try_call(method: str, arg: str) -> bool:
+        try:
+            result = subprocess.run(
+                [
+                    "gdbus", "call", "--session",
+                    "--dest", "org.gnome.Shell",
+                    "--object-path", "/de/lucaswerkmeister/ActivateWindowByTitle",
+                    "--method", f"de.lucaswerkmeister.ActivateWindowByTitle.{method}",
+                    arg,
+                ],
+                capture_output=True, text=True, timeout=3,
+            )
+            return "true" in result.stdout.lower()
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            return False
+
+    # 1. Exact WM_CLASS
+    if _try_call("activateByWmClass", wm_class):
+        logger.info(f"GNOME extension focused {wm_class}")
+        return True
+
+    # 2. Substring raw class
+    if _try_call("activateBySubstring", wm_class):
+        logger.info(f"GNOME extension focused {wm_class} (by substring)")
+        return True
+
+    # 3. Strip common suffixes and try
+    import re
+    stripped = re.sub(r'(?i)(desktop|chat|client|app|web|beta|alpha)$', '', wm_class).strip()
+    if stripped and stripped != wm_class:
+        if _try_call("activateBySubstring", stripped):
+            logger.info(f"GNOME extension focused {stripped} (stripped from {wm_class})")
             return True
-        # Fallback: try substring match
-        result2 = subprocess.run(
-            [
-                "gdbus", "call", "--session",
-                "--dest", "org.gnome.Shell",
-                "--object-path", "/de/lucaswerkmeister/ActivateWindowByTitle",
-                "--method", "de.lucaswerkmeister.ActivateWindowByTitle.activateBySubstring",
-                wm_class,
-            ],
-            capture_output=True, text=True, timeout=3,
-        )
-        if "true" in result2.stdout.lower():
-            logger.info(f"GNOME extension focused {wm_class} (by substring)")
-            return True
-        return False
-    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-        logger.debug(f"GNOME extension focus failed: {e}")
-        return False
+        # Also try title-case
+        title_case = stripped.title()
+        if title_case != stripped and title_case != wm_class:
+            if _try_call("activateBySubstring", title_case):
+                logger.info(f"GNOME extension focused {title_case} (title-case)")
+                return True
+
+    # 4. Try just the first word of the class (e.g. "Telegram" from "TelegramDesktop")
+    words = re.findall(r'[A-Z][a-z]+', wm_class)
+    if words:
+        first_word = words[0]
+        if first_word != wm_class and first_word != stripped:
+            if _try_call("activateBySubstring", first_word):
+                logger.info(f"GNOME extension focused {first_word} (first word of {wm_class})")
+                return True
+
+    return False
 
 
 # ── Public API ─────────────────────────────────────────────────────
@@ -392,6 +419,80 @@ def switch_to_workspace(workspace_num: int) -> bool:
 
     logger.warning(f"switch_to_workspace: no method worked for workspace {workspace_num}")
     return False
+
+
+def get_window_workspace(wm_class: str) -> int | None:
+    """
+    Find which workspace (0-indexed) a window with the given WM_CLASS
+    is on. Uses wmctrl -lx. Returns None if the window can't be found.
+    """
+    if not shutil.which("wmctrl"):
+        return None
+    try:
+        result = subprocess.run(
+            ["wmctrl", "-lx"],
+            capture_output=True, text=True, timeout=3,
+        )
+        # Each line: <window_id> <desktop> <wm_class> <host> <title>
+        for line in result.stdout.splitlines():
+            parts = line.split(None, 3)
+            if len(parts) >= 3:
+                # parts[1] is desktop number (0-indexed), parts[2] is WM_CLASS
+                if wm_class.lower() in parts[2].lower():
+                    try:
+                        return int(parts[1])
+                    except (ValueError, IndexError):
+                        pass
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        pass
+    return None
+
+
+def get_current_workspace() -> int | None:
+    """
+    Get the currently active workspace index (0-based).
+    Uses wmctrl -d and looks for the '*' marker. Returns None on failure.
+    """
+    if not shutil.which("wmctrl"):
+        return None
+    try:
+        result = subprocess.run(
+            ["wmctrl", "-d"],
+            capture_output=True, text=True, timeout=3,
+        )
+        for line in result.stdout.splitlines():
+            if '*' in line:
+                parts = line.split()
+                if parts:
+                    return int(parts[0])
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError, ValueError):
+        pass
+    return None
+
+
+def focus_window_by_class_and_switch(wm_class: str, desktop_id: str | None = None) -> bool:
+    """
+    Focus a window by WM_CLASS AND switch to its workspace.
+
+    First tries focus_window_by_class (GNOME extension, wmctrl, xdotool).
+    Then, regardless of whether focus succeeded, try to detect the window's
+    workspace and switch to it so the user lands on the right desktop.
+    """
+    focused = focus_window_by_class(wm_class, desktop_id)
+
+    workspace = get_window_workspace(wm_class)
+    if workspace is not None:
+        # wmctrl uses 0-indexed desktops; switch_to_workspace takes 1-indexed
+        ws_num = workspace + 1
+        current = get_current_workspace()
+        if current is not None and current == workspace:
+            logger.info(f"{wm_class} already on current workspace {ws_num}, not switching")
+        elif ws_num >= 1:
+            logger.info(f"{wm_class} found on workspace {ws_num} (current={current}), switching")
+            switched = switch_to_workspace(ws_num)
+            return focused or switched
+
+    return focused
 
 
 def focus_browser() -> bool:

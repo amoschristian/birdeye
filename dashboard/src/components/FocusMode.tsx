@@ -134,29 +134,43 @@ export function FocusMode({
     // Allow vertical scroll in the body area to pass through
     (el as HTMLElement).style.touchAction = 'pan-y';
 
+    const didPanRef = { current: false };
+
+    // Use direction 'all' — 'horizontal' does a single-point direction check
+    // at the threshold boundary. If the first 20px of movement is slightly more
+    // vertical (diagonal touch start), the pan fails instantly with no recovery.
+    // With 'all' we track every pan and filter direction in onPanmove.
     const pan = new PanRecognizer({
-      direction: 'horizontal',
-      threshold: 8,
+      direction: 'all',
+      threshold: 20,
       onPanstart() {
         if (!hasUnreadRef.current) return;
       },
       onPanmove(e) {
         if (!hasUnreadRef.current) return;
+        // Only enter swipe mode when horizontal dominates vertical.
+        // Pure vertical scrolls pass through without marking didPanRef,
+        // keeping tap alive for scroll-then-tap interactions.
+        if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) return;
+        didPanRef.current = true;
+        // Suppress browser scroll once horizontal swipe is confirmed
+        e.preventDefault();
         // Bidirectional: clamp between -200 and 200
         const clamped = Math.max(-200, Math.min(200, e.deltaX));
         setSwipeTranslate(clamped);
       },
       onPanend(e) {
         if (!hasUnreadRef.current) return;
-
+        if (!didPanRef.current) {
+          // Never entered horizontal mode — just a vertical scroll.
+          setSwipeTranslate(0);
+          return;
+        }
         if (e.deltaX < -80 || e.velocityX < -0.4) {
           // Swipe left → dismiss
           handleDismiss();
         } else if (e.deltaX > 80 || e.velocityX > 0.4) {
           // Swipe right → open/focus
-          handleOpen();
-        } else if (Math.abs(e.deltaX) < 20) {
-          // Tiny movement → treat as tap → open/focus
           handleOpen();
         } else {
           // Partial swipe → snap back
@@ -170,10 +184,10 @@ export function FocusMode({
     manager.add(pan);
 
     const tap = new TapRecognizer({
-      threshold: 10,
-      interval: 300,
+      threshold: 22,
+      interval: 350,
       onTap() {
-        if (!hasUnreadRef.current) return;
+        if (!hasUnreadRef.current || didPanRef.current) return;
         handleOpen();
       },
     });
@@ -181,7 +195,7 @@ export function FocusMode({
     manager.add(tap);
 
     return () => manager.destroy();
-  }, []); // mount/unmount only — callbacks via refs
+  }, [currentNotif?.id]); // re-wire when notification card appears or identity changes
 
   // Rotate todos for the skip feature
   const rotatedTodos = todoSkipKey > 0 && doFirstTodos.length > 1

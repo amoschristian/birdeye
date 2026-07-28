@@ -67,25 +67,42 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
     (el as HTMLElement).style.touchAction = 'pan-y';
 
     // ── Pan (swipe to reveal READ) ──────────────────────────
+    // Use direction 'all' because 'horizontal' checks at threshold only:
+    // if the first 20px of movement is slightly more vertical (common on
+    // touchscreen — diagonal start), the pan fails instantly with no recovery.
+    // With 'all' we track every pan and filter direction in onPanmove.
     const pan = new PanRecognizer({
-      direction: 'horizontal',
-      threshold: 8,
+      direction: 'all',
+      threshold: 20,
       onPanstart(_e) {
         if (isReadRef.current) return;
-        didPanRef.current = true;
         setDragging(true);
+        // didPanRef not set here — threshold-cross with immediate lift
+        // is still a tap. Only mark on actual onPanmove.
       },
       onPanmove(e) {
         if (isReadRef.current) return;
-        // Only left-swipes
-        if (e.deltaX > 0) return;
+        // Only consider horizontal swipes that are predominantly leftward.
+        // Allow vertical scroll to pass through without marking didPanRef —
+        // this keeps tap alive for scroll-and-then-tap interactions.
+        const absDx = Math.abs(e.deltaX);
+        const absDy = Math.abs(e.deltaY);
+        if (absDx < absDy || e.deltaX > 0) return;
+        // Now we're in a definite left swipe — lock out tap and suppress
+        // browser scroll so the card tracks the finger cleanly.
+        didPanRef.current = true;
+        e.preventDefault();
         const clamped = Math.max(e.deltaX, -120);
         setTranslateX(clamped);
       },
       onPanend(e) {
         if (isReadRef.current) return;
         setDragging(false);
-
+        if (!didPanRef.current) {
+          // Never entered horizontal mode — just a vertical scroll.
+          setTranslateX(0);
+          return;
+        }
         // Dismiss on distance (>80px) OR fast flick (>0.4 px/ms leftward)
         const shouldDismiss = e.deltaX < -80 || e.velocityX < -0.4;
         if (shouldDismiss) {
@@ -106,8 +123,8 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
 
     // ── Tap ─────────────────────────────────────────────────
     const tap = new TapRecognizer({
-      threshold: 10,
-      interval: 300,
+      threshold: 22,
+      interval: 350,
       onTap(e) {
         if (isReadRef.current) return;
         if (didPanRef.current) return;
@@ -123,7 +140,7 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
         setTimeout(() => setFlashFocus(false), 400);
       },
     });
-    // Tap defers to pan — if the user swipes, tap won't fire
+    // Tap defers to pan — if the user swipes, tap won't fire.
     tap.requireFailureOf(pan);
     manager.add(tap);
 
@@ -138,10 +155,13 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
     onMarkRead(notification.id);
   };
 
+  // Keep transition-transform always present so the browser tracks the
+  // property between frames. Vary duration: 0 during drag (instant follow),
+  // 200ms for dismiss animation, 150ms for snap-back.
   const slideClass = dismissing
     ? 'transition-transform duration-200 ease-in'
     : dragging
-    ? ''
+    ? 'transition-transform duration-0'
     : 'transition-transform duration-150 ease-out';
 
   const contentTransform = dismissing

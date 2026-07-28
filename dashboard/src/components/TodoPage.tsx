@@ -34,13 +34,14 @@ function todayStr(): string {
 }
 
 function getQuadrant(todo: TodoItem): QuadrantId {
-  const isUrgent = todo.due_date !== null && todo.due_date <= todayStr();
-  const isImportant = todo.priority === 'high' && todo.due_date !== null;
+  // Urgency = priority level. Soon = due today or overdue.
+  const isUrgent = todo.priority === 'high';
+  const isDueSoon = todo.due_date !== null && todo.due_date <= todayStr();
 
-  if (isUrgent && isImportant) return 'do-first';
-  if (!isUrgent && isImportant) return 'schedule';
-  if (isUrgent && !isImportant) return 'decide';
-  return 'eliminate';
+  if (isUrgent && isDueSoon) return 'do-first';    // Urgent + Soon
+  if (isUrgent && !isDueSoon) return 'schedule';    // Urgent + Distant
+  if (!isUrgent && isDueSoon) return 'decide';      // Low urgency + Soon
+  return 'eliminate';                                 // Low urgency + Distant
 }
 
 function formatDateBadge(dueDate: string | null): { text: string; isOverdue: boolean; isToday: boolean } {
@@ -388,7 +389,8 @@ function TodoRow({
 
   const dateBadge = formatDateBadge(todo.due_date);
 
-  const applyQuickDate = (dateStr: string | null) => {
+  const applyQuickDate = (e: Event, dateStr: string | null) => {
+    e.stopPropagation();
     onSetDueDate(todo.id, dateStr);
     setShowDatePicker(false);
   };
@@ -483,21 +485,26 @@ function TodoRow({
 
         {showDatePicker && (
           <div class="absolute right-0 top-full mt-1 z-20 bg-[#111827] border border-[#1E3A5F] p-1.5 flex flex-col gap-1 min-w-[130px]">
-            <button onClick={() => applyQuickDate(today)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TODAY</button>
-            <button onClick={() => applyQuickDate(tomorrow)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TOMORROW</button>
-            <button onClick={() => applyQuickDate(nextWeek)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">NEXT WEEK</button>
+            <button onClick={(e) => applyQuickDate(e, today)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TODAY</button>
+            <button onClick={(e) => applyQuickDate(e, tomorrow)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">TOMORROW</button>
+            <button onClick={(e) => applyQuickDate(e, nextWeek)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono">NEXT WEEK</button>
             <div class="px-2 py-1">
               <input
                 type="date"
+                onClick={(e) => e.stopPropagation()}
                 onChange={(e) => {
                   const val = (e.target as HTMLInputElement).value;
-                  if (val) applyQuickDate(val);
+                  if (val) {
+                    e.stopPropagation();
+                    onSetDueDate(todo.id, val);
+                    setShowDatePicker(false);
+                  }
                 }}
                 class="font-mono text-[16px] bg-[#0B1120] text-[#E8F0FE] border border-[#1E3A5F] px-1 py-0.5 outline-none w-full"
               />
             </div>
             {todo.due_date && (
-              <button onClick={() => applyQuickDate(null)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
+              <button onClick={(e) => applyQuickDate(e, null)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
             )}
           </div>
         )}

@@ -357,11 +357,14 @@ class Database:
                 for substr, dt in results:
                     # Filter false positives: substring must contain a date-indicator word
                     # or contain a digit (handles "in 3 days", "Apr 15", "15/04", etc.)
-                    words = set(substr.lower().split())
-                    has_date_word = bool(words & Database._DATE_WORDS)
+                    words_set = set(substr.lower().split())
+                    has_date_word = bool(words_set & Database._DATE_WORDS)
                     has_digit = bool(re.search(r'\d', substr))
                     if has_date_word or has_digit:
                         due_date = dt.strftime('%Y-%m-%d')
+                        # Remove the matched date substring from the text
+                        clean = clean.replace(substr, '', 1).strip()
+                        clean = re.sub(r'\s+', ' ', clean).strip()
                         break
 
         return clean, due_date, priority
