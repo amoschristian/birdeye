@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "fngr": "^1.0.1",
     "lucide-preact": "^1.25.0",
     "preact": "^10.25.0",
     "sortablejs": "^1.15.7"

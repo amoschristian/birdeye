@@ -1,5 +1,8 @@
 import { h } from 'preact';
 import { useRef, useState, useEffect } from 'preact/hooks';
+import { Manager } from 'fngr';
+import { PanRecognizer } from 'fngr/pan';
+import { TapRecognizer } from 'fngr/tap';
 import type { Notification, TodoItem, AppConfig } from '../types';
 import { AppIcon } from './AppIcon';
 
@@ -58,35 +61,46 @@ export function FocusMode({
   const [animating, setAnimating] = useState<'left' | 'right' | null>(null);
   const [todoDoneAnimating, setTodoDoneAnimating] = useState(false);
   const [todoSkipKey, setTodoSkipKey] = useState(0);
+  const [swipeTranslate, setSwipeTranslate] = useState(0);
+
+  const cardRef = useRef<HTMLDivElement>(null);
 
   const hasUnread = unreadNotifications.length > 0;
   const hasDoFirst = doFirstTodos.length > 0;
   const allClear = !hasUnread && !hasDoFirst;
 
-  // Always show the first item
   const currentNotif = hasUnread ? unreadNotifications[0] : null;
   const currentTodo = !hasUnread && hasDoFirst ? doFirstTodos[0] : null;
 
+  // Stable refs for callbacks and current data
+  const onMarkReadRef = useRef(onMarkRead);
+  onMarkReadRef.current = onMarkRead;
+  const onFocusRef = useRef(onFocus);
+  onFocusRef.current = onFocus;
+  const currentNotifRef = useRef(currentNotif);
+  currentNotifRef.current = currentNotif;
+  const hasUnreadRef = useRef(hasUnread);
+  hasUnreadRef.current = hasUnread;
+
   const handleDismiss = () => {
-    if (!currentNotif) return;
-    const id = currentNotif.id;
+    const n = currentNotifRef.current;
+    if (!n) return;
     setAnimating('left');
     setSwipeTranslate(0);
     setTimeout(() => {
-      onMarkRead(id);
+      onMarkReadRef.current(n.id);
       setAnimating(null);
     }, 200);
   };
 
   const handleOpen = () => {
-    if (!currentNotif) return;
-    const id = currentNotif.id;
-    const appId = currentNotif.app_id;
+    const n = currentNotifRef.current;
+    if (!n) return;
     setAnimating('right');
     setSwipeTranslate(0);
     setTimeout(() => {
-      onMarkRead(id);
-      onFocus(appId, currentNotif.notif_id ?? undefined);
+      onMarkReadRef.current(n.id);
+      onFocusRef.current(n.app_id, n.notif_id ?? undefined);
       setAnimating(null);
     }, 200);
   };
@@ -103,7 +117,6 @@ export function FocusMode({
 
   const handleTodoSkip = () => {
     if (doFirstTodos.length <= 1) return;
-    // Rotate the list so the next item becomes visible
     setTodoSkipKey((k) => k + 1);
   };
 
@@ -112,74 +125,71 @@ export function FocusMode({
     setSwipeTranslate(0);
   }, [currentNotif?.id]);
 
-  // Rotate: apply skip offset to doFirstTodos
+  // Wire up fngr for bidirectional swipe + tap on the notification card
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+
+    const manager = new Manager(el);
+    // Allow vertical scroll in the body area to pass through
+    (el as HTMLElement).style.touchAction = 'pan-y';
+
+    const pan = new PanRecognizer({
+      direction: 'horizontal',
+      threshold: 8,
+      onPanstart() {
+        if (!hasUnreadRef.current) return;
+      },
+      onPanmove(e) {
+        if (!hasUnreadRef.current) return;
+        // Bidirectional: clamp between -200 and 200
+        const clamped = Math.max(-200, Math.min(200, e.deltaX));
+        setSwipeTranslate(clamped);
+      },
+      onPanend(e) {
+        if (!hasUnreadRef.current) return;
+
+        if (e.deltaX < -80 || e.velocityX < -0.4) {
+          // Swipe left → dismiss
+          handleDismiss();
+        } else if (e.deltaX > 80 || e.velocityX > 0.4) {
+          // Swipe right → open/focus
+          handleOpen();
+        } else if (Math.abs(e.deltaX) < 20) {
+          // Tiny movement → treat as tap → open/focus
+          handleOpen();
+        } else {
+          // Partial swipe → snap back
+          setSwipeTranslate(0);
+        }
+      },
+      onPancancel() {
+        setSwipeTranslate(0);
+      },
+    });
+    manager.add(pan);
+
+    const tap = new TapRecognizer({
+      threshold: 10,
+      interval: 300,
+      onTap() {
+        if (!hasUnreadRef.current) return;
+        handleOpen();
+      },
+    });
+    tap.requireFailureOf(pan);
+    manager.add(tap);
+
+    return () => manager.destroy();
+  }, []); // mount/unmount only — callbacks via refs
+
+  // Rotate todos for the skip feature
   const rotatedTodos = todoSkipKey > 0 && doFirstTodos.length > 1
     ? [...doFirstTodos.slice(todoSkipKey % doFirstTodos.length), ...doFirstTodos.slice(0, todoSkipKey % doFirstTodos.length)]
     : doFirstTodos;
   const visibleTodo = rotatedTodos[0] || null;
 
   const dateBadge = visibleTodo ? formatDateBadge(visibleTodo.due_date) : null;
-
-  // ── Swipe support ────────────────────────────────────────────
-
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const currentTranslateX = useRef(0);
-  const captured = useRef(false);
-  const [swipeTranslate, setSwipeTranslate] = useState(0);
-
-  const handlePointerDown = (e: PointerEvent) => {
-    if (!hasUnread) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    captured.current = true;
-    currentTranslateX.current = 0;
-
-    const handleMove = (ev: PointerEvent) => {
-      if (!captured.current) return;
-      const deltaX = ev.clientX - startX.current;
-      const deltaY = ev.clientY - startY.current;
-
-      // Diagonal moves: defer to vertical vs horizontal dominance
-      if (Math.abs(deltaX) < Math.abs(deltaY) && Math.abs(deltaX) < 10) return;
-
-      const clamped = Math.max(-200, Math.min(200, deltaX));
-      currentTranslateX.current = clamped;
-      setSwipeTranslate(clamped);
-    };
-
-    const handleUp = () => {
-      if (!captured.current) return;
-      captured.current = false;
-      document.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerup', handleUp);
-
-      const finalX = currentTranslateX.current;
-      if (finalX < -80) {
-        // Swipe left past threshold = dismiss
-        handleDismiss();
-      } else if (finalX > 80) {
-        // Swipe right past threshold = open/focus
-        handleOpen();
-      } else {
-        // Snap back (partial swipe or tap — treat as tap)
-        if (Math.abs(finalX) < 20) {
-          // Genuine tap — open/focus
-          handleOpen();
-        }
-        // Partial swipe: snap back with no action
-        setSwipeTranslate(0);
-      }
-    };
-
-    document.addEventListener('pointermove', handleMove, { passive: false });
-    document.addEventListener('pointerup', handleUp);
-    document.addEventListener('pointercancel', handleUp);
-  };
-
-  const handlePointerDownProxy = (e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
-    handlePointerDown(e as unknown as PointerEvent);
-  };
 
   return (
     <div class='flex-1 flex items-center justify-center bg-[#0B1120]'>
@@ -274,8 +284,8 @@ export function FocusMode({
           </div>
 
           <div
-            onPointerDown={handlePointerDownProxy}
-            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab touch-pan-y ${
+            ref={cardRef}
+            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab ${
               animating === 'left' ? '-translate-x-full opacity-0' :
               animating === 'right' ? 'translate-x-full opacity-0' : ''
             }`}
@@ -283,7 +293,11 @@ export function FocusMode({
               transform: swipeTranslate !== 0
                 ? `translateX(${swipeTranslate}px)`
                 : undefined,
-              transition: animating ? 'all 200ms ease-in' : swipeTranslate === 0 ? 'transform 150ms ease-out' : undefined,
+              transition: animating
+                ? 'all 200ms ease-in'
+                : swipeTranslate === 0
+                ? 'transform 150ms ease-out'
+                : undefined,
             }}
           >
             {/* App header */}
@@ -304,9 +318,10 @@ export function FocusMode({
               {currentNotif.summary}
             </p>
 
-            {/* Body — scrollable with system thin scrollbar */}
+            {/* Body — scrollable; touch-action: pan-y so horizontal pan still works */}
             {currentNotif.body && (
-              <div class="flex-1 min-h-0 mx-5 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar">
+              <div class="flex-1 min-h-0 mx-5 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar"
+                   style="touch-action: pan-y">
                 <p class="text-[16px] text-[#8BA3C7] leading-relaxed pb-2">
                   {currentNotif.body}
                 </p>

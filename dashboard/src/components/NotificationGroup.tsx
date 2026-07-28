@@ -1,5 +1,8 @@
 import { h } from 'preact';
 import { useRef, useState, useEffect, useCallback } from 'preact/hooks';
+import { Manager } from 'fngr';
+import { PanRecognizer } from 'fngr/pan';
+import { TapRecognizer } from 'fngr/tap';
 import type { Notification, AppConfig } from '../types';
 import { AppIcon } from './AppIcon';
 import { NotificationCard } from './NotificationCard';
@@ -25,86 +28,97 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
   const [expanded, setExpanded] = useState(false);
   const [translateX, setTranslateX] = useState(0);
   const [dismissing, setDismissing] = useState(false);
-  const startX = useRef(0);
-  const startY = useRef(0);
-  const captured = useRef(false);
-  const currentTranslateX = useRef(0);
-  const didSwipe = useRef(false);
+
+  const groupRef = useRef<HTMLDivElement>(null);
+
+  // Stable callback refs
+  const onMarkReadRef = useRef(onMarkRead);
+  onMarkReadRef.current = onMarkRead;
+
+  // Current unread IDs — kept in a ref so gesture callbacks see live data
+  const unreadIdsRef = useRef<number[]>([]);
+  unreadIdsRef.current = notifications.filter((n) => !n.is_read).map((n) => n.id);
+
+  const unreadCount = unreadIdsRef.current.length;
+
+  // Prevent tap from firing after a pan
+  const didPanRef = useRef(false);
+  const isExpandedRef = useRef(expanded);
+  isExpandedRef.current = expanded;
 
   const appDisplay = app?.name || appId;
   const latest = notifications[0];
-  const unreadCount = notifications.filter((n) => !n.is_read).length;
-  const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
 
-  const handleToggle = () => {
-    if (didSwipe.current) return;
+  const handleToggle = useCallback(() => {
+    if (didPanRef.current) return;
     setExpanded((prev) => !prev);
-  };
+  }, []);
 
   // Reset swipe state when notifications change or all become read
   const notifIdsKey = notifications.map((n) => `${n.id}:${n.is_read}`).join(',');
   useEffect(() => {
     setTranslateX(0);
     setDismissing(false);
-    captured.current = false;
+    didPanRef.current = false;
   }, [notifIdsKey, unreadCount]);
 
-  const markAllRead = () => {
-    for (const id of unreadIds) onMarkRead(id);
-  };
+  // Wire up fngr for the collapsed group swipe
+  useEffect(() => {
+    const el = groupRef.current;
+    if (!el) return;
 
-  const handlePointerDown = useCallback((e: PointerEvent) => {
-    if (unreadCount === 0) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    didSwipe.current = false;
-    captured.current = true;
-    currentTranslateX.current = 0;
+    const manager = new Manager(el);
+    (el as HTMLElement).style.touchAction = 'pan-y';
 
-    e.preventDefault();
-
-    const handleMove = (ev: PointerEvent) => {
-      if (!captured.current) return;
-      const deltaX = ev.clientX - startX.current;
-      const deltaY = ev.clientY - startY.current;
-
-      if (Math.abs(deltaX) < Math.abs(deltaY)) return;
-      if (deltaX > 0) return;
-
-      ev.preventDefault();
-
-      if (Math.abs(deltaX) > 10) didSwipe.current = true;
-
-      const clamped = Math.max(deltaX, -120);
-      currentTranslateX.current = clamped;
-      setTranslateX(clamped);
-    };
-
-    const handleUp = () => {
-      if (!captured.current) return;
-      captured.current = false;
-      document.removeEventListener('pointermove', handleMove);
-      document.removeEventListener('pointerup', handleUp);
-      document.removeEventListener('pointercancel', handleUp);
-
-      if (didSwipe.current && currentTranslateX.current < -80) {
-        setDismissing(true);
-        setTimeout(() => markAllRead(), 200);
-      } else if (!didSwipe.current) {
+    const pan = new PanRecognizer({
+      direction: 'horizontal',
+      threshold: 8,
+      onPanstart() {
+        if (unreadCount === 0) return;
+        didPanRef.current = true;
+      },
+      onPanmove(e) {
+        if (unreadCount === 0) return;
+        if (e.deltaX > 0) return;
+        const clamped = Math.max(e.deltaX, -120);
+        setTranslateX(clamped);
+      },
+      onPanend(e) {
+        if (unreadCount === 0) return;
+        const shouldDismiss = e.deltaX < -80 || e.velocityX < -0.4;
+        if (shouldDismiss) {
+          setDismissing(true);
+          const ids = unreadIdsRef.current;
+          setTimeout(() => {
+            for (const id of ids) onMarkReadRef.current(id);
+          }, 200);
+        } else {
+          setTranslateX(0);
+        }
+      },
+      onPancancel() {
+        if (unreadCount === 0) return;
         setTranslateX(0);
-      } else {
-        setTranslateX(0);
-      }
-    };
+      },
+    });
+    manager.add(pan);
 
-    document.addEventListener('pointermove', handleMove, { passive: false });
-    document.addEventListener('pointerup', handleUp);
-    document.addEventListener('pointercancel', handleUp);
-  }, [unreadCount, markAllRead]);
+    const tap = new TapRecognizer({
+      threshold: 10,
+      interval: 300,
+      onTap(e) {
+        if (didPanRef.current) return;
+        // Ignore taps originating from child buttons
+        const target = e.srcEvent.target as HTMLElement | null;
+        if (target?.closest('button')) return;
+        handleToggle();
+      },
+    });
+    tap.requireFailureOf(pan);
+    manager.add(tap);
 
-  const handlePointerDownProxy = useCallback((e: h.JSX.TargetedPointerEvent<HTMLDivElement>) => {
-    handlePointerDown(e as unknown as PointerEvent);
-  }, [handlePointerDown]);
+    return () => manager.destroy();
+  }, [expanded]); // re-create when expanded toggles (DOM element changes)
 
   // ── Collapsed ──────────────────────────────────────────
   if (!expanded) {
@@ -114,7 +128,8 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
 
     return (
       <div
-        class={`relative overflow-hidden border-b border-[#162035] select-none touch-pan-y ${cardClass}`}
+        ref={groupRef}
+        class={`relative overflow-hidden border-b border-[#162035] select-none ${cardClass}`}
         style={{
           transform: dismissing ? 'translateX(-100%)' : `translateX(${translateX}px)`,
         }}
@@ -127,14 +142,6 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
         <div
           role="button"
           tabIndex={0}
-          onPointerDown={handlePointerDownProxy}
-          onClick={handleToggle}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleToggle();
-            }
-          }}
           class="relative flex items-center gap-3 px-4 py-3 min-h-[56px] bg-[#111827] hover:bg-[#1A2535] cursor-pointer transition-colors active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
           aria-expanded={false}
         >
