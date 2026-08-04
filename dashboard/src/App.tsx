@@ -81,6 +81,7 @@ export function App() {
     sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
+    addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask,
   } = useWebSocket(host);
   const [activeTab, setActiveTab] = useState<MainTab>('notifications');
   const [notifSubTab, setNotifSubTab] = useState<ActiveAllTab>('active');
@@ -224,6 +225,11 @@ export function App() {
           onMarkRead={markRead}
           onFocus={focusApp}
           onToggleTodo={toggleTodo}
+          addSubtask={addSubtask}
+          editSubtask={editSubtask}
+          toggleSubtask={toggleSubtask}
+          deleteSubtask={deleteSubtask}
+          reorderSubtask={reorderSubtask}
           sessionCleared={sessionCleared}
           sessionFocused={sessionFocused}
           sessionCompleted={sessionCompleted}
@@ -397,30 +403,28 @@ export function App() {
                 <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#FF4757]">DO FIRST</span>
               </div>
               <div class="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar">
-                {doFirstTodos.map((todo) => (
-                  <div
-                    key={todo.id}
-                    class="flex items-center gap-2 py-1.5 border-b border-[#162035] last:border-b-0 cursor-pointer group min-h-[44px]"
-                    onClick={() => toggleTodo(todo.id)}
-                  >
-                    <span
-                      class={`w-4 h-4 border-2 shrink-0 flex items-center justify-center ${
-                        todo.completed
-                          ? 'bg-[#26DE81] border-[#26DE81]'
-                          : 'border-[#1E3A5F] group-hover:border-[#00D4FF]'
-                      }`}
+                {doFirstTodos.map((todo) => {
+                  const subs = todo.subtasks || [];
+                  const done = subs.filter((s) => s.completed).length;
+                  const total = subs.length;
+                  return (
+                    <div
+                      key={todo.id}
+                      class="flex items-start gap-2 py-2 border-b border-[#162035] last:border-b-0 min-h-[44px]"
                     >
-                      {todo.completed && (
-                        <svg width="8" height="8" viewBox="0 0 10 10" fill="none">
-                          <path d="M2 5L4 7L8 3" stroke="#0B1120" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
-                      )}
-                    </span>
-                    <span class={`flex-1 text-[18px] leading-snug ${todo.completed ? 'text-[#4A6080] line-through' : 'text-[#E8F0FE]'}`}>
-                      {todo.text}
-                    </span>
-                  </div>
-                ))}
+                      <span class="flex-1 min-w-0">
+                        <span class="text-[18px] leading-snug text-[#E8F0FE] block">
+                          {todo.text}
+                        </span>
+                        {total > 0 && (
+                          <span class="font-mono text-[14px] text-[#FFB800] mt-0.5 block tabular-nums">
+                            {Math.round((done / total) * 100)}%
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </aside>
           )}

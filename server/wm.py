@@ -448,11 +448,52 @@ def get_window_workspace(wm_class: str) -> int | None:
     return None
 
 
+def _gnome_get_current_workspace() -> int | None:
+    """Get the current workspace index (0-based) via GNOME Shell D-Bus.
+
+    More reliable than wmctrl on Wayland.
+    Uses org.gnome.Shell.Eval to call Mutter's workspace_manager.
+    """
+    if not shutil.which("gdbus"):
+        return None
+    try:
+        result = subprocess.run(
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell",
+                "--object-path", "/org/gnome/Shell",
+                "--method", "org.gnome.Shell.Eval",
+                "global.workspace_manager.get_active_workspace().index()",
+            ],
+            capture_output=True, text=True, timeout=3,
+        )
+        if result.returncode == 0:
+            # Output: (true, '0')  (lowercase booleans, not Python)
+            out = result.stdout.strip()
+            # gdbus prints true/false lowercase; normalize to Python
+            out = out.replace("true,", "True,").replace("false,", "False,")
+            import ast
+            parsed = ast.literal_eval(out)
+            if isinstance(parsed, tuple) and len(parsed) == 2 and parsed[0]:
+                return int(parsed[1])
+    except (subprocess.TimeoutExpired, FileNotFoundError, ValueError, SyntaxError):
+        pass
+    return None
+
+
 def get_current_workspace() -> int | None:
     """
     Get the currently active workspace index (0-based).
-    Uses wmctrl -d and looks for the '*' marker. Returns None on failure.
+
+    On GNOME/Wayland: uses D-Bus (more reliable).
+    Fallback: wmctrl -d and looks for the '*' marker.
+    Returns None on failure.
     """
+    if _is_gnome():
+        dbus_ws = _gnome_get_current_workspace()
+        if dbus_ws is not None:
+            return dbus_ws
+
     if not shutil.which("wmctrl"):
         return None
     try:
@@ -487,10 +528,16 @@ def focus_window_by_class_and_switch(wm_class: str, desktop_id: str | None = Non
         current = get_current_workspace()
         if current is not None and current == workspace:
             logger.info(f"{wm_class} already on current workspace {ws_num}, not switching")
-        elif ws_num >= 1:
-            logger.info(f"{wm_class} found on workspace {ws_num} (current={current}), switching")
+            return focused
+        # Only switch if we can detect both workspaces and they differ
+        if current is not None and workspace is not None:
+            logger.info(f"{wm_class} on workspace {ws_num}, current={current}, switching")
             switched = switch_to_workspace(ws_num)
             return focused or switched
+        else:
+            # Can't detect current workspace — skip the switch to avoid
+            # jumping to an unexpected workspace when already on the right one
+            logger.info(f"{wm_class} on workspace {ws_num}, can't detect current workspace, skipping switch")
 
     return focused
 

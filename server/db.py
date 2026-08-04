@@ -23,6 +23,7 @@ class Notification:
     created_at: float
     notif_id: int | None = None
     x_shell_sender: str = ""
+    is_important: bool = False
 
 
 @dataclass
@@ -34,6 +35,16 @@ class Todo:
     created_at: float
     due_date: str | None
     priority: str
+
+
+@dataclass
+class Subtask:
+    id: int
+    todo_id: int
+    text: str
+    completed: bool
+    order_index: int
+    created_at: float
 
 
 class Database:
@@ -68,7 +79,8 @@ class Database:
                 is_read INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL,
                 notif_id INTEGER,
-                x_shell_sender TEXT DEFAULT ''
+                x_shell_sender TEXT DEFAULT '',
+                is_important INTEGER NOT NULL DEFAULT 0
             );
             CREATE INDEX IF NOT EXISTS idx_notifications_app_id
                 ON notifications(app_id);
@@ -82,6 +94,17 @@ class Database:
                 order_index INTEGER NOT NULL DEFAULT 0,
                 created_at REAL NOT NULL
             );
+
+            CREATE TABLE IF NOT EXISTS subtasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+                text TEXT NOT NULL,
+                completed INTEGER NOT NULL DEFAULT 0,
+                order_index INTEGER NOT NULL DEFAULT 0,
+                created_at REAL NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_subtasks_todo_id
+                ON subtasks(todo_id);
         """)
         self._conn.commit()
 
@@ -91,13 +114,14 @@ class Database:
 
     def create_notification(
         self, app_id: str, app_name: str, summary: str = "", body: str = "",
-        notif_id: int | None = None, x_shell_sender: str = ""
+        notif_id: int | None = None, x_shell_sender: str = "",
+        is_important: bool = False,
     ) -> Notification | None:
         if not self._usable:
             return None
         try:
             # Migrate: add columns if they don't exist yet
-            for col, col_type in [("notif_id", "INTEGER"), ("x_shell_sender", "TEXT DEFAULT ''")]:
+            for col, col_type in [("notif_id", "INTEGER"), ("x_shell_sender", "TEXT DEFAULT ''"), ("is_important", "INTEGER NOT NULL DEFAULT 0")]:
                 try:
                     conn = self._connect()
                     conn.execute(f"ALTER TABLE notifications ADD COLUMN {col} {col_type}")
@@ -108,9 +132,9 @@ class Database:
             conn = self._connect()
             now = time.time()
             cur = conn.execute(
-                "INSERT INTO notifications (app_id, app_name, summary, body, created_at, notif_id, x_shell_sender) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (app_id, app_name, summary, body, now, notif_id, x_shell_sender),
+                "INSERT INTO notifications (app_id, app_name, summary, body, created_at, notif_id, x_shell_sender, is_important) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (app_id, app_name, summary, body, now, notif_id, x_shell_sender, int(is_important)),
             )
             row_id = cur.lastrowid
             self._cleanup_old(conn)
@@ -125,6 +149,7 @@ class Database:
                 created_at=now,
                 notif_id=notif_id,
                 x_shell_sender=x_shell_sender,
+                is_important=is_important,
             )
         except sqlite3.Error as e:
             logger.error(f"create_notification failed: {e}")
@@ -140,7 +165,8 @@ class Database:
             row = conn.execute(
                 "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
                 "COALESCE(notif_id, NULL) AS notif_id, "
-                "COALESCE(x_shell_sender, '') AS x_shell_sender "
+                "COALESCE(x_shell_sender, '') AS x_shell_sender, "
+                "COALESCE(is_important, 0) AS is_important "
                 "FROM notifications WHERE id=?",
                 (notification_id,),
             ).fetchone()
@@ -156,6 +182,7 @@ class Database:
                 created_at=row["created_at"],
                 notif_id=row["notif_id"],
                 x_shell_sender=row["x_shell_sender"] or "",
+                is_important=bool(row["is_important"]),
             )
         except sqlite3.Error as e:
             logger.error(f"get_notification({notification_id}) failed: {e}")
@@ -184,7 +211,8 @@ class Database:
             rows = conn.execute(
                 "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
                 "COALESCE(notif_id, NULL) AS notif_id, "
-                "COALESCE(x_shell_sender, '') AS x_shell_sender "
+                "COALESCE(x_shell_sender, '') AS x_shell_sender, "
+                "COALESCE(is_important, 0) AS is_important "
                 "FROM notifications ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
@@ -199,6 +227,7 @@ class Database:
                     created_at=r["created_at"],
                     notif_id=r["notif_id"],
                     x_shell_sender=r["x_shell_sender"] or "",
+                    is_important=bool(r["is_important"]),
                 )
                 for r in rows
             ]
@@ -500,6 +529,11 @@ class Database:
         self._ensure_todos_table()
         try:
             conn = self._connect()
+            # Delete subtasks first (ON DELETE CASCADE should handle this
+            # but SQLite needs PRAGMA foreign_keys=ON at connect time, which
+            # we already set, so cascade should work. Explicit delete anyway
+            # for safety.)
+            conn.execute("DELETE FROM subtasks WHERE todo_id = ?", (todo_id,))
             cur = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
             conn.commit()
             return cur.rowcount > 0
@@ -521,6 +555,200 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"get_all_todos failed: {e}")
             return []
+
+
+    # ── Subtasks ──────────────────────────────────────────────────
+
+    def _ensure_subtasks_table(self):
+        """Ensure the subtasks table exists."""
+        try:
+            conn = self._connect()
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS subtasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    todo_id INTEGER NOT NULL REFERENCES todos(id) ON DELETE CASCADE,
+                    text TEXT NOT NULL,
+                    completed INTEGER NOT NULL DEFAULT 0,
+                    order_index INTEGER NOT NULL DEFAULT 0,
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_subtasks_todo_id
+                    ON subtasks(todo_id);
+            """)
+            conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"_ensure_subtasks_table failed: {e}")
+
+    def _row_to_subtask(self, row: sqlite3.Row) -> Subtask:
+        return Subtask(
+            id=row["id"],
+            todo_id=row["todo_id"],
+            text=row["text"],
+            completed=bool(row["completed"]),
+            order_index=row["order_index"],
+            created_at=row["created_at"],
+        )
+
+    def get_subtasks_for_todo(self, todo_id: int) -> list[Subtask]:
+        """Return all subtasks for a given todo, ordered by order_index."""
+        if not self._usable:
+            return []
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            rows = conn.execute(
+                "SELECT id, todo_id, text, completed, order_index, created_at "
+                "FROM subtasks WHERE todo_id = ? ORDER BY order_index ASC",
+                (todo_id,),
+            ).fetchall()
+            return [self._row_to_subtask(r) for r in rows]
+        except sqlite3.Error as e:
+            logger.error(f"get_subtasks_for_todo({todo_id}) failed: {e}")
+            return []
+
+    def get_all_subtasks(self) -> dict[int, list[Subtask]]:
+        """Return all subtasks grouped by todo_id."""
+        if not self._usable:
+            return {}
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            rows = conn.execute(
+                "SELECT id, todo_id, text, completed, order_index, created_at "
+                "FROM subtasks ORDER BY todo_id, order_index ASC"
+            ).fetchall()
+            result: dict[int, list[Subtask]] = {}
+            for r in rows:
+                s = self._row_to_subtask(r)
+                result.setdefault(s.todo_id, []).append(s)
+            return result
+        except sqlite3.Error as e:
+            logger.error(f"get_all_subtasks failed: {e}")
+            return {}
+
+    def create_subtask(self, todo_id: int, text: str) -> Subtask | None:
+        """Add a subtask to a todo. Max 20 per todo."""
+        if not self._usable:
+            return None
+        if not text.strip():
+            return None
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            # Check max count
+            count_row = conn.execute(
+                "SELECT COUNT(*) AS cnt FROM subtasks WHERE todo_id = ?",
+                (todo_id,),
+            ).fetchone()
+            if count_row and count_row["cnt"] >= 20:
+                logger.warning(f"Todo {todo_id} already has 20 subtasks, max reached")
+                return None
+            # Verify the parent todo exists
+            parent = conn.execute("SELECT id FROM todos WHERE id = ?", (todo_id,)).fetchone()
+            if not parent:
+                logger.warning(f"Todo {todo_id} not found, cannot add subtask")
+                return None
+            now = time.time()
+            # Get next order_index
+            order_row = conn.execute(
+                "SELECT COALESCE(MAX(order_index), -1) AS mx FROM subtasks WHERE todo_id = ?",
+                (todo_id,),
+            ).fetchone()
+            next_order = (order_row["mx"] if order_row else -1) + 1
+            cur = conn.execute(
+                "INSERT INTO subtasks (todo_id, text, order_index, created_at) "
+                "VALUES (?, ?, ?, ?)",
+                (todo_id, text.strip(), next_order, now),
+            )
+            conn.commit()
+            return Subtask(
+                id=cur.lastrowid,
+                todo_id=todo_id,
+                text=text.strip(),
+                completed=False,
+                order_index=next_order,
+                created_at=now,
+            )
+        except sqlite3.Error as e:
+            logger.error(f"create_subtask failed: {e}")
+            return None
+
+    def toggle_subtask(self, subtask_id: int) -> Subtask | None:
+        """Toggle a subtask's completion status."""
+        if not self._usable:
+            return None
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE subtasks SET completed = 1 - completed WHERE id = ?",
+                (subtask_id,),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT id, todo_id, text, completed, order_index, created_at "
+                "FROM subtasks WHERE id = ?",
+                (subtask_id,),
+            ).fetchone()
+            return self._row_to_subtask(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"toggle_subtask failed: {e}")
+            return None
+
+    def update_subtask_text(self, subtask_id: int, text: str) -> Subtask | None:
+        """Update a subtask's text."""
+        if not self._usable:
+            return None
+        if not text.strip():
+            return None
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE subtasks SET text = ? WHERE id = ?",
+                (text.strip(), subtask_id),
+            )
+            conn.commit()
+            row = conn.execute(
+                "SELECT id, todo_id, text, completed, order_index, created_at "
+                "FROM subtasks WHERE id = ?",
+                (subtask_id,),
+            ).fetchone()
+            return self._row_to_subtask(row) if row else None
+        except sqlite3.Error as e:
+            logger.error(f"update_subtask_text failed: {e}")
+            return None
+
+    def delete_subtask(self, subtask_id: int) -> bool:
+        """Delete a subtask."""
+        if not self._usable:
+            return False
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            cur = conn.execute("DELETE FROM subtasks WHERE id = ?", (subtask_id,))
+            conn.commit()
+            return cur.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"delete_subtask failed: {e}")
+            return False
+
+    def reorder_subtask(self, subtask_id: int, order_index: int) -> bool:
+        """Update a subtask's order_index."""
+        if not self._usable:
+            return False
+        self._ensure_subtasks_table()
+        try:
+            conn = self._connect()
+            cur = conn.execute(
+                "UPDATE subtasks SET order_index = ? WHERE id = ?",
+                (order_index, subtask_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"reorder_subtask failed: {e}")
+            return False
 
 
 db = Database()

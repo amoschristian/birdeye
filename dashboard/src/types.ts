@@ -29,6 +29,7 @@ export interface Notification {
   created_at: number;
   notif_id: number | null;
   x_shell_sender: string;
+  is_important: boolean;
 }
 
 export interface ServerStateMessage {
@@ -97,7 +98,7 @@ export interface ServerWorkspaceAckMessage {
   success: boolean;
 }
 
-export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction;
+export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
 
 // ── Monitor types ─────────────────────────────────────────────────
 
@@ -180,6 +181,15 @@ export interface ServerCalendarMessage {
 
 // ── Todo types ───────────────────────────────────────────────────
 
+export interface SubtaskItem {
+  id: number;
+  todo_id: number;
+  text: string;
+  completed: boolean;
+  order_index: number;
+  created_at: number;
+}
+
 export interface TodoItem {
   id: number;
   text: string;
@@ -188,6 +198,7 @@ export interface TodoItem {
   created_at: number;
   due_date: string | null;
   priority: 'high' | 'medium' | 'low';
+  subtasks?: SubtaskItem[];
 }
 
 export interface ServerTodosMessage {
@@ -230,6 +241,34 @@ export interface ClientTodoDateAction {
 
 export interface ClientTodoReorderAction {
   action: 'todo_reorder';
+  id: number;
+  order_index: number;
+}
+
+export interface ClientSubtaskAddAction {
+  action: 'subtask_add';
+  todo_id: number;
+  text: string;
+}
+
+export interface ClientSubtaskToggleAction {
+  action: 'subtask_toggle';
+  id: number;
+}
+
+export interface ClientSubtaskEditAction {
+  action: 'subtask_edit';
+  id: number;
+  text: string;
+}
+
+export interface ClientSubtaskDeleteAction {
+  action: 'subtask_delete';
+  id: number;
+}
+
+export interface ClientSubtaskReorderAction {
+  action: 'subtask_reorder';
   id: number;
   order_index: number;
 }

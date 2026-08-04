@@ -16,6 +16,7 @@ import notif_banner
 from dbus_listener import DBusListener
 from spotify import spotify_listener
 from cal_listener import calendar_listener
+from notif_importance import classify_importance
 import state
 from ws import router as ws_router
 
@@ -153,18 +154,23 @@ async def lifespan(app: FastAPI):
                     continue
 
             # Persist to SQLite
+            summary = notif.get("summary", "")
+            body = notif.get("body", "")
+            is_important = classify_importance(app_id, app_name_display, summary, body)
             notification = db.db.create_notification(
                 app_id=app_id,
                 app_name=app_name_display,
-                summary=notif.get("summary", ""),
-                body=notif.get("body", ""),
+                summary=summary,
+                body=body,
                 notif_id=notif.get("notif_id"),
                 x_shell_sender=notif.get("x_shell_sender", ""),
+                is_important=is_important,
             )
             logger.info(f"D-Bus → app_id={app_id} app_name={app_name_display} "
-                       f"summary=\"{notif.get('summary', '')[:40]}\" "
-                       f"body=\"{notif.get('body', '')[:40]}\" "
+                       f"summary=\"{summary[:40]}\" "
+                       f"body=\"{body[:40]}\" "
                        f"notif_id={notif.get('notif_id')} "
+                       f"important={is_important} "
                        f"saved={'yes' if notification else 'no'}")
             if notification:
                 # Broadcast to dashboards

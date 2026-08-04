@@ -1,4 +1,3 @@
-import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -11,6 +10,7 @@ from config_loader import config
 from monitor import system_monitor
 from spotify import spotify_listener
 from cal_listener import calendar_listener
+from notif_importance import classify_importance
 
 logger = logging.getLogger(__name__)
 
@@ -122,10 +122,16 @@ async def broadcast_calendar():
 
 
 async def broadcast_todos():
-    """Broadcast full todo list to all dashboards."""
+    """Broadcast full todo list with nested subtasks to all dashboards."""
     if not _dashboard_conns:
         return
-    todos_list = [t.__dict__ for t in db.get_all_todos()]
+    todos = db.get_all_todos()
+    subtasks_map = db.get_all_subtasks()
+    todos_list = []
+    for t in todos:
+        d = t.__dict__.copy()
+        d["subtasks"] = [s.__dict__ for s in subtasks_map.get(t.id, [])]
+        todos_list.append(d)
     payload = {"type": "todos", "todos": todos_list}
     await _broadcast(_dashboard_conns, payload)
 
@@ -146,11 +152,17 @@ async def ws_extension(websocket: WebSocket):
                 state.update_tab(data)
                 # Persist as a notification card (browser extension notifications
                 # don't go through D-Bus, so we store them directly in the DB)
+                app_id = data.get("appId", "")
+                app_name = data.get("appName", "")
+                summary = data.get("title", "")
+                body = data.get("body", "")
+                is_important = classify_importance(app_id, app_name, summary, body)
                 db.create_notification(
-                    app_id=data.get("appId", ""),
-                    app_name=data.get("appName", ""),
-                    summary=data.get("title", ""),
-                    body=data.get("body", ""),
+                    app_id=app_id,
+                    app_name=app_name,
+                    summary=summary,
+                    body=body,
+                    is_important=is_important,
                 )
                 await broadcast_state()
             elif msg_type == "update":
@@ -299,6 +311,40 @@ async def ws_dashboard(websocket: WebSocket):
                     db.delete_todo(todo_id)
                     await broadcast_todos()
 
+            elif action == "subtask_add":
+                todo_id = data.get("todo_id")
+                text = data.get("text", "").strip()
+                if todo_id is not None and text:
+                    subtask = db.create_subtask(todo_id, text)
+                    if subtask:
+                        await broadcast_todos()
+
+            elif action == "subtask_toggle":
+                subtask_id = data.get("id")
+                if subtask_id is not None:
+                    db.toggle_subtask(subtask_id)
+                    await broadcast_todos()
+
+            elif action == "subtask_edit":
+                subtask_id = data.get("id")
+                text = data.get("text", "").strip()
+                if subtask_id is not None and text:
+                    db.update_subtask_text(subtask_id, text)
+                    await broadcast_todos()
+
+            elif action == "subtask_delete":
+                subtask_id = data.get("id")
+                if subtask_id is not None:
+                    db.delete_subtask(subtask_id)
+                    await broadcast_todos()
+
+            elif action == "subtask_reorder":
+                subtask_id = data.get("id")
+                order_index = data.get("order_index")
+                if subtask_id is not None and order_index is not None:
+                    db.reorder_subtask(subtask_id, int(order_index))
+                    await broadcast_todos()
+
             elif action == "focus":
                 app_id = data.get("appId", "")
                 notif_id = data.get("notifId")  # D-Bus notification ID for deep-linking
@@ -330,11 +376,9 @@ async def ws_dashboard(websocket: WebSocket):
                             "windowId": tab.window_id,
                         }
                         await _broadcast(_extension_conns, focus_msg)
-                        # Wait a beat for the extension to focus the window,
-                        # then also switch workspace — Chrome's focus may not
-                        # trigger workspace switch on all Wayland compositors.
-                        await asyncio.sleep(0.3)
-                        wm.focus_browser()
+                        # Extension handles window focus via chrome.windows.update
+                        # (xdg-activation on Wayland). No need for a blind fallback
+                        # that finds the wrong browser window.
 
                     await _send(websocket, {
                         "type": "focus_ack",

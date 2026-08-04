@@ -33,15 +33,25 @@ function todayStr(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function getQuadrant(todo: TodoItem): QuadrantId {
-  // Urgency = priority level. Soon = due today or overdue.
-  const isUrgent = todo.priority === 'high';
-  const isDueSoon = todo.due_date !== null && todo.due_date <= todayStr();
+function daysFromNow(n: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 
-  if (isUrgent && isDueSoon) return 'do-first';    // Urgent + Soon
-  if (isUrgent && !isDueSoon) return 'schedule';    // Urgent + Distant
-  if (!isUrgent && isDueSoon) return 'decide';      // Low urgency + Soon
-  return 'eliminate';                                 // Low urgency + Distant
+function getQuadrant(todo: TodoItem): QuadrantId {
+  const p = todo.priority;
+  const d = todo.due_date;
+
+  // DO FIRST: high priority + due today/overdue (must act now)
+  if (p === 'high' && d && d <= todayStr()) return 'do-first';
+  // SCHEDULE: high priority (future date or none)
+  if (p === 'high') return 'schedule';
+  // DECIDE: any item with a due date but not high priority (needs a call)
+  if (d) return 'decide';
+  // ELIMINATE: no priority, no date
+  return 'eliminate';
+
 }
 
 function formatDateBadge(dueDate: string | null): { text: string; isOverdue: boolean; isToday: boolean } {
@@ -127,11 +137,7 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
     if (!isCrossQuadrant) return;
 
     const today = todayStr();
-    const nextWeek = (() => {
-      const d = new Date();
-      d.setDate(d.getDate() + 7);
-      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    })();
+    const nextWeek = daysFromNow(7);
 
     switch (targetQuadrant) {
       case 'do-first':
@@ -144,7 +150,7 @@ export function TodoPage({ todos, onAdd, onToggle, onEdit, onDelete, onSetPriori
         break;
       case 'decide':
         onSetPriority(todoId, 'medium');
-        onSetDueDate(todoId, today);
+        onSetDueDate(todoId, nextWeek);
         break;
       case 'eliminate':
         onSetPriority(todoId, 'low');

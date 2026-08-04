@@ -31,6 +31,11 @@ interface UseWebSocketReturn {
   setPriority: (id: number, priority: 'high' | 'medium' | 'low') => void;
   setDueDate: (id: number, dueDate: string | null) => void;
   reorderTodo: (id: number, orderIndex: number) => void;
+  addSubtask: (todoId: number, text: string) => void;
+  toggleSubtask: (id: number) => void;
+  editSubtask: (id: number, text: string) => void;
+  deleteSubtask: (id: number) => void;
+  reorderSubtask: (id: number, orderIndex: number) => void;
 }
 
 function calcUnreadCounts(notifications: Notification[]): Record<string, number> {
@@ -268,5 +273,77 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     );
   }, [sendMessage]);
 
-  return { apps, tabs, notifications, todos, monitorData, spotifyData, calendarEvents, connected, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo };
+  // ── Subtask actions ─────────────────────────────────
+
+  const addSubtask = useCallback((todoId: number, text: string) => {
+    sendMessage({ action: 'subtask_add', todo_id: todoId, text });
+    // Optimistic: add with temporary negative ID
+    const tempId = -Date.now();
+    setTodos((prev) =>
+      prev.map((t) => {
+        if (t.id !== todoId) return t;
+        const newSubtask = {
+          id: tempId,
+          todo_id: todoId,
+          text,
+          completed: false,
+          order_index: (t.subtasks || []).length,
+          created_at: Date.now() / 1000,
+        };
+        return { ...t, subtasks: [...(t.subtasks || []), newSubtask] };
+      })
+    );
+  }, [sendMessage]);
+
+  const toggleSubtask = useCallback((id: number) => {
+    sendMessage({ action: 'subtask_toggle', id });
+    // Optimistic toggle
+    setTodos((prev) =>
+      prev.map((t) => ({
+        ...t,
+        subtasks: (t.subtasks || []).map((s) =>
+          s.id === id ? { ...s, completed: !s.completed } : s
+        ),
+      }))
+    );
+  }, [sendMessage]);
+
+  const editSubtask = useCallback((id: number, text: string) => {
+    sendMessage({ action: 'subtask_edit', id, text });
+    // Optimistic update
+    setTodos((prev) =>
+      prev.map((t) => ({
+        ...t,
+        subtasks: (t.subtasks || []).map((s) =>
+          s.id === id ? { ...s, text } : s
+        ),
+      }))
+    );
+  }, [sendMessage]);
+
+  const deleteSubtask = useCallback((id: number) => {
+    sendMessage({ action: 'subtask_delete', id });
+    // Optimistic removal
+    setTodos((prev) =>
+      prev.map((t) => ({
+        ...t,
+        subtasks: (t.subtasks || []).filter((s) => s.id !== id),
+      }))
+    );
+  }, [sendMessage]);
+
+  const reorderSubtask = useCallback((id: number, orderIndex: number) => {
+    sendMessage({ action: 'subtask_reorder', id, order_index: orderIndex });
+    // Optimistic
+    setTodos((prev) =>
+      prev.map((t) => ({
+        ...t,
+        subtasks: (t.subtasks || []).map((s) =>
+          s.id === id ? { ...s, order_index: orderIndex } : s
+        ),
+      }))
+    );
+  }, [sendMessage]);
+
+  return { apps, tabs, notifications, todos, monitorData, spotifyData, calendarEvents, connected, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask };
 }

@@ -30,6 +30,7 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
 
   const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
   const unreadCount = unreadIds.length;
+  const importantCount = notifications.filter((n) => !n.is_read && n.is_important).length;
 
   const appDisplay = app?.name || appId;
   const latest = notifications[0];
@@ -71,6 +72,9 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
           </div>
           <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#E8F0FE]">{appDisplay}</span>
           <span class="text-[20px] font-medium text-[#FFB800] font-mono">{label}</span>
+          {importantCount > 0 && (
+            <span class="font-mono text-[18px] font-bold text-[#FF4757] tabular-nums">!{importantCount}</span>
+          )}
           {unreadCount > 0 && (
             <span class="font-mono text-[20px] font-bold text-[#FFB800] tabular-nums">{unreadCount}</span>
           )}

@@ -179,6 +179,10 @@ export function NotificationCard({ notification, onMarkRead, onFocus, emoji }: P
       }
       class="relative overflow-hidden border-b border-[#162035] select-none"
     >
+      {/* Important indicator — red accent bar for DMs and mentions */}
+      {notification.is_important && !notification.is_read && (
+        <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-[#FF4757]" />
+      )}
       {/* Swipe reveal background — pinned to card container */}
       {!notification.is_read && (dragging || dismissing || translateX < 0) && (
         <div class="absolute inset-0 bg-[#26DE81] flex items-center justify-end pr-4">
