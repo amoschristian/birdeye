@@ -467,11 +467,10 @@ class Database:
             return None
         self._ensure_todos_table()
         try:
-            clean_text, due_date, priority = self._parse_todo_meta(text)
             conn = self._connect()
             conn.execute(
-                "UPDATE todos SET text = ?, due_date = ?, priority = ? WHERE id = ?",
-                (clean_text, due_date, priority, todo_id),
+                "UPDATE todos SET text = ? WHERE id = ?",
+                (text, todo_id),
             )
             conn.commit()
             return self._fetch_todo(conn, todo_id)
