@@ -43,6 +43,8 @@ cd dashboard && npm run build
 systemctl --user restart birdeye
 ```
 
+**After every dashboard update**: rebuild and restart — `cd dashboard && npm run build`, then `systemctl --user restart birdeye`. The server serves the built `dist/`, so source changes are not live until rebuilt.
+
 Or for development with hot reload:
 
 ```

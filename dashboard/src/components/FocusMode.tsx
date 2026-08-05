@@ -367,7 +367,10 @@ export function FocusMode({
 
   const subtasks = (visibleTodo?.subtasks || [])
     .slice()
-    .sort((a, b) => a.order_index - b.order_index);
+    .sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1;
+      return a.order_index - b.order_index;
+    });
   const completedCount = subtasks.filter((s) => s.completed).length;
   const totalCount = subtasks.length;
   const canAddSubtask = visibleTodo && totalCount < 20;
