@@ -139,8 +139,6 @@ export function FocusMode({
   const showTodoOnly = !hasUnread && hasDoFirst;
 
   const currentNotif = hasUnread ? sortedNotifications[0] : null;
-  // Count how many important ones remain
-  const importantCount = sortedNotifications.filter((n) => n.is_important).length;
 
   // Rotate todos for the skip feature
   const rotatedTodos = todoSkipKey > 0 && doFirstTodos.length > 1
@@ -466,30 +464,6 @@ export function FocusMode({
             )}
           </div>
 
-          <div class="flex items-center gap-3 shrink-0">
-            {sortedNotifications.length > 1 ? (
-              <div class="flex gap-1.5">
-                {sortedNotifications.map((n, i) => (
-                  <span
-                    key={i}
-                    class={`block w-2 h-2 ${i === 0 ? 'bg-[#FFB800]' : n.is_important ? 'bg-[#FF4757]' : 'bg-[#1E3A5F]'}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <span class="font-mono text-[14px] text-[#4A6080]">Last one</span>
-            )}
-            <span class="font-mono text-[14px] text-[#4A6080]">
-              {sortedNotifications.length > 1
-                ? `${sortedNotifications.length} remaining`
-                : ''}
-            </span>
-            {importantCount > 0 && (
-              <span class="font-mono text-[14px] text-[#FF4757] font-bold">
-                !{importantCount}
-              </span>
-            )}
-          </div>
         </div>
       )}
 
@@ -548,30 +522,6 @@ export function FocusMode({
             )}
           </div>
 
-          <div class="flex items-center gap-2 shrink-0 mt-2">
-            {sortedNotifications.length > 1 ? (
-              <div class="flex gap-1">
-                {sortedNotifications.map((n, i) => (
-                  <span
-                    key={i}
-                    class={`block w-1.5 h-1.5 ${i === 0 ? 'bg-[#FFB800]' : n.is_important ? 'bg-[#FF4757]' : 'bg-[#1E3A5F]'}`}
-                  />
-                ))}
-              </div>
-            ) : (
-              <span class="font-mono text-[14px] text-[#4A6080]">Last one</span>
-            )}
-            <span class="font-mono text-[14px] text-[#4A6080]">
-              {sortedNotifications.length > 1
-                ? `${sortedNotifications.length} remaining`
-                : ''}
-            </span>
-            {importantCount > 0 && (
-              <span class="font-mono text-[14px] text-[#FF4757] font-bold">
-                !{importantCount}
-              </span>
-            )}
-          </div>
         </div>
       )}
     </div>
