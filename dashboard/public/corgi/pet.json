@@ -1,0 +1,9 @@
+{
+  "id": "corgi",
+  "displayName": "Corgi",
+  "description": "A cute chibi corgi companion for Codex.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "animal",
+  "source": "codex-pets.net",
+  "sourceId": "corgi"
+}

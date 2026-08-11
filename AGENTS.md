@@ -123,6 +123,7 @@ dashboard/
 │       ├── AppButton.tsx        # channel selector button with unread badge
 │       ├── AppIcon.tsx          # app icon with image/emoji fallback
 │       ├── BottomBar.tsx        # Spotify strip + CPU/RAM gauges
+│       ├── CorgiBar.tsx         # pixel corgi patrol overlay above bottom bar
 │       ├── CalendarStrip.tsx    # upcoming event marquee ticker
 │       ├── Clock.tsx            # time (32px amber mono) + date
 │       ├── ConnectionStatus.tsx # solid indicator + ONLINE/NO SIGNAL label
@@ -166,6 +167,7 @@ Calendar is hidden from the channel sidebar — upcoming events appear in the ca
 │ [TELE] │ GOOGLE CHAT — team   12m    │              │
 │ [WHAT] │   Design review notes       │              │
 ├────────┴─────────────────────────────┴──────────────┤
+│ ▒ corgi patrol overlay (transparent, no layout space)│ 66px
 │ ♪ Song — Artist                          CPU ██ RAM  │ 56px bottom bar
 └──────────────────────────────────────────────────────┘
 ```
@@ -273,6 +275,7 @@ Todo items are persisted in SQLite with support for:
 
 ## Notes
 
+- **CorgiBar**: a pixel corgi (`public/corgi/`, community Codex pet from codex-pet.org/pets/corgi/) patrols an absolute overlay strip just above the bottom bar — no layout space reserved, `pointer-events-none`, respects `prefers-reduced-motion`. Behaviors: walk (40px/s, bounces at edges), plus random breaks — idle, wait, review, wave (first break after boot), and jump. Its sprite sheet's run rows are swapped vs the Codex convention ("runRight" faces left) — CorgiBar compensates.
 - **MV3 world split**: `content-notif.js` runs in `MAIN` world at `document_start` — this is the only world that can intercept page-level `new Notification()` calls. It uses `window.postMessage` to bridge back to `content.js` which runs in `ISOLATED` world (the only world with `chrome.runtime.sendMessage` access). `content-gchat.js` runs at `document_end` (needs DOM body).
 - Google Chat badge detection uses `document.body.innerText` with regex `/(\d+)\s*Notification/`. Fragile — if GChat DOM changes, update `content-gchat.js`.
 - Focus for browser apps uses extension tab routing; for native apps uses `wmctrl -x -a <WM_CLASS>`. Requires `wmctrl` installed.

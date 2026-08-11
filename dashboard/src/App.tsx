@@ -29,6 +29,7 @@ import { ConnectionStatus } from './components/ConnectionStatus';
 import { AppButton } from './components/AppButton';
 import { NotificationCard } from './components/NotificationCard';
 import { BottomBar } from './components/BottomBar';
+import { CorgiBar } from './components/CorgiBar';
 import { Clock } from './components/Clock';
 import { CalendarStrip } from './components/CalendarStrip';
 import { TodoPage } from './components/TodoPage';
@@ -165,7 +166,7 @@ export function App() {
     .slice(0, 4);
 
   return (
-    <div class="h-screen w-screen bg-[#0B1120] text-[#E8F0FE] antialiased flex flex-col overflow-hidden select-none">
+    <div class="relative h-screen w-screen bg-[#0B1120] text-[#E8F0FE] antialiased flex flex-col overflow-hidden select-none">
       {/* ── Status bar (48px) ────────────────────────────────── */}
       <header class="flex items-center justify-between px-4 h-14 shrink-0 border-b border-[#1E3A5F] bg-[#0B1120]">
         <div class="flex items-center gap-4">
@@ -446,6 +447,9 @@ export function App() {
           />
         </div>
       )}
+
+      {/* ── Corgi patrol strip (66px) ──────────────────────── */}
+      <CorgiBar />
 
       {/* ── Audio/comms bar (48px) ──────────────────────────── */}
       <BottomBar
