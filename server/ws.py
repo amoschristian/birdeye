@@ -135,6 +135,300 @@ async def broadcast_todos():
     payload = {"type": "todos", "todos": todos_list}
     await _broadcast(_dashboard_conns, payload)
 
+
+async def broadcast_todo_reminder(todo):
+    """Broadcast a single todo reminder to all dashboards (not a notification)."""
+    payload = {"type": "todo_reminder", "todo": todo.__dict__}
+    await _broadcast(_dashboard_conns, payload)
+
+
+async def _todo_ack(websocket: WebSocket, request_id: str | None, action: str,
+                    success: bool, entity_id: int | None = None, error: str | None = None):
+    """Request-correlated acknowledgement for todo/subtask mutations."""
+    if not request_id:
+        return
+    await _send(websocket, {
+        "type": "todo_ack",
+        "requestId": request_id,
+        "action": action,
+        "id": entity_id,
+        "success": success,
+        "error": error,
+    })
+
+
+async def _handle_todo_action(websocket: WebSocket, data: dict):
+    """Dispatch todo/subtask mutations. Always acks; broadcasts only on success."""
+    action = data.get("action")
+    req = data.get("requestId")
+    ok = False
+    entity_id: int | None = None
+    error: str | None = None
+
+    if action == "todo_add":
+        text = (data.get("text") or "").strip()
+        if not text:
+            error = "empty_text"
+        else:
+            todo = db.create_todo(text)
+            if todo:
+                ok, entity_id = True, todo.id
+            else:
+                error = "create_failed"
+
+    elif action == "todo_toggle":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.toggle_todo(todo_id)
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_status":
+        todo_id = data.get("id")
+        status = data.get("status", "")
+        if todo_id is None:
+            error = "missing_id"
+        elif status not in ("inbox", "active", "waiting", "completed", "archived"):
+            error = "invalid_status"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_status(todo_id, status)
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_edit":
+        todo_id = data.get("id")
+        text = (data.get("text") or "").strip()
+        if todo_id is None:
+            error = "missing_id"
+        elif not text:
+            error = "empty_text"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_text(todo_id, text)
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_notes":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_notes(todo_id, data.get("notes") or "")
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_project":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_project(todo_id, data.get("project") or "")
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_estimate":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_estimate(todo_id, data.get("estimate_minutes"))
+            if todo:
+                ok = True
+            else:
+                error = "invalid_estimate"
+
+    elif action == "todo_schedule":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_schedule(
+                todo_id,
+                data.get("scheduled_date") or None,
+                data.get("scheduled_time") or None,
+            )
+            if todo:
+                ok = True
+            else:
+                error = "invalid_schedule"
+
+    elif action == "todo_reminder":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_reminder(todo_id, data.get("reminder_at"))
+            if todo:
+                ok = True
+            else:
+                error = "invalid_reminder"
+
+    elif action == "todo_repeat":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_repeat_rule(todo_id, data.get("repeat_rule"))
+            if todo:
+                ok = True
+            else:
+                error = "invalid_rule"
+
+    elif action == "todo_attach_context":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.attach_todo_context(
+                todo_id,
+                source_app=data.get("source_app"),
+                source_sender=data.get("source_sender"),
+                source_url=data.get("source_url"),
+                source_notification_id=data.get("source_notification_id"),
+            )
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_priority":
+        todo_id = data.get("id")
+        priority = data.get("priority", "")
+        if todo_id is None:
+            error = "missing_id"
+        elif priority not in ("high", "medium", "low"):
+            error = "invalid_priority"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_priority(todo_id, priority)
+            if todo:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "todo_date":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            todo = db.update_todo_due_date(todo_id, data.get("due_date") or None)
+            if todo:
+                ok = True
+            else:
+                error = "invalid_date"
+
+    elif action == "todo_reorder":
+        todo_id = data.get("id")
+        order_index = data.get("order_index")
+        if todo_id is None or order_index is None:
+            error = "missing_fields"
+        else:
+            entity_id = todo_id
+            ok = db.reorder_todo(todo_id, int(order_index))
+            if not ok:
+                error = "not_found"
+
+    elif action == "todo_delete":
+        todo_id = data.get("id")
+        if todo_id is None:
+            error = "missing_id"
+        else:
+            entity_id = todo_id
+            ok = db.delete_todo(todo_id)  # soft-delete → archive
+            if not ok:
+                error = "not_found"
+
+    elif action == "subtask_add":
+        todo_id = data.get("todo_id")
+        text = (data.get("text") or "").strip()
+        if todo_id is None:
+            error = "missing_id"
+        elif not text:
+            error = "empty_text"
+        else:
+            subtask = db.create_subtask(todo_id, text)
+            if subtask:
+                ok, entity_id = True, subtask.id
+            else:
+                error = "create_failed"
+
+    elif action == "subtask_toggle":
+        subtask_id = data.get("id")
+        if subtask_id is None:
+            error = "missing_id"
+        else:
+            entity_id = subtask_id
+            subtask = db.toggle_subtask(subtask_id)
+            if subtask:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "subtask_edit":
+        subtask_id = data.get("id")
+        text = (data.get("text") or "").strip()
+        if subtask_id is None:
+            error = "missing_id"
+        elif not text:
+            error = "empty_text"
+        else:
+            entity_id = subtask_id
+            subtask = db.update_subtask_text(subtask_id, text)
+            if subtask:
+                ok = True
+            else:
+                error = "not_found"
+
+    elif action == "subtask_delete":
+        subtask_id = data.get("id")
+        if subtask_id is None:
+            error = "missing_id"
+        else:
+            entity_id = subtask_id
+            ok = db.delete_subtask(subtask_id)
+            if not ok:
+                error = "not_found"
+
+    elif action == "subtask_reorder":
+        subtask_id = data.get("id")
+        order_index = data.get("order_index")
+        if subtask_id is None or order_index is None:
+            error = "missing_fields"
+        else:
+            entity_id = subtask_id
+            ok = db.reorder_subtask(subtask_id, int(order_index))
+            if not ok:
+                error = "not_found"
+
+    else:
+        error = "unknown_action"
+
+    await _todo_ack(websocket, req, action, ok, entity_id, error)
+    if ok:
+        await broadcast_todos()
+
 # ── Extension WebSocket ────────────────────────────────────────────
 
 
@@ -264,86 +558,8 @@ async def ws_dashboard(websocket: WebSocket):
                         "command": command,
                     })
 
-            elif action == "todo_add":
-                text = data.get("text", "").strip()
-                if text:
-                    todo = db.create_todo(text)
-                    if todo:
-                        await broadcast_todos()
-
-            elif action == "todo_toggle":
-                todo_id = data.get("id")
-                if todo_id is not None:
-                    db.toggle_todo(todo_id)
-                    await broadcast_todos()
-
-            elif action == "todo_edit":
-                todo_id = data.get("id")
-                text = data.get("text", "").strip()
-                if todo_id is not None and text:
-                    db.update_todo_text(todo_id, text)
-                    await broadcast_todos()
-
-            elif action == "todo_priority":
-                todo_id = data.get("id")
-                priority = data.get("priority", "")
-                if todo_id is not None and priority in ('high', 'medium', 'low'):
-                    db.update_todo_priority(todo_id, priority)
-                    await broadcast_todos()
-
-            elif action == "todo_date":
-                todo_id = data.get("id")
-                due_date = data.get("due_date")
-                if todo_id is not None:
-                    db.update_todo_due_date(todo_id, due_date if due_date else None)
-                    await broadcast_todos()
-
-            elif action == "todo_reorder":
-                todo_id = data.get("id")
-                order_index = data.get("order_index")
-                if todo_id is not None and order_index is not None:
-                    db.reorder_todo(todo_id, int(order_index))
-                    await broadcast_todos()
-
-            elif action == "todo_delete":
-                todo_id = data.get("id")
-                if todo_id is not None:
-                    db.delete_todo(todo_id)
-                    await broadcast_todos()
-
-            elif action == "subtask_add":
-                todo_id = data.get("todo_id")
-                text = data.get("text", "").strip()
-                if todo_id is not None and text:
-                    subtask = db.create_subtask(todo_id, text)
-                    if subtask:
-                        await broadcast_todos()
-
-            elif action == "subtask_toggle":
-                subtask_id = data.get("id")
-                if subtask_id is not None:
-                    db.toggle_subtask(subtask_id)
-                    await broadcast_todos()
-
-            elif action == "subtask_edit":
-                subtask_id = data.get("id")
-                text = data.get("text", "").strip()
-                if subtask_id is not None and text:
-                    db.update_subtask_text(subtask_id, text)
-                    await broadcast_todos()
-
-            elif action == "subtask_delete":
-                subtask_id = data.get("id")
-                if subtask_id is not None:
-                    db.delete_subtask(subtask_id)
-                    await broadcast_todos()
-
-            elif action == "subtask_reorder":
-                subtask_id = data.get("id")
-                order_index = data.get("order_index")
-                if subtask_id is not None and order_index is not None:
-                    db.reorder_subtask(subtask_id, int(order_index))
-                    await broadcast_todos()
+            elif action.startswith("todo_") or action.startswith("subtask_"):
+                await _handle_todo_action(websocket, data)
 
             elif action == "focus":
                 app_id = data.get("appId", "")

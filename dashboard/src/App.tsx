@@ -78,11 +78,12 @@ function groupNotifications(notifications: Notification[], apps: AppConfig[]): N
 export function App() {
   const host = window.location.host;
   const {
-    apps, notifications, todos, monitorData, spotifyData, calendarEvents, connected,
+    apps, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected,
     sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
-    addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask,
+    setStatus, setNotes, setProject, setEstimate, setSchedule, setReminder, setRepeatRule,
+    addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder,
   } = useWebSocket(host);
   const [activeTab, setActiveTab] = useState<MainTab>('notifications');
   const [notifSubTab, setNotifSubTab] = useState<ActiveAllTab>('active');
@@ -153,12 +154,16 @@ export function App() {
   };
 
   // ── Do First items for Home strip ──────────────────────────
+  // Only active/inbox work — exclude waiting, completed, archived.
   const today = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
   const doFirstTodos = todos
-    .filter((t) => !t.completed && t.priority === 'high' && t.due_date !== null && t.due_date <= today)
+    .filter((t) =>
+      !t.completed && t.status !== 'waiting' && t.status !== 'archived' &&
+      t.priority === 'high' && t.due_date !== null && t.due_date <= today
+    )
     .sort((a, b) => {
       if (a.due_date !== b.due_date) return (a.due_date || '').localeCompare(b.due_date || '');
       return a.order_index - b.order_index;
@@ -226,6 +231,8 @@ export function App() {
           onMarkRead={markRead}
           onFocus={focusApp}
           onToggleTodo={toggleTodo}
+          onSetStatus={setStatus}
+          onSetNotes={setNotes}
           addSubtask={addSubtask}
           editSubtask={editSubtask}
           toggleSubtask={toggleSubtask}
@@ -443,8 +450,47 @@ export function App() {
             onDelete={deleteTodo}
             onSetPriority={setPriority}
             onSetDueDate={setDueDate}
+            onSetStatus={setStatus}
+            onSetNotes={setNotes}
+            onSetProject={setProject}
+            onSetEstimate={setEstimate}
+            onSetSchedule={setSchedule}
+            onSetReminder={setReminder}
+            onSetRepeatRule={setRepeatRule}
             onReorder={reorderTodo}
+            addSubtask={addSubtask}
+            toggleSubtask={toggleSubtask}
+            editSubtask={editSubtask}
+            deleteSubtask={deleteSubtask}
           />
+        </div>
+      )}
+
+      {/* ── Todo reminder banner ───────────────────────────────── */}
+      {todoReminders.length > 0 && (
+        <div class="absolute bottom-[120px] left-1/2 -translate-x-1/2 z-40 flex flex-col gap-1 w-[440px] max-w-[92vw]">
+          {todoReminders.map((r) => (
+            <div key={r.id} class="bg-[#1E3A5F] border border-[#FF9F43] px-3 py-2 flex items-center gap-3">
+              <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: '#FF9F43' }} />
+              <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#FF9F43] shrink-0">
+                REMINDER
+              </span>
+              <span class="flex-1 min-w-0 text-[16px] text-[#E8F0FE] font-mono truncate">{r.text}</span>
+              <button
+                onClick={() => setActiveTab('todos')}
+                class="text-[15px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] active:brightness-125 shrink-0 px-2 py-1"
+              >
+                OPEN
+              </button>
+              <button
+                onClick={() => dismissReminder(r.id)}
+                class="text-[15px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7] active:text-[#E8F0FE] shrink-0 px-2 py-1"
+                aria-label="Dismiss reminder"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
         </div>
       )}
 

@@ -1,6 +1,10 @@
+import calendar
+import datetime
+import json
+import logging
 import sqlite3
 import time
-import logging
+import uuid
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -35,6 +39,22 @@ class Todo:
     created_at: float
     due_date: str | None
     priority: str
+    status: str = "inbox"
+    notes: str = ""
+    project: str = ""
+    estimate_minutes: int | None = None
+    scheduled_date: str | None = None
+    scheduled_time: str | None = None
+    reminder_at: float | None = None
+    last_reminded_at: float | None = None
+    repeat_rule: str | None = None
+    series_id: str | None = None
+    occurrence_number: int = 1
+    source_app: str | None = None
+    source_sender: str | None = None
+    source_url: str | None = None
+    source_notification_id: int | None = None
+    archived_at: float | None = None
 
 
 @dataclass
@@ -92,7 +112,25 @@ class Database:
                 text TEXT NOT NULL,
                 completed INTEGER NOT NULL DEFAULT 0,
                 order_index INTEGER NOT NULL DEFAULT 0,
-                created_at REAL NOT NULL
+                created_at REAL NOT NULL,
+                due_date TEXT,
+                priority TEXT NOT NULL DEFAULT 'medium',
+                status TEXT NOT NULL DEFAULT 'inbox',
+                notes TEXT NOT NULL DEFAULT '',
+                project TEXT NOT NULL DEFAULT '',
+                estimate_minutes INTEGER,
+                scheduled_date TEXT,
+                scheduled_time TEXT,
+                reminder_at REAL,
+                last_reminded_at REAL,
+                repeat_rule TEXT,
+                series_id TEXT,
+                occurrence_number INTEGER NOT NULL DEFAULT 1,
+                source_app TEXT,
+                source_sender TEXT,
+                source_url TEXT,
+                source_notification_id INTEGER,
+                archived_at REAL
             );
 
             CREATE TABLE IF NOT EXISTS subtasks (
@@ -321,21 +359,61 @@ class Database:
                     text TEXT NOT NULL,
                     completed INTEGER NOT NULL DEFAULT 0,
                     order_index INTEGER NOT NULL DEFAULT 0,
-                    created_at REAL NOT NULL
+                    created_at REAL NOT NULL,
+                    due_date TEXT,
+                    priority TEXT NOT NULL DEFAULT 'medium',
+                    status TEXT NOT NULL DEFAULT 'inbox',
+                    notes TEXT NOT NULL DEFAULT '',
+                    project TEXT NOT NULL DEFAULT '',
+                    estimate_minutes INTEGER,
+                    scheduled_date TEXT,
+                    scheduled_time TEXT,
+                    reminder_at REAL,
+                    last_reminded_at REAL,
+                    repeat_rule TEXT,
+                    series_id TEXT,
+                    occurrence_number INTEGER NOT NULL DEFAULT 1,
+                    source_app TEXT,
+                    source_sender TEXT,
+                    source_url TEXT,
+                    source_notification_id INTEGER,
+                    archived_at REAL
                 );
             """)
             # Migrations: add columns if they don't exist yet
+            existing = {r[1] for r in conn.execute("PRAGMA table_info(todos)").fetchall()}
             for col, col_def in [
                 ("due_date", "TEXT"),
                 ("priority", "TEXT NOT NULL DEFAULT 'medium'"),
+                ("status", "TEXT NOT NULL DEFAULT 'inbox'"),
+                ("notes", "TEXT NOT NULL DEFAULT ''"),
+                ("project", "TEXT NOT NULL DEFAULT ''"),
+                ("estimate_minutes", "INTEGER"),
+                ("scheduled_date", "TEXT"),
+                ("scheduled_time", "TEXT"),
+                ("reminder_at", "REAL"),
+                ("last_reminded_at", "REAL"),
+                ("repeat_rule", "TEXT"),
+                ("series_id", "TEXT"),
+                ("occurrence_number", "INTEGER NOT NULL DEFAULT 1"),
+                ("source_app", "TEXT"),
+                ("source_sender", "TEXT"),
+                ("source_url", "TEXT"),
+                ("source_notification_id", "INTEGER"),
+                ("archived_at", "REAL"),
             ]:
-                try:
+                if col not in existing:
                     conn.execute(f"ALTER TABLE todos ADD COLUMN {col} {col_def}")
-                except sqlite3.OperationalError:
-                    # Column already exists (or SQLite < 3.35) — check via pragma
-                    existing = [r[1] for r in conn.execute("PRAGMA table_info(todos)").fetchall()]
-                    if col not in existing:
-                        conn.execute(f"ALTER TABLE todos ADD COLUMN {col} {col_def}")
+
+            # One-time backfill for legacy rows (user_version gate prevents re-runs)
+            version = conn.execute("PRAGMA user_version").fetchone()[0]
+            if version < 2:
+                conn.execute("UPDATE todos SET status='completed' WHERE status='inbox' AND completed=1")
+                conn.execute(
+                    "UPDATE todos SET status='active' WHERE status='inbox' AND completed=0 "
+                    "AND (due_date IS NOT NULL OR priority != 'medium')"
+                )
+                conn.execute("PRAGMA user_version = 2")
             conn.commit()
         except sqlite3.Error as e:
             logger.error(f"_ensure_todos_table failed: {e}")
@@ -404,63 +482,155 @@ class Database:
         self._ensure_todos_table()
         try:
             clean_text, due_date, priority = self._parse_todo_meta(text)
+            if not clean_text:
+                return None
             conn = self._connect()
-            now = time.time()
-            # Get next order_index
-            row = conn.execute("SELECT COALESCE(MAX(order_index), -1) AS mx FROM todos").fetchone()
-            next_order = (row["mx"] if row else -1) + 1
-            cur = conn.execute(
-                "INSERT INTO todos (text, order_index, created_at, due_date, priority) VALUES (?, ?, ?, ?, ?)",
-                (clean_text, next_order, now, due_date, priority),
-            )
-            conn.commit()
-            return Todo(
-                id=cur.lastrowid,
-                text=clean_text,
-                completed=False,
-                order_index=next_order,
-                created_at=now,
-                due_date=due_date,
-                priority=priority,
+            return self._insert_todo(
+                conn, text=clean_text, due_date=due_date, priority=priority
             )
         except sqlite3.Error as e:
             logger.error(f"create_todo failed: {e}")
             return None
 
+    def _insert_todo(self, conn: sqlite3.Connection, *, text: str, order_index: int | None = None,
+                     due_date: str | None = None, priority: str = "medium", status: str = "inbox",
+                     notes: str = "", project: str = "", estimate_minutes: int | None = None,
+                     scheduled_date: str | None = None, scheduled_time: str | None = None,
+                     reminder_at: float | None = None, repeat_rule: str | None = None,
+                     series_id: str | None = None, occurrence_number: int = 1,
+                     source_app: str | None = None, source_sender: str | None = None,
+                     source_url: str | None = None,
+                     source_notification_id: int | None = None) -> Todo | None:
+        """Insert a todo row and return it. Shared by create_todo and recurrence rolls."""
+        if order_index is None:
+            row = conn.execute(
+                "SELECT COALESCE(MAX(order_index), -1) AS mx FROM todos"
+            ).fetchone()
+            order_index = (row["mx"] if row else -1) + 1
+        now = time.time()
+        sid = series_id or uuid.uuid4().hex
+        cur = conn.execute(
+            "INSERT INTO todos (text, order_index, created_at, due_date, priority, status, "
+            "notes, project, estimate_minutes, scheduled_date, scheduled_time, reminder_at, "
+            "repeat_rule, series_id, occurrence_number, source_app, source_sender, source_url, "
+            "source_notification_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (text, order_index, now, due_date, priority, status, notes, project,
+             estimate_minutes, scheduled_date, scheduled_time, reminder_at, repeat_rule,
+             sid, occurrence_number, source_app, source_sender, source_url,
+             source_notification_id),
+        )
+        conn.commit()
+        return self._fetch_todo(conn, cur.lastrowid)
+
     def _row_to_todo(self, row: sqlite3.Row) -> Todo:
+        status = row["status"] if "status" in row.keys() else (
+            "completed" if row["completed"] else "inbox"
+        )
         return Todo(
             id=row["id"],
             text=row["text"],
-            completed=bool(row["completed"]),
+            completed=status == "completed",
             order_index=row["order_index"],
             created_at=row["created_at"],
             due_date=row["due_date"] if row["due_date"] else None,
             priority=row["priority"] if row["priority"] else "medium",
+            status=status,
+            notes=row["notes"] if "notes" in row.keys() else "",
+            project=row["project"] if "project" in row.keys() else "",
+            estimate_minutes=row["estimate_minutes"] if "estimate_minutes" in row.keys() else None,
+            scheduled_date=row["scheduled_date"] if "scheduled_date" in row.keys() else None,
+            scheduled_time=row["scheduled_time"] if "scheduled_time" in row.keys() else None,
+            reminder_at=row["reminder_at"] if "reminder_at" in row.keys() else None,
+            last_reminded_at=row["last_reminded_at"] if "last_reminded_at" in row.keys() else None,
+            repeat_rule=row["repeat_rule"] if "repeat_rule" in row.keys() else None,
+            series_id=row["series_id"] if "series_id" in row.keys() else None,
+            occurrence_number=row["occurrence_number"] if "occurrence_number" in row.keys() else 1,
+            source_app=row["source_app"] if "source_app" in row.keys() else None,
+            source_sender=row["source_sender"] if "source_sender" in row.keys() else None,
+            source_url=row["source_url"] if "source_url" in row.keys() else None,
+            source_notification_id=row["source_notification_id"]
+            if "source_notification_id" in row.keys() else None,
+            archived_at=row["archived_at"] if "archived_at" in row.keys() else None,
         )
 
     def _fetch_todo(self, conn: sqlite3.Connection, todo_id: int) -> Todo | None:
         row = conn.execute(
-            "SELECT id, text, completed, order_index, created_at, due_date, priority "
-            "FROM todos WHERE id = ?",
+            "SELECT * FROM todos WHERE id = ?",
             (todo_id,),
         ).fetchone()
         return self._row_to_todo(row) if row else None
 
+    def _apply_status(self, conn: sqlite3.Connection, todo_id: int, status: str) -> Todo | None:
+        """Set lifecycle status and keep the legacy `completed` column in sync."""
+        completed = 1 if status == "completed" else 0
+        archived_at = time.time() if status == "archived" else None
+        conn.execute(
+            "UPDATE todos SET status=?, completed=?, archived_at=? WHERE id=?",
+            (status, completed, archived_at, todo_id),
+        )
+        conn.commit()
+        return self._fetch_todo(conn, todo_id)
+
     def toggle_todo(self, todo_id: int) -> Todo | None:
+        """Complete or reopen a todo. Recurring todos roll to their next occurrence."""
         if not self._usable:
             return None
         self._ensure_todos_table()
         try:
             conn = self._connect()
-            conn.execute(
-                "UPDATE todos SET completed = 1 - completed WHERE id = ?",
-                (todo_id,),
-            )
-            conn.commit()
-            return self._fetch_todo(conn, todo_id)
+            todo = self._fetch_todo(conn, todo_id)
+            if not todo:
+                return None
+            if todo.status == "completed":
+                return self._apply_status(conn, todo_id, "active")
+            return self._complete_todo(conn, todo)
         except sqlite3.Error as e:
             logger.error(f"toggle_todo failed: {e}")
             return None
+
+    def _complete_todo(self, conn: sqlite3.Connection, todo: Todo) -> Todo | None:
+        """Mark complete; if recurring, archive and create the next occurrence."""
+        if todo.repeat_rule:
+            rule = self._validate_repeat_rule(todo.repeat_rule)
+            if rule:
+                base = todo.due_date or datetime.date.today().isoformat()
+                next_due = self._next_occurrence(base, rule)
+                if next_due:
+                    self._apply_status(conn, todo.id, "archived")
+                    # Shift absolute reminder to match the shifted due date
+                    reminder_at = todo.reminder_at
+                    if reminder_at is not None:
+                        shift_days = (
+                            datetime.date.fromisoformat(next_due)
+                            - datetime.date.fromisoformat(base)
+                        ).days
+                        reminder_at = reminder_at + shift_days * 86400
+                    new_todo = self._insert_todo(
+                        conn,
+                        text=todo.text,
+                        due_date=next_due,
+                        priority=todo.priority,
+                        status="active",
+                        notes=todo.notes,
+                        project=todo.project,
+                        estimate_minutes=todo.estimate_minutes,
+                        scheduled_date=todo.scheduled_date,
+                        scheduled_time=todo.scheduled_time,
+                        reminder_at=reminder_at,
+                        repeat_rule=todo.repeat_rule,
+                        series_id=todo.series_id,
+                        occurrence_number=(todo.occurrence_number or 1) + 1,
+                        source_app=todo.source_app,
+                        source_sender=todo.source_sender,
+                        source_url=todo.source_url,
+                        source_notification_id=todo.source_notification_id,
+                    )
+                    if new_todo:
+                        # Copy subtasks (fresh, uncompleted)
+                        for s in self.get_subtasks_for_todo(todo.id):
+                            self.create_subtask(new_todo.id, s.text)
+                        return new_todo
+        return self._apply_status(conn, todo.id, "completed")
 
     def update_todo_text(self, todo_id: int, text: str) -> Todo | None:
         if not self._usable:
@@ -477,6 +647,262 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"update_todo_text failed: {e}")
             return None
+
+    def update_todo_status(self, todo_id: int, status: str) -> Todo | None:
+        if not self._usable:
+            return None
+        if status not in ("inbox", "active", "waiting", "completed", "archived"):
+            return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            return self._apply_status(conn, todo_id, status)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_status failed: {e}")
+            return None
+
+    def update_todo_notes(self, todo_id: int, notes: str) -> Todo | None:
+        if not self._usable:
+            return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute("UPDATE todos SET notes = ? WHERE id = ?", (notes, todo_id))
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_notes failed: {e}")
+            return None
+
+    def update_todo_project(self, todo_id: int, project: str) -> Todo | None:
+        if not self._usable:
+            return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute("UPDATE todos SET project = ? WHERE id = ?", (project, todo_id))
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_project failed: {e}")
+            return None
+
+    def update_todo_estimate(self, todo_id: int, estimate_minutes: int | None) -> Todo | None:
+        if not self._usable:
+            return None
+        if estimate_minutes is not None:
+            try:
+                estimate_minutes = int(estimate_minutes)
+            except (TypeError, ValueError):
+                return None
+            if estimate_minutes < 0:
+                return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE todos SET estimate_minutes = ? WHERE id = ?",
+                (estimate_minutes, todo_id),
+            )
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_estimate failed: {e}")
+            return None
+
+    def update_todo_schedule(self, todo_id: int, scheduled_date: str | None,
+                             scheduled_time: str | None) -> Todo | None:
+        if not self._usable:
+            return None
+        if scheduled_date is not None:
+            try:
+                datetime.date.fromisoformat(scheduled_date)
+            except ValueError:
+                return None
+        if scheduled_time is not None:
+            if not (len(scheduled_time) == 5 and scheduled_time[2] == ":"
+                    and scheduled_time[:2].isdigit() and scheduled_time[3:].isdigit()):
+                return None
+            hh, mm = int(scheduled_time[:2]), int(scheduled_time[3:])
+            if hh > 23 or mm > 59:
+                return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE todos SET scheduled_date = ?, scheduled_time = ? WHERE id = ?",
+                (scheduled_date, scheduled_time, todo_id),
+            )
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_schedule failed: {e}")
+            return None
+
+    def update_todo_reminder(self, todo_id: int, reminder_at: float | None) -> Todo | None:
+        """Set an absolute-epoch reminder. Changing it resets last_reminded_at."""
+        if not self._usable:
+            return None
+        if reminder_at is not None:
+            try:
+                reminder_at = float(reminder_at)
+            except (TypeError, ValueError):
+                return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE todos SET reminder_at = ?, last_reminded_at = NULL WHERE id = ?",
+                (reminder_at, todo_id),
+            )
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_reminder failed: {e}")
+            return None
+
+    def update_todo_repeat_rule(self, todo_id: int, repeat_rule: str | None) -> Todo | None:
+        """Set a validated recurrence rule (JSON) or clear it with None."""
+        if not self._usable:
+            return None
+        if repeat_rule is not None:
+            rule = self._validate_repeat_rule(repeat_rule)
+            if rule is None:
+                return None
+            repeat_rule = json.dumps(rule, separators=(",", ":"))
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute("UPDATE todos SET repeat_rule = ? WHERE id = ?", (repeat_rule, todo_id))
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"update_todo_repeat_rule failed: {e}")
+            return None
+
+    def attach_todo_context(self, todo_id: int, source_app: str | None = None,
+                            source_sender: str | None = None, source_url: str | None = None,
+                            source_notification_id: int | None = None) -> Todo | None:
+        """Attach manual source context. Never auto-invoked from notification text."""
+        if not self._usable:
+            return None
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE todos SET source_app = ?, source_sender = ?, source_url = ?, "
+                "source_notification_id = ? WHERE id = ?",
+                (source_app, source_sender, source_url, source_notification_id, todo_id),
+            )
+            conn.commit()
+            return self._fetch_todo(conn, todo_id)
+        except sqlite3.Error as e:
+            logger.error(f"attach_todo_context failed: {e}")
+            return None
+
+    @staticmethod
+    def _validate_repeat_rule(rule: str | dict) -> dict | None:
+        """Validate a recurrence rule. Returns normalized dict or None if invalid."""
+        try:
+            data = json.loads(rule) if isinstance(rule, str) else rule
+        except (ValueError, TypeError):
+            return None
+        if not isinstance(data, dict):
+            return None
+        freq = data.get("freq")
+        if freq not in ("daily", "weekly", "monthly"):
+            return None
+        interval = data.get("interval", 1)
+        if not isinstance(interval, int) or interval < 1:
+            return None
+        weekdays = data.get("weekdays")
+        if weekdays is not None:
+            if (not isinstance(weekdays, list) or freq != "weekly"
+                    or not all(isinstance(w, int) and 0 <= w <= 6 for w in weekdays)
+                    or not weekdays):
+                return None
+            weekdays = sorted(set(weekdays))
+        end_date = data.get("end_date")
+        if end_date is not None:
+            try:
+                datetime.date.fromisoformat(end_date)
+            except (ValueError, TypeError):
+                return None
+        return {"freq": freq, "interval": interval, "weekdays": weekdays, "end_date": end_date}
+
+    @staticmethod
+    def _next_occurrence(due_date: str, rule: dict) -> str | None:
+        """Compute the next due date from a validated rule. None = series ended."""
+        try:
+            d = datetime.date.fromisoformat(due_date)
+        except ValueError:
+            return None
+        freq = rule.get("freq")
+        interval = rule.get("interval", 1) or 1
+        weekdays = rule.get("weekdays")
+        if freq == "daily":
+            nxt = d + datetime.timedelta(days=interval)
+        elif freq == "weekly":
+            if weekdays:
+                nxt = d + datetime.timedelta(days=1)
+                limit = interval * 7 + 1
+                for _ in range(limit):
+                    if nxt.weekday() in weekdays:
+                        break
+                    nxt += datetime.timedelta(days=1)
+            else:
+                nxt = d + datetime.timedelta(weeks=interval)
+        elif freq == "monthly":
+            total = d.year * 12 + (d.month - 1) + interval
+            year, month0 = divmod(total, 12)
+            month = month0 + 1
+            last = calendar.monthrange(year, month)[1]
+            nxt = datetime.date(year, month, min(d.day, last))
+        else:
+            return None
+        end_date = rule.get("end_date")
+        if end_date:
+            try:
+                if nxt.isoformat() > end_date:
+                    return None
+            except TypeError:
+                pass
+        return nxt.isoformat()
+
+    def get_due_reminders(self, now_ts: float | None = None) -> list[Todo]:
+        """Todos whose reminder is due and not yet fired for this reminder time."""
+        if not self._usable:
+            return []
+        now = now_ts if now_ts is not None else time.time()
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
+            rows = conn.execute(
+                "SELECT * FROM todos WHERE reminder_at IS NOT NULL AND reminder_at <= ? "
+                "AND status NOT IN ('completed','archived') "
+                "AND (last_reminded_at IS NULL OR last_reminded_at < reminder_at)",
+                (now,),
+            ).fetchall()
+            return [self._row_to_todo(r) for r in rows]
+        except sqlite3.Error as e:
+            logger.error(f"get_due_reminders failed: {e}")
+            return []
+
+    def mark_reminded(self, todo_id: int, ts: float | None = None) -> bool:
+        """Record that a reminder fired so it is not re-emitted."""
+        if not self._usable:
+            return False
+        try:
+            conn = self._connect()
+            cur = conn.execute(
+                "UPDATE todos SET last_reminded_at = ? WHERE id = ?",
+                (ts if ts is not None else time.time(), todo_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"mark_reminded failed: {e}")
+            return False
 
     def update_todo_priority(self, todo_id: int, priority: str) -> Todo | None:
         if not self._usable:
@@ -496,6 +922,11 @@ class Database:
     def update_todo_due_date(self, todo_id: int, due_date: str | None) -> Todo | None:
         if not self._usable:
             return None
+        if due_date is not None:
+            try:
+                datetime.date.fromisoformat(due_date)
+            except ValueError:
+                return None
         self._ensure_todos_table()
         try:
             conn = self._connect()
@@ -523,21 +954,35 @@ class Database:
             return False
 
     def delete_todo(self, todo_id: int) -> bool:
+        """Soft-delete: archive the todo instead of destroying it."""
         if not self._usable:
             return False
         self._ensure_todos_table()
         try:
             conn = self._connect()
-            # Delete subtasks first (ON DELETE CASCADE should handle this
-            # but SQLite needs PRAGMA foreign_keys=ON at connect time, which
-            # we already set, so cascade should work. Explicit delete anyway
-            # for safety.)
+            cur = conn.execute(
+                "UPDATE todos SET status='archived', completed=0, archived_at=? WHERE id=?",
+                (time.time(), todo_id),
+            )
+            conn.commit()
+            return cur.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"delete_todo failed: {e}")
+            return False
+
+    def purge_todo(self, todo_id: int) -> bool:
+        """Permanent delete (maintenance only — not exposed to the dashboard)."""
+        if not self._usable:
+            return False
+        self._ensure_todos_table()
+        try:
+            conn = self._connect()
             conn.execute("DELETE FROM subtasks WHERE todo_id = ?", (todo_id,))
             cur = conn.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
             conn.commit()
             return cur.rowcount > 0
         except sqlite3.Error as e:
-            logger.error(f"delete_todo failed: {e}")
+            logger.error(f"purge_todo failed: {e}")
             return False
 
     def get_all_todos(self) -> list[Todo]:
@@ -547,8 +992,7 @@ class Database:
         try:
             conn = self._connect()
             rows = conn.execute(
-                "SELECT id, text, completed, order_index, created_at, due_date, priority "
-                "FROM todos ORDER BY order_index ASC"
+                "SELECT * FROM todos WHERE status != 'archived' ORDER BY order_index ASC"
             ).fetchall()
             return [self._row_to_todo(r) for r in rows]
         except sqlite3.Error as e:

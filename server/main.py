@@ -215,6 +215,21 @@ async def lifespan(app: FastAPI):
 
     calendar_bridge_task = asyncio.create_task(_bridge_calendar())
 
+    # Bridge todo reminders to dashboards (30s poll, restart-safe)
+    async def _bridge_todo_reminders():
+        while not _shutting_down:
+            try:
+                from ws import broadcast_todo_reminder
+                due = db.db.get_due_reminders()
+                for t in due:
+                    await broadcast_todo_reminder(t)
+                    db.db.mark_reminded(t.id)
+            except Exception as e:
+                logger.warning(f"todo reminder worker error: {e}")
+            await asyncio.sleep(30)
+
+    todo_reminder_task = asyncio.create_task(_bridge_todo_reminders())
+
     # Send initial calendar state to new dashboards
     from ws import broadcast_calendar
     await broadcast_calendar()
@@ -246,6 +261,12 @@ async def lifespan(app: FastAPI):
     calendar_bridge_task.cancel()
     try:
         await calendar_bridge_task
+    except asyncio.CancelledError:
+        pass
+
+    todo_reminder_task.cancel()
+    try:
+        await todo_reminder_task
     except asyncio.CancelledError:
         pass
 

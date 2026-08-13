@@ -70,7 +70,9 @@ export type ServerMessage =
   | ServerMonitorMessage
   | ServerSpotifyMessage
   | ServerCalendarMessage
-  | ServerTodosMessage;
+  | ServerTodosMessage
+  | ServerTodoAckMessage
+  | ServerTodoReminderMessage;
 
 export interface ClientFocusAction {
   action: 'focus';
@@ -98,7 +100,7 @@ export interface ServerWorkspaceAckMessage {
   success: boolean;
 }
 
-export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
+export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoProjectAction | ClientTodoEstimateAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoRepeatAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
 
 // ── Monitor types ─────────────────────────────────────────────────
 
@@ -181,6 +183,8 @@ export interface ServerCalendarMessage {
 
 // ── Todo types ───────────────────────────────────────────────────
 
+export type TodoStatus = 'inbox' | 'active' | 'waiting' | 'completed' | 'archived';
+
 export interface SubtaskItem {
   id: number;
   todo_id: number;
@@ -198,6 +202,22 @@ export interface TodoItem {
   created_at: number;
   due_date: string | null;
   priority: 'high' | 'medium' | 'low';
+  status: TodoStatus;
+  notes: string;
+  project: string;
+  estimate_minutes: number | null;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  reminder_at: number | null;
+  last_reminded_at: number | null;
+  repeat_rule: string | null;
+  series_id: string | null;
+  occurrence_number: number;
+  source_app: string | null;
+  source_sender: string | null;
+  source_url: string | null;
+  source_notification_id: number | null;
+  archived_at: number | null;
   subtasks?: SubtaskItem[];
 }
 
@@ -206,69 +226,155 @@ export interface ServerTodosMessage {
   todos: TodoItem[];
 }
 
+export interface ServerTodoAckMessage {
+  type: 'todo_ack';
+  requestId?: string;
+  action: string;
+  id?: number | null;
+  success: boolean;
+  error?: string;
+}
+
+export interface ServerTodoReminderMessage {
+  type: 'todo_reminder';
+  todo: TodoItem;
+}
+
 export interface ClientTodoAddAction {
   action: 'todo_add';
   text: string;
+  requestId?: string;
 }
 
 export interface ClientTodoToggleAction {
   action: 'todo_toggle';
   id: number;
+  requestId?: string;
 }
 
 export interface ClientTodoEditAction {
   action: 'todo_edit';
   id: number;
   text: string;
+  requestId?: string;
 }
 
 export interface ClientTodoDeleteAction {
   action: 'todo_delete';
   id: number;
+  requestId?: string;
 }
 
 export interface ClientTodoPriorityAction {
   action: 'todo_priority';
   id: number;
   priority: 'high' | 'medium' | 'low';
+  requestId?: string;
 }
 
 export interface ClientTodoDateAction {
   action: 'todo_date';
   id: number;
   due_date: string | null;
+  requestId?: string;
 }
 
 export interface ClientTodoReorderAction {
   action: 'todo_reorder';
   id: number;
   order_index: number;
+  requestId?: string;
+}
+
+export interface ClientTodoStatusAction {
+  action: 'todo_status';
+  id: number;
+  status: TodoStatus;
+  requestId?: string;
+}
+
+export interface ClientTodoNotesAction {
+  action: 'todo_notes';
+  id: number;
+  notes: string;
+  requestId?: string;
+}
+
+export interface ClientTodoProjectAction {
+  action: 'todo_project';
+  id: number;
+  project: string;
+  requestId?: string;
+}
+
+export interface ClientTodoEstimateAction {
+  action: 'todo_estimate';
+  id: number;
+  estimate_minutes: number | null;
+  requestId?: string;
+}
+
+export interface ClientTodoScheduleAction {
+  action: 'todo_schedule';
+  id: number;
+  scheduled_date: string | null;
+  scheduled_time: string | null;
+  requestId?: string;
+}
+
+export interface ClientTodoReminderAction {
+  action: 'todo_reminder';
+  id: number;
+  reminder_at: number | null;
+  requestId?: string;
+}
+
+export interface ClientTodoRepeatAction {
+  action: 'todo_repeat';
+  id: number;
+  repeat_rule: string | null;
+  requestId?: string;
+}
+
+export interface ClientTodoAttachContextAction {
+  action: 'todo_attach_context';
+  id: number;
+  source_app?: string | null;
+  source_sender?: string | null;
+  source_url?: string | null;
+  source_notification_id?: number | null;
+  requestId?: string;
 }
 
 export interface ClientSubtaskAddAction {
   action: 'subtask_add';
   todo_id: number;
   text: string;
+  requestId?: string;
 }
 
 export interface ClientSubtaskToggleAction {
   action: 'subtask_toggle';
   id: number;
+  requestId?: string;
 }
 
 export interface ClientSubtaskEditAction {
   action: 'subtask_edit';
   id: number;
   text: string;
+  requestId?: string;
 }
 
 export interface ClientSubtaskDeleteAction {
   action: 'subtask_delete';
   id: number;
+  requestId?: string;
 }
 
 export interface ClientSubtaskReorderAction {
   action: 'subtask_reorder';
   id: number;
   order_index: number;
+  requestId?: string;
 }

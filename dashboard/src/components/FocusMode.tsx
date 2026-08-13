@@ -4,7 +4,7 @@ import { Manager } from 'fngr';
 import { PanRecognizer } from 'fngr/pan';
 import { TapRecognizer } from 'fngr/tap';
 import Sortable from 'sortablejs';
-import type { Notification, TodoItem, AppConfig, SubtaskItem } from '../types';
+import type { Notification, TodoItem, TodoStatus, AppConfig, SubtaskItem } from '../types';
 import { AppIcon } from './AppIcon';
 
 interface Props {
@@ -14,6 +14,8 @@ interface Props {
   onMarkRead: (id: number) => void;
   onFocus: (appId: string, notifId?: number) => void;
   onToggleTodo: (id: number) => void;
+  onSetStatus: (id: number, status: TodoStatus) => void;
+  onSetNotes: (id: number, notes: string) => void;
   addSubtask: (todoId: number, text: string) => void;
   editSubtask: (id: number, text: string) => void;
   toggleSubtask: (id: number) => void;
@@ -97,6 +99,8 @@ export function FocusMode({
   onMarkRead,
   onFocus,
   onToggleTodo,
+  onSetStatus,
+  onSetNotes,
   addSubtask,
   editSubtask,
   toggleSubtask,
@@ -114,6 +118,8 @@ export function FocusMode({
   const [subtaskText, setSubtaskText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState('');
+  const [noteDraft, setNoteDraft] = useState('');
+  const [editingNote, setEditingNote] = useState(false);
 
   // ── Refs ──────────────────────────────────────────────────
   const cardRef = useRef<HTMLDivElement>(null);
@@ -163,6 +169,12 @@ export function FocusMode({
     setSwipeTranslate(0);
   }, [currentNotif?.id]);
 
+  // Sync note draft when the focused todo changes
+  useEffect(() => {
+    setNoteDraft(visibleTodo?.notes || '');
+    setEditingNote(false);
+  }, [visibleTodo?.id]);
+
   // ── Notification handlers ────────────────────────────────
 
   const handleDismiss = useCallback(() => {
@@ -199,6 +211,22 @@ export function FocusMode({
       setTodoDoneAnimating(false);
     }, 200);
   }, [visibleTodo, onToggleTodo]);
+
+  const handleTodoWait = useCallback(() => {
+    if (!visibleTodo) return;
+    onSetStatus(visibleTodo.id, 'waiting');
+    setSubtaskText('');
+  }, [visibleTodo, onSetStatus]);
+
+  const handleTodoReopen = useCallback(() => {
+    if (!visibleTodo) return;
+    onSetStatus(visibleTodo.id, 'active');
+  }, [visibleTodo, onSetStatus]);
+
+  const handleTodoNote = useCallback((note: string) => {
+    if (!visibleTodo) return;
+    onSetNotes(visibleTodo.id, note);
+  }, [visibleTodo, onSetNotes]);
 
   const handleTodoSkip = useCallback(() => {
     if (doFirstTodos.length <= 1) return;
@@ -561,6 +589,18 @@ export function FocusMode({
             >
               {visibleTodo.priority}
             </span>
+            <span
+              class="text-[14px] font-semibold uppercase tracking-[0.06em]"
+              style={{
+                color:
+                  visibleTodo.status === 'waiting' ? '#FF9F43'
+                  : visibleTodo.status === 'inbox' ? '#8BA3C7'
+                  : visibleTodo.status === 'completed' ? '#26DE81'
+                  : '#00D4FF',
+              }}
+            >
+              · {visibleTodo.status.toUpperCase()}
+            </span>
             {dateBadge?.text && (
               <span class={`text-[14px] font-semibold uppercase tracking-[0.06em] ${
                 dateBadge.isOverdue ? 'text-[#FF4757]' : dateBadge.isToday ? 'text-[#FF9F43]' : 'text-[#8BA3C7]'
@@ -569,6 +609,39 @@ export function FocusMode({
               </span>
             )}
           </div>
+
+          {/* Manually typed note after conversation review */}
+          {editingNote ? (
+            <div class="mt-1 ml-7 flex gap-1">
+              <input
+                type="text"
+                value={noteDraft}
+                onInput={(e) => setNoteDraft((e.target as HTMLInputElement).value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleTodoNote(noteDraft.trim());
+                    setEditingNote(false);
+                  }
+                  if (e.key === 'Escape') setEditingNote(false);
+                }}
+                onBlur={() => {
+                  handleTodoNote(noteDraft.trim());
+                  setEditingNote(false);
+                }}
+                autofocus
+                maxLength={500}
+                placeholder="Note / source reference…"
+                class="flex-1 min-w-0 bg-[#0B1120] text-[#E8F0FE] text-[16px] px-2 py-1 border border-[#00D4FF] placeholder-[#4A6080] outline-none font-mono"
+              />
+            </div>
+          ) : (
+            <button
+              onClick={() => setEditingNote(true)}
+              class="mt-1 ml-7 max-w-full truncate text-left text-[15px] text-[#8BA3C7] font-mono px-2 py-1 border border-[#1E3A5F] bg-[#0B1120] active:border-[#00D4FF] transition-colors"
+            >
+              {visibleTodo.notes ? visibleTodo.notes : '＋ NOTE / SOURCE…'}
+            </button>
+          )}
         </div>
 
         {/* ── Subtask list (scrollable, SortableJS) ───────────────── */}
@@ -699,15 +772,36 @@ export function FocusMode({
         {/* ── DONE / SKIP ─────────────────────────────────────────── */}
         <div class={`shrink-0 flex flex-col gap-2 px-2 py-2 ${fullWidth ? '' : 'border-t border-[#1E3A5F]'}`}>
           <div class={`flex gap-2 ${fullWidth ? 'justify-center' : ''}`}>
-            <button
-              onClick={handleTodoDone}
-              class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2 ${
-                fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
-              }`}
-            >
-              DONE
-            </button>
-            {doFirstTodos.length > 1 && (
+            {visibleTodo.completed ? (
+              <button
+                onClick={handleTodoReopen}
+                class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#00D4FF] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                  fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
+                }`}
+              >
+                REOPEN
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleTodoDone}
+                  class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2 ${
+                    fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
+                  }`}
+                >
+                  DONE
+                </button>
+                <button
+                  onClick={handleTodoWait}
+                  class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#FF9F43] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                    fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
+                  }`}
+                >
+                  WAIT
+                </button>
+              </>
+            )}
+            {!visibleTodo.completed && doFirstTodos.length > 1 && (
               <button
                 onClick={handleTodoSkip}
                 class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#8BA3C7] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
