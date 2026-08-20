@@ -579,6 +579,9 @@ function SortableZone({
       touchStartThreshold: 3,
       // Expanded detail sections are inputs/buttons — never drag them
       filter: '.todo-detail, .todo-detail *',
+      // Without this SortableJS preventDefaults pointerdown for filtered
+      // elements, which breaks tap-to-focus on inputs in .todo-detail
+      preventOnFilter: false,
       onEnd: (evt) => {
         const todoId = parseInt(evt.item.dataset.todoId || '', 10);
         const targetContainer = evt.to as HTMLElement;
@@ -632,6 +635,9 @@ function SortableList({
       touchStartThreshold: 3,
       // Expanded detail sections are inputs/buttons — never drag them
       filter: '.todo-detail, .todo-detail *',
+      // Without this SortableJS preventDefaults pointerdown for filtered
+      // elements, which breaks tap-to-focus on inputs in .todo-detail
+      preventOnFilter: false,
       onEnd: (evt) => {
         const todoId = parseInt(evt.item.dataset.todoId || '', 10);
         if (!todoId || isNaN(todoId)) return;
@@ -745,16 +751,26 @@ function TodoRow({
     onSetPriority(todo.id, order[(idx + 1) % order.length]);
   };
 
-  const dateBadge = formatDateBadge(todo.due_date);
+  const dateBadge = formatDateBadge(todo.scheduled_date || todo.due_date);
   const schedBadge = formatSchedule(todo);
   const remLabel = formatReminderLabel(todo.reminder_at);
   const repLabel = repeatLabel(todo.repeat_rule);
   const statusMeta = STATUS_META[todo.status];
   const pGlyph = priorityGlyph(todo.priority);
 
+  // One date display: the compact badge reflects the scheduled date when set,
+  // otherwise the due date — and clicking it edits whichever one it shows.
+  const setDisplayDate = (dateStr: string | null) => {
+    if (todo.scheduled_date) {
+      onSetSchedule(todo.id, dateStr, dateStr ? todo.scheduled_time : null);
+    } else {
+      onSetDueDate(todo.id, dateStr);
+    }
+  };
+
   const applyQuickDate = (e: Event, dateStr: string | null) => {
     e.stopPropagation();
-    onSetDueDate(todo.id, dateStr);
+    setDisplayDate(dateStr);
     setShowDatePicker(false);
   };
 
@@ -884,14 +900,14 @@ function TodoRow({
                     const val = (e.target as HTMLInputElement).value;
                     if (val) {
                       e.stopPropagation();
-                      onSetDueDate(todo.id, val);
+                      setDisplayDate(val);
                       setShowDatePicker(false);
                     }
                   }}
                   class="font-mono text-[16px] bg-[#0B1120] text-[#E8F0FE] border border-[#1E3A5F] px-1 py-0.5 outline-none w-full"
                 />
               </div>
-              {todo.due_date && (
+              {(todo.due_date || todo.scheduled_date) && (
                 <button onClick={(e) => applyQuickDate(e, null)} class="text-[16px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
               )}
             </div>
