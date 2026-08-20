@@ -153,22 +153,29 @@ export function App() {
     setClearConfirm(false);
   };
 
-  // ── Do First items for Home strip ──────────────────────────
+  // ── Do First queue (Focus page + Home strip) ───────────────
+  // High-priority due work first, then medium — medium only
+  // surfaces after every high item is done/skipped.
   // Only active/inbox work — exclude waiting, completed, archived.
   const today = (() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   })();
+  const priorityRank: Record<string, number> = { high: 0, medium: 1 };
   const doFirstTodos = todos
     .filter((t) =>
       !t.completed && t.status !== 'waiting' && t.status !== 'archived' &&
-      t.priority === 'high' && t.due_date !== null && t.due_date <= today
+      (t.priority === 'high' || t.priority === 'medium') &&
+      t.due_date !== null && t.due_date <= today
     )
     .sort((a, b) => {
+      const pa = priorityRank[a.priority] ?? 2;
+      const pb = priorityRank[b.priority] ?? 2;
+      if (pa !== pb) return pa - pb;
       if (a.due_date !== b.due_date) return (a.due_date || '').localeCompare(b.due_date || '');
       return a.order_index - b.order_index;
     })
-    .slice(0, 4);
+    .slice(0, 6);
 
   return (
     <div class="relative h-screen w-screen bg-[#0B1120] text-[#E8F0FE] antialiased flex flex-col overflow-hidden select-none">
