@@ -16,6 +16,8 @@ interface UseWebSocketReturn {
   spotifyData: SpotifyState | null;
   calendarEvents: CalendarEvent[];
   connected: boolean;
+  soundMuted: boolean;
+  toggleSoundMuted: () => void;
   sessionCleared: number;
   sessionFocused: number;
   sessionCompleted: number;
@@ -78,7 +80,7 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const todosRef = useRef<TodoItem[]>([]);
   const pendingTodoRollbacks = useRef(new Map<string, () => void>());
 
-  const { play: playSound } = useSound();
+  const { play: playSound, muted: soundMuted, toggleMuted: toggleSoundMuted } = useSound();
 
   // Keep ref in sync with apps state
   useEffect(() => {
@@ -431,5 +433,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setProject, setEstimate, setSchedule, setReminder, setRepeatRule, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, toggleSoundMuted, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setProject, setEstimate, setSchedule, setReminder, setRepeatRule, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

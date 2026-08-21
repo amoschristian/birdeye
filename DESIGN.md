@@ -1,6 +1,6 @@
 ---
 name: Birdeye Mission Control
-description: Launch control telemetry dashboard for a 7-inch secondary touchscreen
+description: Launch-control telemetry dashboard for a 1024×600 secondary touchscreen
 colors:
   void-navy: "#0B1120"
   console-gray: "#111827"
@@ -19,7 +19,7 @@ colors:
 typography:
   display:
     fontFamily: "ui-monospace, SF Mono, Menlo, Consolas, monospace"
-    fontSize: "1.75rem"
+    fontSize: "2rem"
     fontWeight: 700
     lineHeight: 1.0
   data:
@@ -57,17 +57,31 @@ components:
   primary-button:
     backgroundColor: "{colors.accent-cyan}"
     textColor: "{colors.void-navy}"
-    rounded: "{rounded.sm}"
-    padding: "10px 20px"
-  danger-button:
-    backgroundColor: "{colors.critical-red}"
+    rounded: "{rounded.none}"
+    padding: "8px 16px"
+    height: "44px"
+  success-button:
+    backgroundColor: "{colors.status-green}"
     textColor: "{colors.void-navy}"
-    rounded: "{rounded.sm}"
-    padding: "10px 20px"
-  data-tile:
+    rounded: "{rounded.none}"
+    padding: "8px 16px"
+    height: "44px"
+  ghost-button:
     backgroundColor: "{colors.console-gray}"
-    borderColor: "{colors.rule-line}"
-    rounded: "{rounded.sm}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.none}"
+    padding: "8px 16px"
+    height: "44px"
+  channel-button:
+    backgroundColor: "{colors.console-gray}"
+    textColor: "{colors.text-secondary}"
+    rounded: "{rounded.none}"
+    width: "72px"
+    height: "60px"
+  data-surface:
+    backgroundColor: "{colors.console-gray}"
+    textColor: "{colors.text-primary}"
+    rounded: "{rounded.none}"
     padding: "12px"
 ---
 
@@ -77,153 +91,172 @@ components:
 
 **Creative North Star: "Launch Control Telemetry"**
 
-Birdeye is a mission control console for digital attention — a 7-inch telemetry panel mounted at the desk, read at arm's length. Every pixel serves operational awareness. The aesthetic draws from SpaceX and NASA mission control rooms: deep navy backgrounds, amber telemetry values, cyan active indicators, and large monospaced data readouts designed to be read at 3 meters in low light by someone who hasn't slept.
+Birdeye is a persistent attention console for a 7-inch-class secondary display. It is designed to be read at arm's length while the user remains focused on work, so the interface behaves like a calm operations panel rather than a notification inbox: time, connection state, channel activity, actionable alerts, todos, calendar status, now-playing data, and system resources occupy clearly separated bands.
 
-The design trades the previous panel-grid and indicator-lamp language for a calm, spacious, information-dense telemetry console. Corners are sharp (0–2px). Borders are thin (1px). Status is conveyed through solid-lit indicators and color — never through glow, bloom, drop shadows, or decorative effects. Depth comes from background layering (navy → console gray → active), not elevation.
+The current visual language is a deep navy telemetry deck with tonal surface steps, thin blue rule lines, amber data values, and cyan active states. Structural text uses the system sans stack; measured information uses the system monospace stack. The interface is intentionally flat: status is carried by solid color, labels, and position—not glow, bloom, elevation, or decorative gradients.
 
-Type is sized for the physical scene: a 7-inch panel at ~50cm viewing distance. Nothing falls below 14px. The clock is the largest element at 28px. Data values run at 18px, body at 16px. All text uses system fonts (ui-monospace for data, ui-sans-serif for structure) — zero downloads, instant rendering.
+The dashboard is touch-first and fixed to a 1024×600 target. It supports three operating views—HOME, FOCUS, and TODOS—while retaining a persistent status bar, optional calendar ticker, animated-but-non-blocking corgi patrol overlay, and audio/comms bar. The status bar places a compact icon-only notification-alert mute control immediately to the left of WORKSPACE; muting alert chimes does not alter Spotify playback.
 
 **Key Characteristics:**
-- Deep navy backgrounds with subtle gray surface layering
-- Amber telemetry values on navy — the core contrast pair
-- Cyan accent for active/selected/focus states
-- Thin 1px rule-line dividers between zones
-- Solid-lit rectangular status indicators — no glow, no bloom, no halos
-- Sharp corners (0–2px) throughout
-- Large monospaced data at 18px minimum
-- System UI + system mono font pairing (zero downloads)
-- Touch targets ≥44px, press feedback via brightness shift
-- Sparse motion: one fade-in on content load, 100ms brightness on press, nothing else
+- Deep navy canvas with console-gray surfaces and a darker subtle-rule layer
+- Telemetry amber reserved for unread counts, notification summaries, progress, and measured values
+- Cyan reserved for active, selected, focused, and primary-action states
+- Solid 8px connection indicator and status labels; no glow or pulse
+- Sharp, mostly square geometry with 0–2px corner language
+- System sans for structure and system mono for data, timestamps, and task text
+- 56px status and audio/comms bars, 24px conditional calendar ticker, flexible center console
+- Touch targets of at least 44px for actions and controls
+- Sparse state motion: brightness press feedback, short transitions, swipe dismissal, and a reduced-motion-aware corgi overlay
 
 ## Colors
 
-### Backgrounds
-- **Void Navy** (`#0B1120`): The deepest background. The canvas behind all console surfaces. Deep space blue-black.
-- **Console Gray** (`#111827`): Standard console surface. Cards, panels, input fields. Sits above Void Navy.
-- **Console Hover** (`#1A2535`): Interactive surface hover state. Buttons, list items on hover.
-- **Console Active** (`#1E3A5F`): Selected or active surface. Active app channel, expanded sections.
+The palette is restrained and semantic: navy layers establish depth, cyan marks interaction, amber marks attention/data, and green/red/alert amber communicate operational state.
 
-### Data (telemetry values)
-- **Telemetry Amber** (`#FFB800`): Primary data color. Key metrics, unread counts, active notification summaries. The core "this is information" signal.
-- **Accent Cyan** (`#00D4FF`): Active/selected indicators, primary action buttons, focus rings. Appears on ≤10% of any panel surface.
-- **Status Green** (`#26DE81`): Nominal state. Connected indicator, mark-read confirmation, resource usage below 60%.
-- **Alert Amber** (`#FF9F43`): Warning state. Reconnecting, resource usage 60–85%, upcoming calendar events.
-- **Critical Red** (`#FF4757`): Critical failure. Disconnected, resource usage > 85%, overdue items.
+### Primary
+- **Accent Cyan** (`#00D4FF`): Active tabs, selected channels, primary actions, focus outlines, and the enabled edge of the alert-mute control.
+- **Telemetry Amber** (`#FFB800`): Unread badges and counts, unread notification summaries, task progress, clock emphasis, and other changed data.
 
-### Text
-- **Text Primary** (`#E8F0FE`): Primary content. Notification summaries, headlines, clock.
-- **Text Secondary** (`#8BA3C7`): Labels, descriptors, metadata. Cool blue-gray.
-- **Text Tertiary** (`#4A6080`): Timestamps, grid labels, secondary metadata. Lowest contrast — only for non-critical information.
+### Secondary
+- **Status Green** (`#26DE81`): Connected/nominal status, mark-read actions, completed task actions, and the swipe-to-read reveal.
+- **Alert Amber** (`#FF9F43`): Reconnecting state, waiting state, imminent calendar events, and warning-level resource values.
+- **Critical Red** (`#FF4757`): Important notification marker, overdue/do-first state, destructive actions, and critical resource values.
+
+### Neutral
+- **Void Navy** (`#0B1120`): Canvas, root surfaces, empty states, input backgrounds, and the deepest layer.
+- **Console Gray** (`#111827`): Notification groups, cards, inactive controls, and task surfaces.
+- **Console Hover** (`#1A2535`): Press/hover surface for interactive rows and controls.
+- **Console Active** (`#1E3A5F`): Selected channels, expanded groups, active tab surfaces, button backgrounds, and divider tone.
+- **Rule Subtle** (`#162035`): Quiet row separators and low-priority internal rules.
+- **Text Primary** (`#E8F0FE`): Main notification, todo, and clock-adjacent content.
+- **Text Secondary** (`#8BA3C7`): Structural labels, body copy, metadata, and inactive controls.
+- **Text Tertiary** (`#4A6080`): Relative timestamps, date labels, empty-state hints, and low-priority annotations.
 
 ### Named Rules
-**The No Glow Rule.** Status indicators are solid-lit rectangles or dots with no glow, no box-shadow, no bloom. Lit = filled with the status color. Unlit = filled with rule-line gray. The only permitted transition is color + background-color at 200ms.
 
-**The No Shadow Rule.** Drop shadows and box-shadows do not exist in this system. Depth comes from background color steps. A visible box-shadow anywhere is a lapse.
+**The Amber Rule.** Amber is information, not decoration. Use it for counts, changed values, unread summaries, clock data, and progress—not for generic borders or labels.
 
-**The Amber Rule.** Telemetry Amber is reserved for data values — numbers, counts, percentages, active notification text. It never appears on structural elements (borders, backgrounds, labels). When amber is visible, information has changed.
+**The Solid Status Rule.** A state indicator is a filled square or colored label with no glow, bloom, box-shadow, or pulse.
+
+**The Cyan Budget Rule.** Cyan is reserved for interaction and focus. It should identify where the user can act or what is currently selected, not decorate static content.
 
 ## Typography
 
-**Character:** Two typefaces, two jobs. Monospace carries all data — timestamps, counts, percentages, durations, notification body text. It signals "this is information, not prose." The UI sans-serif carries structural elements — labels, headings, button text, navigation. Zero web fonts; both stacks render instantly.
+**Display Font:** `ui-monospace, SF Mono, Menlo, Consolas, monospace`
 
-### Scale (sized for 7" panel at ~50cm)
-- **Display** (bold/700, 1.75rem/28px, line-height 1.0): Clock only. The largest element on screen.
-- **Data** (medium/500, 1.125rem/18px, tabular-nums, line-height 1.3): Timestamps, counts, resource values, notification summaries. Monospaced.
-- **Body** (normal/400, 1rem/16px, line-height 1.4): Notification body text, todo text, button labels.
-- **Label** (semibold/600, 0.875rem/14px, tracking 0.06em): Panel headers, section labels, button text, filter tabs.
-- **Caption** (normal/400, 0.875rem/14px, line-height 1.3): Secondary timestamps, metadata. Monospaced.
+**Body Font:** `ui-sans-serif, system-ui, -apple-system, sans-serif`
+
+**Label/Mono Font:** The mono stack carries data, while the sans stack carries structure.
+
+**Character:** The pairing is utilitarian and immediate. Sans-serif names zones and actions; monospace makes counts, timestamps, task text, notification subjects, durations, and resource values feel like measurable telemetry. No web fonts are loaded.
+
+### Hierarchy
+- **Display** (700, `2rem`/32px, line-height 1.0): The live clock, the largest persistent readout.
+- **Data** (500, `1.125rem`/18px, line-height 1.3): Notification summaries, todo text, counts, gauges, and measured values.
+- **Body** (400, `1rem`/16px, line-height 1.4): Notification bodies, structural supporting text, and operational copy.
+- **Label** (600, `0.875rem`/14px, line-height 1.2, tracking `0.06em`): Uppercase view tabs, app names, section markers, action buttons, and state labels.
+- **Caption** (400, `0.875rem`/14px, line-height 1.3): Monospaced timestamps and secondary metadata.
+- **Compact status** (600, 10–13px): Only for constrained badges such as `IMP`, `IMPORTANT`, and small task markers; never for primary reading content.
 
 ### Named Rules
-**The 14px Floor.** Nothing renders below 14px. The 7-inch panel at arm's length demands it. Timestamps, metadata, and secondary labels all sit at 14px minimum.
 
-**The Type Boundary.** Monospace for data, sans-serif for structure. Never cross the streams. A monospaced label or a sans-serif data value is a lapse.
+**The Type Boundary Rule.** Use sans-serif for structure and mono for data. Do not use monospace for headings/labels or sans-serif for measured values.
+
+**The Read-at-Arm's-Length Rule.** Primary interactive and informational content stays at 14px or larger; compact status badges may be smaller only when their adjacent label provides context.
 
 ## Layout
 
-Single-page 1024×600 dashboard organized as a telemetry console with three horizontal bands:
+Birdeye uses a fixed single-screen composition for the 1024×600 touchscreen. The root fills the viewport, clips page overflow, and keeps the main console flexible rather than allowing the outer page to scroll.
 
-- **Status bar** (48px): Clock (left, 28px display), connection indicator + ONLINE label, workspace button (right). Separated by a 1px rule-line below.
-- **Calendar ticker** (24px, conditional): Amber-highlighted upcoming event strip. Only rendered when events exist.
-- **Main console** (flex-1): Two-column layout — channel selector (80px left) + telemetry feed (flex-1). Clean divider between.
-- **Audio/comms bar** (48px): Spotify telemetry (left) + CPU/RAM mini-instruments (right). Rule-line divider above.
+- **Status bar:** 56px high. Clock and connection state sit at left; HOME/FOCUS/TODOS view tabs occupy the center-left; an icon-only alert mute control sits immediately left of the cyan WORKSPACE action at right.
+- **Calendar ticker:** Conditional 24px strip below the status bar. Active or imminent events park at the leading edge while other events marquee across the strip. It disappears when there are no events.
+- **Home console:** Flexible center region with an 88px channel rail, a scrollable notification feed, and an optional 224px DO FIRST rail when due high/medium-priority todos exist.
+- **Focus view:** Replaces the home console with a notification review surface, a task breakdown surface, or a centered all-clear state. Notification and task panels split evenly when both are present.
+- **Todos view:** Occupies the full flexible center region and presents inbox, today, upcoming, and matrix workflows with drag-to-reorder and inline task controls.
+- **Corgi overlay:** A 66px absolute, pointer-transparent strip above the bottom bar. It consumes no layout space and respects `prefers-reduced-motion`.
+- **Audio/comms bar:** 56px high. Spotify occupies the flexible left side and CPU/RAM instruments occupy the right side. The bar does not contain the alert mute control.
 
-Spacing is calibrated for the physical panel: 4px internal, 8px between related elements, 12px between sections, 16px between distinct panels.
+The spacing rhythm is 4px for compact gaps, 8px for related controls, 12px for row/card padding, and 16px for panel boundaries. The design does not introduce responsive reflow; the physical target is fixed.
+
+## Elevation & Depth
+
+This is a flat telemetry deck. There are no drop shadows, box shadows, glows, blurred backdrops, or elevation effects in the current implementation. Depth comes from the sequence Void Navy → Console Gray → Console Active and from 1px rule lines. Overlays use position and contrast, not simulated physical lift.
+
+### Named Rules
+
+**The No Shadow Rule.** Drop shadows and box-shadows do not exist in the interface.
+
+**The Tonal Deck Rule.** When a region needs separation, move one step in the navy surface scale or add a thin rule line; do not add elevation.
+
+## Shapes
+
+The silhouette is rectangular and instrument-like. Most controls and containers have square corners; the documented small radius token is reserved for any future 2px instrument treatment. Borders are generally 1px solid `rule-line` or `rule-subtle`. Status lamps, badges, and progress indicators are filled blocks rather than pill-shaped UI. Content rows clip overflow and use truncation or line clamping for constrained width.
 
 ## Components
 
-### Status Indicators
-- **Connected:** 8px solid green square, no glow. Green ONLINE label beside it.
-- **Reconnecting:** 8px solid amber square, no glow. Amber NO SIGNAL label beside it.
-- **Transition:** 200ms color crossfade. No pulse animation.
+### Buttons and Actions
+- **Shape:** Square, typically no radius, with a minimum 44px height for touch actions.
+- **Primary:** Accent Cyan fill with Void Navy text; uppercase semibold label; brightness shift on press.
+- **Success:** Status Green fill with Void Navy text for READ, DONE, and completion actions.
+- **Warning:** Console Active fill with Alert Amber text for WAIT and warning actions.
+- **Danger:** Critical Red fill with light text for CLEAR and destructive actions.
+- **Ghost:** Console Gray or transparent surface with Text Secondary label; hover changes border/text toward Cyan.
+- **Focus:** 2px Cyan or semantic-color outline with a 2px offset; no shadow.
 
-### Channel Selector (App Buttons)
-- **Shape:** 64×52px panel, 2px radius, 1px rule-line border
-- **Idle:** Console Gray background, rule-line border, text-secondary icon
-- **Active:** Console Active background, accent-cyan border, accent-cyan icon
-- **Hover:** Border shifts to accent-cyan
-- **Unread badge:** Telemetry amber fill, void-navy text, 18px data size, positioned top-right
+### Channel Selector
+- **Shape:** 72×60px square tile, 1px Rule Line border.
+- **Idle:** Console Gray background and Text Secondary icon/label.
+- **Active:** Console Active background, Cyan border, and Cyan icon/label.
+- **Unread:** Amber numeric badge with Void Navy text, squared geometry, and a dark outline against the rail.
+- **Interaction:** The tile is keyboard-operable as well as touch-operable and exposes unread count in its accessible name.
 
-### Telemetry Feed (Notification Cards)
-- **Shape:** 0px radius. Flat terminal rows with 1px rule-line divider between items.
-- **Unread:** Console Gray background, telemetry amber summary text
-- **Read:** Void Navy background, text at 60% opacity
-- **Layout:** App icon (20px) + label + summary + timestamp (mono, right-aligned)
-- **Internal padding:** 10px horizontal, 10px vertical
-- **Swipe:** TranslateX with status-green reveal background. Dismiss animation: 200ms.
+### Notification Rows and Groups
+- **Shape:** Flat rows with a 1px Rule Subtle bottom divider and a minimum 56px content height.
+- **Unread:** Console Gray row, Amber monospace summary, optional 6px Critical Red important marker.
+- **Read:** Reduced visual emphasis with Text Secondary summary.
+- **Group:** Collapsed groups show app, group key, unread counts, latest summary, timestamp, and a READ action; expanded groups use Console Active header and expose individual rows.
+- **Interaction:** Tap focuses the source and marks unread; left swipe reveals a green READ action; explicit mark-read buttons remain available.
 
-### Data Tiles (CPU/RAM instruments)
-- **Shape:** 2px radius, Console Gray background, 1px rule-line border
-- **Layout:** Label (14px, text-secondary) + value (18px, mono, color-coded)
-- **Compact bar gauge:** 48px × 4px, rule-line track, color-coded fill
-- **Thresholds:** Green (< 60%), amber (60–85%), red (> 85%)
-- **Stale data:** 40% opacity after 10 seconds
+### Navigation
+- **Style:** HOME, FOCUS, and TODOS are uppercase sans labels in a compact horizontal control group.
+- **Active:** Console Active surface with Cyan text.
+- **Inactive:** Console Gray surface with Text Secondary text.
+- **Workspace:** Cyan filled action in the status bar; it switches to workspace 1.
 
-### Bottom Bar
-- **Height:** 48px, top rule-line divider
-- **Left (Spotify):** Album art (32px square) + track info + progress bar (2px) + transport controls
-- **Right (CPU/RAM):** Two data tiles with gauge bars
+### Telemetry Gauges
+- **Shape:** Compact label/value/gauge group in the bottom bar.
+- **Track:** Rule Line, 48px wide and 4px high.
+- **Fill:** Status Green below 60%, Alert Amber from 60% to below 85%, Critical Red at 85% and above.
+- **Stale:** The full instrument fades to 40% opacity after 10 seconds without fresh data.
 
-### Buttons
-- **Shape:** 2px radius, 1px border matching fill
-- **Primary:** Accent cyan fill, void-navy text
-- **Danger:** Critical red fill, void-navy text
-- **Ghost:** Transparent, text-secondary label, console-gray hover
-- **Press feedback:** `filter: brightness(1.2)` at 100ms. No scale transform.
+### Alert Mute Control
+- **Shape:** 44×44px square icon-only button immediately left of WORKSPACE in the status bar, using a Lucide Volume2/VolumeX icon.
+- **Enabled:** Console Gray surface with a Text Secondary Volume2 icon; hover border shifts toward Cyan.
+- **Muted:** Console Active surface, Cyan border, and VolumeX icon.
+- **Behavior:** Toggles notification and todo-reminder chimes and persists the preference locally. Spotify transport and playback are not changed. The icon-only control exposes `aria-pressed`, an accessible action label, and a tooltip.
 
-### Tabs (Navigation)
-- **Shape:** 2px radius, no border
-- **Active:** Console Active background, accent-cyan text
-- **Inactive:** Console Gray background, text-secondary label
-
-## Motion
-
-Motion is sparse and purposeful — mission control is calm, not animated.
-
-| Event | Duration | Effect |
-|-------|----------|--------|
-| Content appear | 200ms | Opacity 0→1, ease-out |
-| Press feedback | 100ms | Brightness 1.2, ease-in |
-| Value change | 150ms | Background flash, ease-out |
-| Swipe dismiss | 200ms | TranslateX, ease-in |
-| Status transition | 200ms | Color crossfade |
-
-No entrance animations on individual cards. No staggered reveals. No pulse loops. No glow oscillations.
+### Calendar Ticker
+- **Shape:** 24px ruled strip with monospace event text and solid 6px status markers.
+- **State:** Green for current events, Alert Amber for imminent events, Tertiary text for future events.
+- **Behavior:** Current/imminent events park at the leading edge; remaining events scroll in a slow marquee. No ticker renders when the event list is empty.
 
 ## Do's and Don'ts
 
 ### Do:
-- Use telemetry amber for data values only — numbers, counts, percentages
-- Use accent cyan sparingly — active states, focus rings, primary actions
-- Keep text at 14px minimum — the 7-inch panel demands it
-- Use solid-lit indicators — a filled square, not a glowing dot
-- Maintain ≥44px touch targets
-- Use `filter: brightness()` for press feedback
+- **Do** keep the 1024×600 fixed-target composition intact and make every action comfortable for touch.
+- **Do** use Void Navy, Console Gray, and Console Active tonal steps before reaching for extra decoration.
+- **Do** reserve Amber for telemetry and attention data, and Cyan for interaction/focus.
+- **Do** use system sans for labels and system mono for data, timestamps, summaries, task text, and resource values.
+- **Do** keep action targets at least 44px high and provide visible focus outlines.
+- **Do** use solid indicators, thin rules, truncation, line clamping, and explicit labels for glanceability.
+- **Do** respect `prefers-reduced-motion` for the corgi patrol and keep motion tied to state changes.
+- **Do** let the alert mute control silence Birdeye chimes without muting Spotify playback.
 
 ### Don't:
-- Use drop shadows, box-shadows, or glow effects anywhere
-- Use rounded corners above 4px
-- Animate non-state-change elements
-- Use monospace for labels or headings
-- Use sans-serif for data values
-- Leave a panel zone unlabeled
-- Use scale transforms for press feedback
+- **Don't** use drop shadows, box-shadows, glow, bloom, gradients, or decorative blur.
+- **Don't** use rounded cards, pills, or large-radius containers; this is a flat instrument deck.
+- **Don't** use Amber for structural borders, generic labels, or decoration.
+- **Don't** use Cyan as a static accent unrelated to selection, focus, or action.
+- **Don't** replace the system font pairing with downloaded display fonts.
+- **Don't** add page-level scrolling or responsive scaling that undermines the fixed touchscreen composition.
+- **Don't** animate cards or decorative elements without conveying state; do not add pulse loops.
+- **Don't** make the mute control ambiguous: it must say that it affects alert sounds, not Spotify.

@@ -24,6 +24,7 @@
 // Seed key: ded25121, roll index 5 → user overrode to this world after re-rolls.
 
 import { useState } from 'preact/hooks';
+import { Volume2, VolumeX } from 'lucide-preact';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { AppButton } from './components/AppButton';
@@ -79,6 +80,7 @@ export function App() {
   const host = window.location.host;
   const {
     apps, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected,
+    soundMuted, toggleSoundMuted,
     sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
@@ -217,13 +219,29 @@ export function App() {
             </button>
           </div>
         </div>
-        <button
-          onClick={() => switchWorkspace(1)}
-          class="px-5 py-2 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-          title="Switch to workspace 1"
-        >
-          WORKSPACE
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            onClick={toggleSoundMuted}
+            class={`w-11 h-11 flex items-center justify-center border transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+              soundMuted
+                ? 'bg-[#1E3A5F] border-[#00D4FF] text-[#00D4FF]'
+                : 'bg-[#111827] border-[#1E3A5F] text-[#8BA3C7] hover:text-[#E8F0FE] hover:border-[#00D4FF]'
+            }`}
+            type="button"
+            aria-pressed={soundMuted}
+            aria-label={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
+            title={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
+          >
+            {soundMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
+          </button>
+          <button
+            onClick={() => switchWorkspace(1)}
+            class="px-5 py-2 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+            title="Switch to workspace 1"
+          >
+            WORKSPACE
+          </button>
+        </div>
       </header>
 
       {/* ── Calendar ticker (24px, conditional) ──────────────── */}
