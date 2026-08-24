@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useCallback, useState } from 'preact/hooks';
 
 const SOUNDS: Record<string, string> = {
   default: '/sounds/default.mp3',
@@ -7,7 +7,8 @@ const SOUNDS: Record<string, string> = {
 
 const MUTED_STORAGE_KEY = 'birdeye:notification-sounds-muted';
 let _audioUnlocked = false;
-let _muted = false;
+let _manualMuted = false;
+let _eventMuted = false;
 
 function readMutedPreference(): boolean {
   try {
@@ -18,28 +19,41 @@ function readMutedPreference(): boolean {
 }
 
 if (typeof window !== 'undefined') {
-  _muted = readMutedPreference();
+  _manualMuted = readMutedPreference();
 }
 
 export function useSound() {
-  const [muted, setMuted] = useState(_muted);
+  const [manualMuted, setManualMutedState] = useState(_manualMuted);
+  const [eventMuted, setEventMutedState] = useState(_eventMuted);
 
-  const setMutedPreference = (value: boolean) => {
-    _muted = value;
-    setMuted(value);
+  const setManualMuted = useCallback((value: boolean) => {
+    _manualMuted = value;
+    setManualMutedState(value);
     try {
       window.localStorage.setItem(MUTED_STORAGE_KEY, String(value));
     } catch {
       // Storage can be unavailable in private or restricted browser contexts.
     }
-  };
+  }, []);
 
-  const toggleMuted = () => {
-    setMutedPreference(!_muted);
-  };
+  const setEventMuted = useCallback((value: boolean) => {
+    _eventMuted = value;
+    setEventMutedState(value);
+  }, []);
 
-  const play = (soundKey: string) => {
-    if (_muted) return;
+  const toggleMuted = useCallback(() => {
+    // A manual tap can override an event-scoped mute. The manual preference
+    // remains persisted after the event ends.
+    if (_eventMuted) {
+      setEventMuted(false);
+      setManualMuted(false);
+      return;
+    }
+    setManualMuted(!_manualMuted);
+  }, [setEventMuted, setManualMuted]);
+
+  const play = useCallback((soundKey: string) => {
+    if (_manualMuted || _eventMuted) return;
 
     const path = SOUNDS[soundKey] || SOUNDS.default;
     const audio = new Audio(path);
@@ -49,13 +63,20 @@ export function useSound() {
         console.warn('Birdeye: audio autoplay blocked — tap the dashboard to unlock sounds');
         const unlock = () => {
           _audioUnlocked = true;
-          if (!_muted) audio.play().catch(() => {});
+          if (!_manualMuted && !_eventMuted) audio.play().catch(() => {});
           document.removeEventListener('pointerdown', unlock);
         };
         document.addEventListener('pointerdown', unlock, { once: true });
       }
     });
-  };
+  }, []);
 
-  return { play, muted, toggleMuted };
+  return {
+    play,
+    muted: manualMuted || eventMuted,
+    manualMuted,
+    eventMuted,
+    toggleMuted,
+    setEventMuted,
+  };
 }

@@ -23,7 +23,7 @@
 // FORM: Launch Control Center (grounded direction #1, ordered-list rank 1).
 // Seed key: ded25121, roll index 5 → user overrode to this world after re-rolls.
 
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Volume2, VolumeX } from 'lucide-preact';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ConnectionStatus } from './components/ConnectionStatus';
@@ -36,7 +36,7 @@ import { CalendarStrip } from './components/CalendarStrip';
 import { TodoPage } from './components/TodoPage';
 import { NotificationGroup } from './components/NotificationGroup';
 import { FocusMode } from './components/FocusMode';
-import type { Notification, AppConfig } from './types';
+import type { Notification, AppConfig, CalendarEvent } from './types';
 import { parseGroupKey } from './utils/groupKey';
 
 type ActiveAllTab = 'active' | 'all';
@@ -80,7 +80,7 @@ export function App() {
   const host = window.location.host;
   const {
     apps, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected,
-    soundMuted, toggleSoundMuted,
+    soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted,
     sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
@@ -92,6 +92,11 @@ export function App() {
   const [filterAppId, setFilterAppId] = useState<string | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
   const [undoState, setUndoState] = useState<{ ids: number[]; timer: ReturnType<typeof setTimeout> | null }>({ ids: [], timer: null });
+  const [soundPrompt, setSoundPrompt] = useState<CalendarEvent | null>(null);
+  const [soundPromptDeadline, setSoundPromptDeadline] = useState<number | null>(null);
+  const [soundPromptSeconds, setSoundPromptSeconds] = useState(10);
+  const soundPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const promptedCalendarEventsRef = useRef(new Set<string>());
 
   // Filter out calendar from sidebar — calendar strip already shows events
   const enabledApps = apps.filter((a) => a.enabled && a.id !== 'calendar');
@@ -154,6 +159,73 @@ export function App() {
     clearRead();
     setClearConfirm(false);
   };
+
+  const resolveSoundPrompt = (muteForEvent: boolean) => {
+    if (soundPromptTimerRef.current) {
+      clearTimeout(soundPromptTimerRef.current);
+      soundPromptTimerRef.current = null;
+    }
+    setEventSoundMuted(muteForEvent);
+    setSoundPrompt(null);
+    setSoundPromptDeadline(null);
+  };
+
+  // Calendar events can arrive before or during an event, so check the
+  // boundary every second instead of relying only on websocket updates.
+  useEffect(() => {
+    const checkCalendarAudio = () => {
+      const now = Date.now() / 1000;
+      const activeEvent = calendarEvents
+        .filter((event) => now >= event.start && now < event.end)
+        .sort((a, b) => a.start - b.start)[0];
+
+      if (!activeEvent) {
+        if (soundPromptTimerRef.current) {
+          clearTimeout(soundPromptTimerRef.current);
+          soundPromptTimerRef.current = null;
+        }
+        setEventSoundMuted(false);
+        setSoundPrompt(null);
+        setSoundPromptDeadline(null);
+        return;
+      }
+
+      const eventKey = `${activeEvent.id}:${activeEvent.start}`;
+      if (promptedCalendarEventsRef.current.has(eventKey)) return;
+      promptedCalendarEventsRef.current.add(eventKey);
+
+      // A manually muted dashboard does not need a second question. Its
+      // preference remains untouched when the calendar event ends.
+      if (manualSoundMuted) return;
+
+      const deadline = Date.now() + 10000;
+      setEventSoundMuted(false);
+      setSoundPrompt(activeEvent);
+      setSoundPromptDeadline(deadline);
+      setSoundPromptSeconds(10);
+      soundPromptTimerRef.current = setTimeout(() => {
+        setEventSoundMuted(false);
+        setSoundPrompt(null);
+        setSoundPromptDeadline(null);
+        soundPromptTimerRef.current = null;
+      }, 10000);
+    };
+
+    checkCalendarAudio();
+    const interval = setInterval(checkCalendarAudio, 1000);
+    return () => clearInterval(interval);
+  }, [calendarEvents, manualSoundMuted, setEventSoundMuted]);
+
+  useEffect(() => {
+    if (soundPromptDeadline === null) return;
+
+    const updateCountdown = () => {
+      setSoundPromptSeconds(Math.max(0, Math.ceil((soundPromptDeadline - Date.now()) / 1000)));
+    };
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 250);
+    return () => clearInterval(interval);
+  }, [soundPromptDeadline]);
 
   // ── Do First queue (Focus page + Home strip) ───────────────
   // High-priority due work first, then medium — medium only
@@ -246,6 +318,46 @@ export function App() {
 
       {/* ── Calendar ticker (24px, conditional) ──────────────── */}
       <CalendarStrip events={calendarEvents} />
+
+      {/* ── Event audio prompt (10s timeout defaults to alerts ON) ─ */}
+      {soundPrompt && (
+        <div
+          class="absolute top-[84px] right-4 z-50 w-[360px] max-w-[calc(100vw-32px)] border border-[#FF9F43] bg-[#111827] px-4 py-3"
+          role="alertdialog"
+          aria-labelledby="sound-prompt-title"
+          aria-describedby="sound-prompt-description"
+        >
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 shrink-0 bg-[#FF9F43]" />
+            <span id="sound-prompt-title" class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#FF9F43]">
+              EVENT STARTED
+            </span>
+          </div>
+          <p class="mt-2 text-[18px] font-medium text-[#E8F0FE] font-mono truncate">{soundPrompt.summary}</p>
+          <p id="sound-prompt-description" class="mt-1 text-[16px] text-[#8BA3C7]">
+            Mute notification alerts for this event?
+          </p>
+          <div class="mt-3 flex items-center justify-between gap-3">
+            <span class="text-[14px] text-[#4A6080] font-mono">KEEP ON IN {soundPromptSeconds}S</span>
+            <div class="flex gap-2">
+              <button
+                onClick={() => resolveSoundPrompt(true)}
+                class="min-h-[44px] px-4 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#FF9F43] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#FF9F43] focus-visible:outline-offset-2"
+                type="button"
+              >
+                MUTE
+              </button>
+              <button
+                onClick={() => resolveSoundPrompt(false)}
+                class="min-h-[44px] px-4 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
+                type="button"
+              >
+                KEEP ON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Focus Mode (full-width, replaces sidebar+feed+todos) ─── */}
       {activeTab === 'focus' && (

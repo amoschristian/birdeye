@@ -95,7 +95,7 @@ Birdeye is a persistent attention console for a 7-inch-class secondary display. 
 
 The current visual language is a deep navy telemetry deck with tonal surface steps, thin blue rule lines, amber data values, and cyan active states. Structural text uses the system sans stack; measured information uses the system monospace stack. The interface is intentionally flat: status is carried by solid color, labels, and position—not glow, bloom, elevation, or decorative gradients.
 
-The dashboard is touch-first and fixed to a 1024×600 target. It supports three operating views—HOME, FOCUS, and TODOS—while retaining a persistent status bar, optional calendar ticker, animated-but-non-blocking corgi patrol overlay, and audio/comms bar. The status bar places a compact icon-only notification-alert mute control immediately to the left of WORKSPACE; muting alert chimes does not alter Spotify playback.
+The dashboard is touch-first and fixed to a 1024×600 target. It supports three operating views—HOME, FOCUS, and TODOS—while retaining a persistent status bar, optional calendar ticker, animated-but-non-blocking corgi patrol overlay, and audio/comms bar. The status bar places a compact icon-only notification-alert mute control immediately to the left of WORKSPACE; muting alert chimes does not alter Spotify playback. When a calendar event starts, a non-blocking prompt offers event-scoped muting for 10 seconds; no response means alerts stay on, and event-scoped muting clears when the event ends.
 
 **Key Characteristics:**
 - Deep navy canvas with console-gray surfaces and a darker subtle-rule layer
@@ -232,7 +232,12 @@ The silhouette is rectangular and instrument-like. Most controls and containers 
 - **Shape:** 44×44px square icon-only button immediately left of WORKSPACE in the status bar, using a Lucide Volume2/VolumeX icon.
 - **Enabled:** Console Gray surface with a Text Secondary Volume2 icon; hover border shifts toward Cyan.
 - **Muted:** Console Active surface, Cyan border, and VolumeX icon.
-- **Behavior:** Toggles notification and todo-reminder chimes and persists the preference locally. Spotify transport and playback are not changed. The icon-only control exposes `aria-pressed`, an accessible action label, and a tooltip.
+- **Behavior:** The icon-only control toggles the persistent manual preference for notification and todo-reminder chimes. Spotify transport and playback are not changed. The control exposes `aria-pressed`, an accessible action label, and a tooltip.
+
+### Event Audio Prompt
+- **Shape:** Non-blocking, square-corner alert panel near the top-right of the console, below the status bar, with a 1px Alert Amber border.
+- **Content:** `EVENT STARTED`, the calendar summary, a direct mute question, `MUTE` and `KEEP ON` actions, and a visible countdown.
+- **Behavior:** Opens when an active calendar event is first detected. It times out after 10 seconds to the no-mute/KEEP ON decision. `MUTE` applies only to that event; the event mute clears automatically at its end. A persistent manual mute remains independent.
 
 ### Calendar Ticker
 - **Shape:** 24px ruled strip with monospace event text and solid 6px status markers.
