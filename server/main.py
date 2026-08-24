@@ -182,6 +182,9 @@ async def lifespan(app: FastAPI):
     # Start system resource monitor
     await system_monitor.start()
 
+    # Start Spotify MPRIS listener
+    await spotify_listener.start()
+
     # Bridge monitor broadcasts to dashboards
     async def _bridge_monitor():
         while not _shutting_down:
@@ -191,12 +194,11 @@ async def lifespan(app: FastAPI):
 
     monitor_bridge_task = asyncio.create_task(_bridge_monitor())
 
-    # Bridge spotify position extrapolation to dashboards (1s interval)
+    # Bridge spotify broadcasts to dashboards
     async def _bridge_spotify():
         while not _shutting_down:
-            await asyncio.sleep(1)
-            spotify_listener.check_stale(timeout_seconds=10.0)
-            if spotify_listener.get_state().get("available"):
+            update = await spotify_listener.wait_for_update()
+            if update:
                 from ws import broadcast_spotify
                 await broadcast_spotify()
 
@@ -271,7 +273,7 @@ async def lifespan(app: FastAPI):
         pass
 
     await system_monitor.stop()
-    # spotify_listener no longer uses D-Bus — no stop needed
+    await spotify_listener.stop()
     await calendar_listener.stop()
 
     listener.stop()

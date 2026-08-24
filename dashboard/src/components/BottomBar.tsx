@@ -4,7 +4,7 @@ import type { SpotifyState, MonitorData } from '../types';
 
 interface BottomBarProps {
   spotifyData: SpotifyState | null;
-  onSpotifyCommand: (command: 'play_pause' | 'previous' | 'next') => void;
+  onSpotifyCommand: (command: 'play_pause' | 'previous' | 'next' | 'seek', positionMs?: number) => void;
   monitorData: MonitorData | null;
 }
 
@@ -50,7 +50,7 @@ export function BottomBar({ spotifyData, onSpotifyCommand, monitorData }: Bottom
   );
 }
 
-function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onCommand: (command: 'play_pause' | 'previous' | 'next') => void }) {
+function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onCommand: (command: 'play_pause' | 'previous' | 'next' | 'seek', positionMs?: number) => void }) {
   if (!data) {
     return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO —</span>;
   }
@@ -63,9 +63,7 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
     return <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">AUDIO IDLE</span>;
   }
 
-  // Only treat as ad if everything is missing (no album, no art, AND no artist)
-  // Spotify ads have nothing but a title like "Advertisement"
-  const isAd = !data.album && !data.artUrl && !data.artist;
+  const isAd = !data.album && !data.artUrl;
 
   return (
     <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -79,7 +77,7 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
       )}
 
       {/* Track info */}
-      <div class="min-w-0 flex flex-col justify-center flex-1">
+      <div class="min-w-0 flex flex-col justify-center flex-1 relative">
         {isAd ? (
           <span class="text-[18px] text-[#FF9F43] truncate font-mono leading-tight">{data.title}</span>
         ) : (
@@ -89,12 +87,11 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
           </>
         )}
         {!isAd && data.duration > 0 && (
-          <div class="w-full h-[2px] bg-[#1E3A5F] overflow-hidden mt-0.5">
-            <div
-              class="h-full bg-[#00D4FF] transition-all duration-1000"
-              style={{ width: `${Math.min((data.position / data.duration) * 100, 100)}%` }}
-            />
-          </div>
+          <ScrubBar
+            duration={data.duration}
+            position={data.position}
+            onScrub={(ms) => onCommand('seek', ms)}
+          />
         )}
       </div>
 
@@ -131,6 +128,27 @@ function SpotifySection({ data, onCommand }: { data: SpotifyState | null; onComm
           {formatDuration(data.position)}
         </span>
       )}
+    </div>
+  );
+}
+
+function ScrubBar({ duration, position, onScrub }: { duration: number; position: number; onScrub: (ms: number) => void }) {
+  const pct = duration > 0 ? Math.min(position / duration, 1) : 0;
+  return (
+    <div class="absolute bottom-0 left-0 right-0 h-7 flex items-end">
+      <div class="relative w-full h-[2px] bg-[#1E3A5F] overflow-hidden">
+        <div class="absolute inset-y-0 left-0 bg-[#00D4FF]" style={{ width: `${pct * 100}%` }} />
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={duration || 1}
+        value={Math.min(position, duration)}
+        step={1000}
+        onChange={(e) => onScrub(Number((e.target as HTMLInputElement).value))}
+        aria-label="Seek"
+        class="absolute inset-0 w-full h-full cursor-pointer opacity-0"
+      />
     </div>
   );
 }

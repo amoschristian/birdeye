@@ -164,7 +164,8 @@ export interface ClientSwitchWorkspaceAction {
 
 export interface ClientSpotifyAction {
   action: 'spotify';
-  command: 'play_pause' | 'next' | 'previous';
+  command: 'play_pause' | 'next' | 'previous' | 'seek';
+  position_ms?: number;
 }
 
 // ── Calendar types ────────────────────────────────────────────────

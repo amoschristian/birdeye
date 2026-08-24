@@ -39,9 +39,3 @@ const whatsappProvider = {
   name: 'WhatsApp',
   urlPattern: 'web.whatsapp.com',
 };
-
-const spotifyProvider = {
-  id: 'spotify-web',
-  name: 'Spotify',
-  urlPattern: 'open.spotify.com',
-};

@@ -28,7 +28,7 @@ interface UseWebSocketReturn {
   clearRead: () => void;
   focusApp: (appId: string) => void;
   switchWorkspace: (workspace: number) => void;
-  spotifyCommand: (command: 'play_pause' | 'next' | 'previous') => void;
+  spotifyCommand: (command: 'play_pause' | 'next' | 'previous' | 'seek', positionMs?: number) => void;
   addTodo: (text: string) => void;
   toggleTodo: (id: number) => void;
   deleteTodo: (id: number) => void;
@@ -257,8 +257,8 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     sendMessage({ action: 'switch_workspace', workspace });
   }, [sendMessage]);
 
-  const spotifyCommand = useCallback((command: 'play_pause' | 'next' | 'previous') => {
-    sendMessage({ action: 'spotify', command });
+  const spotifyCommand = useCallback((command: 'play_pause' | 'next' | 'previous' | 'seek', positionMs?: number) => {
+    sendMessage({ action: 'spotify', command, ...(positionMs !== undefined ? { position_ms: positionMs } : {}) });
   }, [sendMessage]);
 
   const focusApp = useCallback((appId: string, notifId?: number) => {
