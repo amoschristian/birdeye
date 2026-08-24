@@ -37,11 +37,8 @@ interface UseWebSocketReturn {
   setDueDate: (id: number, dueDate: string | null) => void;
   setStatus: (id: number, status: TodoStatus) => void;
   setNotes: (id: number, notes: string) => void;
-  setProject: (id: number, project: string) => void;
-  setEstimate: (id: number, estimateMinutes: number | null) => void;
   setSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
   setReminder: (id: number, reminderAt: number | null) => void;
-  setRepeatRule: (id: number, repeatRule: string | null) => void;
   attachContext: (id: number, context: { source_app?: string | null; source_sender?: string | null; source_url?: string | null; source_notification_id?: number | null }) => void;
   reorderTodo: (id: number, orderIndex: number) => void;
   addSubtask: (todoId: number, text: string) => void;
@@ -274,7 +271,7 @@ export function useWebSocket(host: string): UseWebSocketReturn {
       const tempId = -Date.now();
       setTodos((prev) => [
         ...prev,
-        { id: tempId, text, completed: false, order_index: prev.length, created_at: Date.now() / 1000, due_date: null, priority: 'medium', status: 'inbox', notes: '', project: '', estimate_minutes: null, scheduled_date: null, scheduled_time: null, reminder_at: null, last_reminded_at: null, repeat_rule: null, series_id: null, occurrence_number: 1, source_app: null, source_sender: null, source_url: null, source_notification_id: null, archived_at: null },
+        { id: tempId, text, completed: false, order_index: prev.length, created_at: Date.now() / 1000, due_date: null, priority: 'medium', status: 'inbox', notes: '', scheduled_date: null, scheduled_time: null, reminder_at: null, last_reminded_at: null, source_app: null, source_sender: null, source_url: null, source_notification_id: null, archived_at: null },
       ]);
     });
   }, [sendTodoMutation]);
@@ -327,18 +324,6 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  const setProject = useCallback((id: number, project: string) => {
-    sendTodoMutation('todo_project', { id, project }, () => {
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, project } : t)));
-    });
-  }, [sendTodoMutation]);
-
-  const setEstimate = useCallback((id: number, estimateMinutes: number | null) => {
-    sendTodoMutation('todo_estimate', { id, estimate_minutes: estimateMinutes }, () => {
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, estimate_minutes: estimateMinutes } : t)));
-    });
-  }, [sendTodoMutation]);
-
   const setSchedule = useCallback((id: number, scheduledDate: string | null, scheduledTime: string | null) => {
     sendTodoMutation('todo_schedule', { id, scheduled_date: scheduledDate, scheduled_time: scheduledTime }, () => {
       setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, scheduled_date: scheduledDate, scheduled_time: scheduledTime } : t)));
@@ -348,12 +333,6 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const setReminder = useCallback((id: number, reminderAt: number | null) => {
     sendTodoMutation('todo_reminder', { id, reminder_at: reminderAt }, () => {
       setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, reminder_at: reminderAt, last_reminded_at: null } : t)));
-    });
-  }, [sendTodoMutation]);
-
-  const setRepeatRule = useCallback((id: number, repeatRule: string | null) => {
-    sendTodoMutation('todo_repeat', { id, repeat_rule: repeatRule }, () => {
-      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, repeat_rule: repeatRule } : t)));
     });
   }, [sendTodoMutation]);
 
@@ -441,5 +420,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setProject, setEstimate, setSchedule, setReminder, setRepeatRule, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

@@ -100,7 +100,7 @@ export interface ServerWorkspaceAckMessage {
   success: boolean;
 }
 
-export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoProjectAction | ClientTodoEstimateAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoRepeatAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
+export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
 
 // ── Monitor types ─────────────────────────────────────────────────
 
@@ -204,15 +204,10 @@ export interface TodoItem {
   priority: 'high' | 'medium' | 'low';
   status: TodoStatus;
   notes: string;
-  project: string;
-  estimate_minutes: number | null;
   scheduled_date: string | null;
   scheduled_time: string | null;
   reminder_at: number | null;
   last_reminded_at: number | null;
-  repeat_rule: string | null;
-  series_id: string | null;
-  occurrence_number: number;
   source_app: string | null;
   source_sender: string | null;
   source_url: string | null;
@@ -300,20 +295,6 @@ export interface ClientTodoNotesAction {
   requestId?: string;
 }
 
-export interface ClientTodoProjectAction {
-  action: 'todo_project';
-  id: number;
-  project: string;
-  requestId?: string;
-}
-
-export interface ClientTodoEstimateAction {
-  action: 'todo_estimate';
-  id: number;
-  estimate_minutes: number | null;
-  requestId?: string;
-}
-
 export interface ClientTodoScheduleAction {
   action: 'todo_schedule';
   id: number;
@@ -326,13 +307,6 @@ export interface ClientTodoReminderAction {
   action: 'todo_reminder';
   id: number;
   reminder_at: number | null;
-  requestId?: string;
-}
-
-export interface ClientTodoRepeatAction {
-  action: 'todo_repeat';
-  id: number;
-  repeat_rule: string | null;
   requestId?: string;
 }
 

@@ -1,10 +1,8 @@
-import calendar
 import datetime
-import json
 import logging
+import re
 import sqlite3
 import time
-import uuid
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -41,15 +39,10 @@ class Todo:
     priority: str
     status: str = "inbox"
     notes: str = ""
-    project: str = ""
-    estimate_minutes: int | None = None
     scheduled_date: str | None = None
     scheduled_time: str | None = None
     reminder_at: float | None = None
     last_reminded_at: float | None = None
-    repeat_rule: str | None = None
-    series_id: str | None = None
-    occurrence_number: int = 1
     source_app: str | None = None
     source_sender: str | None = None
     source_url: str | None = None
@@ -117,15 +110,10 @@ class Database:
                 priority TEXT NOT NULL DEFAULT 'medium',
                 status TEXT NOT NULL DEFAULT 'inbox',
                 notes TEXT NOT NULL DEFAULT '',
-                project TEXT NOT NULL DEFAULT '',
-                estimate_minutes INTEGER,
                 scheduled_date TEXT,
                 scheduled_time TEXT,
                 reminder_at REAL,
                 last_reminded_at REAL,
-                repeat_rule TEXT,
-                series_id TEXT,
-                occurrence_number INTEGER NOT NULL DEFAULT 1,
                 source_app TEXT,
                 source_sender TEXT,
                 source_url TEXT,
@@ -364,15 +352,10 @@ class Database:
                     priority TEXT NOT NULL DEFAULT 'medium',
                     status TEXT NOT NULL DEFAULT 'inbox',
                     notes TEXT NOT NULL DEFAULT '',
-                    project TEXT NOT NULL DEFAULT '',
-                    estimate_minutes INTEGER,
                     scheduled_date TEXT,
                     scheduled_time TEXT,
                     reminder_at REAL,
                     last_reminded_at REAL,
-                    repeat_rule TEXT,
-                    series_id TEXT,
-                    occurrence_number INTEGER NOT NULL DEFAULT 1,
                     source_app TEXT,
                     source_sender TEXT,
                     source_url TEXT,
@@ -387,15 +370,10 @@ class Database:
                 ("priority", "TEXT NOT NULL DEFAULT 'medium'"),
                 ("status", "TEXT NOT NULL DEFAULT 'inbox'"),
                 ("notes", "TEXT NOT NULL DEFAULT ''"),
-                ("project", "TEXT NOT NULL DEFAULT ''"),
-                ("estimate_minutes", "INTEGER"),
                 ("scheduled_date", "TEXT"),
                 ("scheduled_time", "TEXT"),
                 ("reminder_at", "REAL"),
                 ("last_reminded_at", "REAL"),
-                ("repeat_rule", "TEXT"),
-                ("series_id", "TEXT"),
-                ("occurrence_number", "INTEGER NOT NULL DEFAULT 1"),
                 ("source_app", "TEXT"),
                 ("source_sender", "TEXT"),
                 ("source_url", "TEXT"),
@@ -430,14 +408,25 @@ class Database:
     }
 
     @staticmethod
-    def _parse_todo_meta(text: str) -> tuple[str, str | None, str]:
-        """Parse natural language date and !priority tags from todo text.
+    def _has_explicit_time(substr: str) -> bool:
+        """True when the matched phrase carries a specific clock time.
 
-        Returns (clean_text, due_date, priority).
+        dateparser resolves bare "today"/"tomorrow" to the current wall-clock
+        time, so we only schedule + remind when the text actually names a time
+        (e.g. "2 pm", "14:00", "09:30").
+        """
+        return bool(re.search(r'\d{1,2}:\d{2}|\b\d{1,2}\s*(?:am|pm)\b|\bnoon\b', substr, re.IGNORECASE))
+
+    @staticmethod
+    def _parse_todo_meta(text: str) -> tuple[str, str | None, str, str | None, str | None, float | None]:
+        """Parse natural language date/time and !priority tags from todo text.
+
+        Returns (clean_text, due_date, priority, scheduled_date, scheduled_time, reminder_at).
         Priority tags: !high/!h, !medium/!m, !low/!l (case-insensitive, last win).
         Date: parsed from remaining text via dateparser.search_dates.
+        When the date carries an explicit time (e.g. "today 2 pm"), the task is
+        scheduled and reminded at that time as well as dated.
         """
-        import re
 
         priority = "medium"
 
@@ -458,6 +447,8 @@ class Database:
 
         # Parse date from clean text using search_dates
         due_date = None
+        scheduled_date = scheduled_time = None
+        reminder_at = None
         if clean:
             results = search_dates(clean, settings={'PREFER_DATES_FROM': 'future'})
             if results:
@@ -469,24 +460,32 @@ class Database:
                     has_digit = bool(re.search(r'\d', substr))
                     if has_date_word or has_digit:
                         due_date = dt.strftime('%Y-%m-%d')
+                        # An explicit clock time ("2 pm", "14:00") schedules + reminds at it
+                        if Database._has_explicit_time(substr):
+                            scheduled_date = due_date
+                            scheduled_time = dt.strftime('%H:%M')
+                            reminder_at = dt.timestamp()
                         # Remove the matched date substring from the text
                         clean = clean.replace(substr, '', 1).strip()
                         clean = re.sub(r'\s+', ' ', clean).strip()
                         break
 
-        return clean, due_date, priority
+        return clean, due_date, priority, scheduled_date, scheduled_time, reminder_at
 
     def create_todo(self, text: str) -> Todo | None:
         if not self._usable:
             return None
         self._ensure_todos_table()
         try:
-            clean_text, due_date, priority = self._parse_todo_meta(text)
+            (clean_text, due_date, priority,
+             scheduled_date, scheduled_time, reminder_at) = self._parse_todo_meta(text)
             if not clean_text:
                 return None
             conn = self._connect()
             return self._insert_todo(
-                conn, text=clean_text, due_date=due_date, priority=priority
+                conn, text=clean_text, due_date=due_date, priority=priority,
+                scheduled_date=scheduled_date, scheduled_time=scheduled_time,
+                reminder_at=reminder_at,
             )
         except sqlite3.Error as e:
             logger.error(f"create_todo failed: {e}")
@@ -494,29 +493,27 @@ class Database:
 
     def _insert_todo(self, conn: sqlite3.Connection, *, text: str, order_index: int | None = None,
                      due_date: str | None = None, priority: str = "medium", status: str = "inbox",
-                     notes: str = "", project: str = "", estimate_minutes: int | None = None,
+                     notes: str = "",
                      scheduled_date: str | None = None, scheduled_time: str | None = None,
-                     reminder_at: float | None = None, repeat_rule: str | None = None,
-                     series_id: str | None = None, occurrence_number: int = 1,
+                     reminder_at: float | None = None,
                      source_app: str | None = None, source_sender: str | None = None,
                      source_url: str | None = None,
                      source_notification_id: int | None = None) -> Todo | None:
-        """Insert a todo row and return it. Shared by create_todo and recurrence rolls."""
+        """Insert a todo row and return it."""
         if order_index is None:
             row = conn.execute(
                 "SELECT COALESCE(MAX(order_index), -1) AS mx FROM todos"
             ).fetchone()
             order_index = (row["mx"] if row else -1) + 1
         now = time.time()
-        sid = series_id or uuid.uuid4().hex
         cur = conn.execute(
             "INSERT INTO todos (text, order_index, created_at, due_date, priority, status, "
-            "notes, project, estimate_minutes, scheduled_date, scheduled_time, reminder_at, "
-            "repeat_rule, series_id, occurrence_number, source_app, source_sender, source_url, "
-            "source_notification_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (text, order_index, now, due_date, priority, status, notes, project,
-             estimate_minutes, scheduled_date, scheduled_time, reminder_at, repeat_rule,
-             sid, occurrence_number, source_app, source_sender, source_url,
+            "notes, scheduled_date, scheduled_time, reminder_at, "
+            "source_app, source_sender, source_url, "
+            "source_notification_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (text, order_index, now, due_date, priority, status, notes,
+             scheduled_date, scheduled_time, reminder_at,
+             source_app, source_sender, source_url,
              source_notification_id),
         )
         conn.commit()
@@ -536,15 +533,10 @@ class Database:
             priority=row["priority"] if row["priority"] else "medium",
             status=status,
             notes=row["notes"] if "notes" in row.keys() else "",
-            project=row["project"] if "project" in row.keys() else "",
-            estimate_minutes=row["estimate_minutes"] if "estimate_minutes" in row.keys() else None,
             scheduled_date=row["scheduled_date"] if "scheduled_date" in row.keys() else None,
             scheduled_time=row["scheduled_time"] if "scheduled_time" in row.keys() else None,
             reminder_at=row["reminder_at"] if "reminder_at" in row.keys() else None,
             last_reminded_at=row["last_reminded_at"] if "last_reminded_at" in row.keys() else None,
-            repeat_rule=row["repeat_rule"] if "repeat_rule" in row.keys() else None,
-            series_id=row["series_id"] if "series_id" in row.keys() else None,
-            occurrence_number=row["occurrence_number"] if "occurrence_number" in row.keys() else 1,
             source_app=row["source_app"] if "source_app" in row.keys() else None,
             source_sender=row["source_sender"] if "source_sender" in row.keys() else None,
             source_url=row["source_url"] if "source_url" in row.keys() else None,
@@ -572,7 +564,7 @@ class Database:
         return self._fetch_todo(conn, todo_id)
 
     def toggle_todo(self, todo_id: int) -> Todo | None:
-        """Complete or reopen a todo. Recurring todos roll to their next occurrence."""
+        """Complete or reopen a todo."""
         if not self._usable:
             return None
         self._ensure_todos_table()
@@ -589,47 +581,7 @@ class Database:
             return None
 
     def _complete_todo(self, conn: sqlite3.Connection, todo: Todo) -> Todo | None:
-        """Mark complete; if recurring, archive and create the next occurrence."""
-        if todo.repeat_rule:
-            rule = self._validate_repeat_rule(todo.repeat_rule)
-            if rule:
-                base = todo.due_date or datetime.date.today().isoformat()
-                next_due = self._next_occurrence(base, rule)
-                if next_due:
-                    self._apply_status(conn, todo.id, "archived")
-                    # Shift absolute reminder to match the shifted due date
-                    reminder_at = todo.reminder_at
-                    if reminder_at is not None:
-                        shift_days = (
-                            datetime.date.fromisoformat(next_due)
-                            - datetime.date.fromisoformat(base)
-                        ).days
-                        reminder_at = reminder_at + shift_days * 86400
-                    new_todo = self._insert_todo(
-                        conn,
-                        text=todo.text,
-                        due_date=next_due,
-                        priority=todo.priority,
-                        status="active",
-                        notes=todo.notes,
-                        project=todo.project,
-                        estimate_minutes=todo.estimate_minutes,
-                        scheduled_date=todo.scheduled_date,
-                        scheduled_time=todo.scheduled_time,
-                        reminder_at=reminder_at,
-                        repeat_rule=todo.repeat_rule,
-                        series_id=todo.series_id,
-                        occurrence_number=(todo.occurrence_number or 1) + 1,
-                        source_app=todo.source_app,
-                        source_sender=todo.source_sender,
-                        source_url=todo.source_url,
-                        source_notification_id=todo.source_notification_id,
-                    )
-                    if new_todo:
-                        # Copy subtasks (fresh, uncompleted)
-                        for s in self.get_subtasks_for_todo(todo.id):
-                            self.create_subtask(new_todo.id, s.text)
-                        return new_todo
+        """Mark a todo complete."""
         return self._apply_status(conn, todo.id, "completed")
 
     def update_todo_text(self, todo_id: int, text: str) -> Todo | None:
@@ -672,42 +624,6 @@ class Database:
             return self._fetch_todo(conn, todo_id)
         except sqlite3.Error as e:
             logger.error(f"update_todo_notes failed: {e}")
-            return None
-
-    def update_todo_project(self, todo_id: int, project: str) -> Todo | None:
-        if not self._usable:
-            return None
-        self._ensure_todos_table()
-        try:
-            conn = self._connect()
-            conn.execute("UPDATE todos SET project = ? WHERE id = ?", (project, todo_id))
-            conn.commit()
-            return self._fetch_todo(conn, todo_id)
-        except sqlite3.Error as e:
-            logger.error(f"update_todo_project failed: {e}")
-            return None
-
-    def update_todo_estimate(self, todo_id: int, estimate_minutes: int | None) -> Todo | None:
-        if not self._usable:
-            return None
-        if estimate_minutes is not None:
-            try:
-                estimate_minutes = int(estimate_minutes)
-            except (TypeError, ValueError):
-                return None
-            if estimate_minutes < 0:
-                return None
-        self._ensure_todos_table()
-        try:
-            conn = self._connect()
-            conn.execute(
-                "UPDATE todos SET estimate_minutes = ? WHERE id = ?",
-                (estimate_minutes, todo_id),
-            )
-            conn.commit()
-            return self._fetch_todo(conn, todo_id)
-        except sqlite3.Error as e:
-            logger.error(f"update_todo_estimate failed: {e}")
             return None
 
     def update_todo_schedule(self, todo_id: int, scheduled_date: str | None,
@@ -761,25 +677,6 @@ class Database:
             logger.error(f"update_todo_reminder failed: {e}")
             return None
 
-    def update_todo_repeat_rule(self, todo_id: int, repeat_rule: str | None) -> Todo | None:
-        """Set a validated recurrence rule (JSON) or clear it with None."""
-        if not self._usable:
-            return None
-        if repeat_rule is not None:
-            rule = self._validate_repeat_rule(repeat_rule)
-            if rule is None:
-                return None
-            repeat_rule = json.dumps(rule, separators=(",", ":"))
-        self._ensure_todos_table()
-        try:
-            conn = self._connect()
-            conn.execute("UPDATE todos SET repeat_rule = ? WHERE id = ?", (repeat_rule, todo_id))
-            conn.commit()
-            return self._fetch_todo(conn, todo_id)
-        except sqlite3.Error as e:
-            logger.error(f"update_todo_repeat_rule failed: {e}")
-            return None
-
     def attach_todo_context(self, todo_id: int, source_app: str | None = None,
                             source_sender: str | None = None, source_url: str | None = None,
                             source_notification_id: int | None = None) -> Todo | None:
@@ -799,75 +696,6 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"attach_todo_context failed: {e}")
             return None
-
-    @staticmethod
-    def _validate_repeat_rule(rule: str | dict) -> dict | None:
-        """Validate a recurrence rule. Returns normalized dict or None if invalid."""
-        try:
-            data = json.loads(rule) if isinstance(rule, str) else rule
-        except (ValueError, TypeError):
-            return None
-        if not isinstance(data, dict):
-            return None
-        freq = data.get("freq")
-        if freq not in ("daily", "weekly", "monthly"):
-            return None
-        interval = data.get("interval", 1)
-        if not isinstance(interval, int) or interval < 1:
-            return None
-        weekdays = data.get("weekdays")
-        if weekdays is not None:
-            if (not isinstance(weekdays, list) or freq != "weekly"
-                    or not all(isinstance(w, int) and 0 <= w <= 6 for w in weekdays)
-                    or not weekdays):
-                return None
-            weekdays = sorted(set(weekdays))
-        end_date = data.get("end_date")
-        if end_date is not None:
-            try:
-                datetime.date.fromisoformat(end_date)
-            except (ValueError, TypeError):
-                return None
-        return {"freq": freq, "interval": interval, "weekdays": weekdays, "end_date": end_date}
-
-    @staticmethod
-    def _next_occurrence(due_date: str, rule: dict) -> str | None:
-        """Compute the next due date from a validated rule. None = series ended."""
-        try:
-            d = datetime.date.fromisoformat(due_date)
-        except ValueError:
-            return None
-        freq = rule.get("freq")
-        interval = rule.get("interval", 1) or 1
-        weekdays = rule.get("weekdays")
-        if freq == "daily":
-            nxt = d + datetime.timedelta(days=interval)
-        elif freq == "weekly":
-            if weekdays:
-                nxt = d + datetime.timedelta(days=1)
-                limit = interval * 7 + 1
-                for _ in range(limit):
-                    if nxt.weekday() in weekdays:
-                        break
-                    nxt += datetime.timedelta(days=1)
-            else:
-                nxt = d + datetime.timedelta(weeks=interval)
-        elif freq == "monthly":
-            total = d.year * 12 + (d.month - 1) + interval
-            year, month0 = divmod(total, 12)
-            month = month0 + 1
-            last = calendar.monthrange(year, month)[1]
-            nxt = datetime.date(year, month, min(d.day, last))
-        else:
-            return None
-        end_date = rule.get("end_date")
-        if end_date:
-            try:
-                if nxt.isoformat() > end_date:
-                    return None
-            except TypeError:
-                pass
-        return nxt.isoformat()
 
     def get_due_reminders(self, now_ts: float | None = None) -> list[Todo]:
         """Todos whose reminder is due and not yet fired for this reminder time."""

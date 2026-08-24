@@ -84,7 +84,7 @@ export function App() {
     sessionCleared, sessionFocused, sessionCompleted,
     markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
-    setStatus, setNotes, setProject, setEstimate, setSchedule, setReminder, setRepeatRule,
+    setStatus, setNotes, setSchedule, setReminder,
     addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder,
   } = useWebSocket(host);
   const [activeTab, setActiveTab] = useState<MainTab>('notifications');
@@ -589,11 +589,8 @@ export function App() {
             onSetDueDate={setDueDate}
             onSetStatus={setStatus}
             onSetNotes={setNotes}
-            onSetProject={setProject}
-            onSetEstimate={setEstimate}
             onSetSchedule={setSchedule}
             onSetReminder={setReminder}
-            onSetRepeatRule={setRepeatRule}
             onReorder={reorderTodo}
             addSubtask={addSubtask}
             toggleSubtask={toggleSubtask}

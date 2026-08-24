@@ -12,11 +12,8 @@ interface TodoPageProps {
   onSetDueDate: (id: number, dueDate: string | null) => void;
   onSetStatus: (id: number, status: TodoStatus) => void;
   onSetNotes: (id: number, notes: string) => void;
-  onSetProject: (id: number, project: string) => void;
-  onSetEstimate: (id: number, estimateMinutes: number | null) => void;
   onSetSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
   onSetReminder: (id: number, reminderAt: number | null) => void;
-  onSetRepeatRule: (id: number, repeatRule: string | null) => void;
   onReorder: (id: number, orderIndex: number) => void;
   addSubtask: (todoId: number, text: string) => void;
   toggleSubtask: (id: number) => void;
@@ -107,31 +104,6 @@ function formatReminderLabel(reminderAt: number | null): string | null {
   if (day === daysFromNow(1)) return `TOMORROW ${hm}`;
   const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
   return `${d.getDate()} ${months[d.getMonth()]} ${hm}`;
-}
-
-function parseRepeatRule(rule: string | null): { freq: string; interval: number; weekdays: number[] | null; end_date: string | null } | null {
-  if (!rule) return null;
-  try {
-    const r = JSON.parse(rule);
-    if (!r || typeof r !== 'object' || !r.freq) return null;
-    return {
-      freq: r.freq,
-      interval: r.interval || 1,
-      weekdays: Array.isArray(r.weekdays) ? r.weekdays : null,
-      end_date: r.end_date || null,
-    };
-  } catch {
-    return null;
-  }
-}
-
-function repeatLabel(rule: string | null): string {
-  const r = parseRepeatRule(rule);
-  if (!r) return '';
-  if (r.freq === 'daily') return 'DAILY';
-  if (r.freq === 'weekly') return r.weekdays && r.weekdays.length > 0 ? 'WEEKDAYS' : 'WEEKLY';
-  if (r.freq === 'monthly') return 'MONTHLY';
-  return '';
 }
 
 function priorityGlyph(priority: string): { char: string; color: string } {
@@ -505,7 +477,7 @@ export function TodoPage(props: TodoPageProps) {
               <span class="text-[#FF4757] font-semibold">!high</span>{' '}
               <span class="text-[#8BA3C7] font-semibold">!medium</span>{' '}
               <span class="text-[#00D4FF] font-semibold">!low</span> set priority;
-              natural dates too: "Fix login !high tomorrow"
+              natural dates too — add a time and it schedules & reminds: "Fix login !high tomorrow 2pm"
             </p>
             <div class="flex gap-2 justify-end">
               <button
@@ -539,11 +511,8 @@ function rowHandlers(props: TodoPageProps) {
     onSetDueDate: props.onSetDueDate,
     onSetStatus: props.onSetStatus,
     onSetNotes: props.onSetNotes,
-    onSetProject: props.onSetProject,
-    onSetEstimate: props.onSetEstimate,
     onSetSchedule: props.onSetSchedule,
     onSetReminder: props.onSetReminder,
-    onSetRepeatRule: props.onSetRepeatRule,
     addSubtask: props.addSubtask,
     toggleSubtask: props.toggleSubtask,
     editSubtask: props.editSubtask,
@@ -673,11 +642,8 @@ function TodoRow({
   onSetDueDate,
   onSetStatus,
   onSetNotes,
-  onSetProject,
-  onSetEstimate,
   onSetSchedule,
   onSetReminder,
-  onSetRepeatRule,
   addSubtask,
   toggleSubtask,
   editSubtask,
@@ -693,11 +659,8 @@ function TodoRow({
   onSetDueDate: (id: number, dueDate: string | null) => void;
   onSetStatus: (id: number, status: TodoStatus) => void;
   onSetNotes: (id: number, notes: string) => void;
-  onSetProject: (id: number, project: string) => void;
-  onSetEstimate: (id: number, estimateMinutes: number | null) => void;
   onSetSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
   onSetReminder: (id: number, reminderAt: number | null) => void;
-  onSetRepeatRule: (id: number, repeatRule: string | null) => void;
   addSubtask: (todoId: number, text: string) => void;
   toggleSubtask: (id: number) => void;
   editSubtask: (id: number, text: string) => void;
@@ -754,7 +717,6 @@ function TodoRow({
   const dateBadge = formatDateBadge(todo.scheduled_date || todo.due_date);
   const schedBadge = formatSchedule(todo);
   const remLabel = formatReminderLabel(todo.reminder_at);
-  const repLabel = repeatLabel(todo.repeat_rule);
   const statusMeta = STATUS_META[todo.status];
   const pGlyph = priorityGlyph(todo.priority);
 
@@ -950,11 +912,8 @@ function TodoRow({
           todo={todo}
           onSetStatus={onSetStatus}
           onSetNotes={onSetNotes}
-          onSetProject={onSetProject}
-          onSetEstimate={onSetEstimate}
           onSetSchedule={onSetSchedule}
           onSetReminder={onSetReminder}
-          onSetRepeatRule={onSetRepeatRule}
           addSubtask={addSubtask}
           toggleSubtask={toggleSubtask}
           editSubtask={editSubtask}
@@ -971,11 +930,8 @@ function TodoDetail({
   todo,
   onSetStatus,
   onSetNotes,
-  onSetProject,
-  onSetEstimate,
   onSetSchedule,
   onSetReminder,
-  onSetRepeatRule,
   addSubtask,
   toggleSubtask,
   editSubtask,
@@ -984,21 +940,14 @@ function TodoDetail({
   todo: TodoItem;
   onSetStatus: (id: number, status: TodoStatus) => void;
   onSetNotes: (id: number, notes: string) => void;
-  onSetProject: (id: number, project: string) => void;
-  onSetEstimate: (id: number, estimateMinutes: number | null) => void;
   onSetSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
   onSetReminder: (id: number, reminderAt: number | null) => void;
-  onSetRepeatRule: (id: number, repeatRule: string | null) => void;
   addSubtask: (todoId: number, text: string) => void;
   toggleSubtask: (id: number) => void;
   editSubtask: (id: number, text: string) => void;
   deleteSubtask: (id: number) => void;
 }) {
-  const [projectDraft, setProjectDraft] = useState(todo.project);
   const [notesDraft, setNotesDraft] = useState(todo.notes);
-  const [estimateDraft, setEstimateDraft] = useState(
-    todo.estimate_minutes !== null && todo.estimate_minutes !== undefined ? String(todo.estimate_minutes) : ''
-  );
   const [subtaskText, setSubtaskText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState('');
@@ -1007,7 +956,6 @@ function TodoDetail({
   const [customReminder, setCustomReminder] = useState('');
   const schedulePicker = usePicker();
   const reminderPicker = usePicker();
-  const repeatPicker = usePicker();
   const statusPicker = usePicker();
 
   const subtasks = (todo.subtasks || []).slice().sort((a, b) => {
@@ -1016,28 +964,10 @@ function TodoDetail({
   });
   const remLabel = formatReminderLabel(todo.reminder_at);
   const schedLabel = formatSchedule(todo);
-  const repLabel = repeatLabel(todo.repeat_rule);
   const statusMeta = STATUS_META[todo.status];
-
-  const commitProject = () => {
-    const v = projectDraft.trim();
-    if (v !== todo.project) onSetProject(todo.id, v);
-  };
 
   const commitNotes = () => {
     if (notesDraft !== todo.notes) onSetNotes(todo.id, notesDraft);
-  };
-
-  const commitEstimate = () => {
-    const v = estimateDraft.trim();
-    if (v === '') {
-      if (todo.estimate_minutes !== null) onSetEstimate(todo.id, null);
-      return;
-    }
-    const n = parseInt(v, 10);
-    if (!isNaN(n) && n >= 0 && n !== todo.estimate_minutes) {
-      onSetEstimate(todo.id, n);
-    }
   };
 
   const nowEpoch = () => Date.now() / 1000;
@@ -1053,11 +983,6 @@ function TodoDetail({
     d.setDate(d.getDate() + 1);
     d.setHours(9, 0, 0, 0);
     return d.getTime() / 1000;
-  };
-
-  const applyRepeat = (rule: string | null) => {
-    onSetRepeatRule(todo.id, rule);
-    repeatPicker.setOpen(false);
   };
 
   const handleAddSubtask = () => {
@@ -1081,46 +1006,11 @@ function TodoDetail({
     setEditingSubtaskText('');
   };
 
-  const repeatBtn = (label: string, rule: string | null) => (
-    <button
-      onClick={(e) => { e.stopPropagation(); applyRepeat(rule); }}
-      class="text-[15px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#E8F0FE] font-mono uppercase tracking-[0.06em]"
-    >
-      {label}
-    </button>
-  );
-
   const metaRow = 'flex items-center gap-2 min-h-[44px] border-b border-[#162035] px-2';
   const fieldLabel = 'w-[64px] shrink-0 text-[13px] font-semibold uppercase tracking-[0.08em] text-[#4A6080]';
 
   return (
     <div class="todo-detail border-b border-[#162035] bg-[#0D1424]">
-      {/* Project / estimate */}
-      <div class={metaRow}>
-        <span class={fieldLabel}>PROJECT</span>
-        <input
-          type="text"
-          value={projectDraft}
-          onInput={(e) => setProjectDraft((e.target as HTMLInputElement).value)}
-          onBlur={commitProject}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          placeholder="—"
-          maxLength={60}
-          class="flex-1 bg-transparent text-[16px] text-[#E8F0FE] outline-none font-mono placeholder-[#4A6080] min-w-0"
-        />
-        <span class={fieldLabel + ' w-[52px]'}>MIN</span>
-        <input
-          type="number"
-          min={0}
-          value={estimateDraft}
-          onInput={(e) => setEstimateDraft((e.target as HTMLInputElement).value)}
-          onBlur={commitEstimate}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          placeholder="—"
-          class="w-[64px] bg-transparent text-[16px] text-[#FFB800] outline-none font-mono placeholder-[#4A6080] text-right"
-        />
-      </div>
-
       {/* Notes */}
       <div class={metaRow}>
         <span class={fieldLabel}>NOTES</span>
@@ -1136,7 +1026,7 @@ function TodoDetail({
         />
       </div>
 
-      {/* Schedule / reminder / repeat */}
+      {/* Schedule / reminder */}
       <div class={`${metaRow} gap-1`}>
         {/* Schedule */}
         <div ref={schedulePicker.ref} class="relative shrink-0">
@@ -1232,30 +1122,6 @@ function TodoDetail({
               {todo.reminder_at && (
                 <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, null); reminderPicker.setOpen(false); }} class="text-[15px] text-left px-2 py-1 hover:bg-[#1A2535] text-[#FF4757] font-mono">CLEAR</button>
               )}
-            </div>
-          )}
-        </div>
-
-        {/* Repeat */}
-        <div ref={repeatPicker.ref} class="relative shrink-0">
-          <button
-            onClick={repeatPicker.toggle}
-            class={`font-mono text-[13px] font-semibold uppercase tracking-[0.06em] px-1.5 py-1 border transition-colors ${
-              repLabel
-                ? 'border-[#26DE81] bg-[#26DE81]/15 text-[#26DE81]'
-                : 'border-[#1E3A5F] bg-[#111827] text-[#8BA3C7] active:bg-[#1E3A5F]'
-            }`}
-            title="Repeat this task"
-          >
-            {repLabel ? `↻ ${repLabel}` : '↻ REPEAT'}
-          </button>
-          {repeatPicker.open && (
-            <div class={`absolute z-30 ${repeatPicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 bg-[#111827] border border-[#1E3A5F] p-1.5 flex flex-col gap-1 min-w-[140px]`}>
-              {repeatBtn('NONE', null)}
-              {repeatBtn('DAILY', JSON.stringify({ freq: 'daily', interval: 1, weekdays: null, end_date: null }))}
-              {repeatBtn('WEEKDAYS', JSON.stringify({ freq: 'weekly', interval: 1, weekdays: [0, 1, 2, 3, 4], end_date: null }))}
-              {repeatBtn('WEEKLY', JSON.stringify({ freq: 'weekly', interval: 1, weekdays: null, end_date: null }))}
-              {repeatBtn('MONTHLY', JSON.stringify({ freq: 'monthly', interval: 1, weekdays: null, end_date: null }))}
             </div>
           )}
         </div>

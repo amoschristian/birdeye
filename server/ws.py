@@ -230,30 +230,6 @@ async def _handle_todo_action(websocket: WebSocket, data: dict):
             else:
                 error = "not_found"
 
-    elif action == "todo_project":
-        todo_id = data.get("id")
-        if todo_id is None:
-            error = "missing_id"
-        else:
-            entity_id = todo_id
-            todo = db.update_todo_project(todo_id, data.get("project") or "")
-            if todo:
-                ok = True
-            else:
-                error = "not_found"
-
-    elif action == "todo_estimate":
-        todo_id = data.get("id")
-        if todo_id is None:
-            error = "missing_id"
-        else:
-            entity_id = todo_id
-            todo = db.update_todo_estimate(todo_id, data.get("estimate_minutes"))
-            if todo:
-                ok = True
-            else:
-                error = "invalid_estimate"
-
     elif action == "todo_schedule":
         todo_id = data.get("id")
         if todo_id is None:
@@ -281,18 +257,6 @@ async def _handle_todo_action(websocket: WebSocket, data: dict):
                 ok = True
             else:
                 error = "invalid_reminder"
-
-    elif action == "todo_repeat":
-        todo_id = data.get("id")
-        if todo_id is None:
-            error = "missing_id"
-        else:
-            entity_id = todo_id
-            todo = db.update_todo_repeat_rule(todo_id, data.get("repeat_rule"))
-            if todo:
-                ok = True
-            else:
-                error = "invalid_rule"
 
     elif action == "todo_attach_context":
         todo_id = data.get("id")

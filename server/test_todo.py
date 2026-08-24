@@ -1,10 +1,8 @@
 """Todo 2.0 logic tests — run with: server/.venv/bin/python3 -m unittest test_todo -v
 
 Covers: legacy migration mapping, lifecycle transitions, invalid updates,
-soft-delete, reminders (due + no-duplicate + re-arm), recurrence date math,
-recurring completion roll, and series/occurrence bookkeeping.
+soft-delete, and reminders (due + no-duplicate + re-arm).
 """
-import json
 import os
 import sqlite3
 import tempfile
@@ -88,16 +86,11 @@ class TodoDatabaseTest(unittest.TestCase):
     def test_meta_field_validation(self):
         t = self.db.create_todo("meta")
         self.db.update_todo_notes(t.id, "note")
-        self.db.update_todo_project(t.id, "proj")
-        self.db.update_todo_estimate(t.id, 45)
         self.db.update_todo_schedule(t.id, "2026-08-12", "09:30")
         got = [x for x in self.db.get_all_todos() if x.id == t.id][0]
         self.assertEqual(got.notes, "note")
-        self.assertEqual(got.project, "proj")
-        self.assertEqual(got.estimate_minutes, 45)
         self.assertEqual(got.scheduled_date, "2026-08-12")
         self.assertEqual(got.scheduled_time, "09:30")
-        self.assertIsNone(self.db.update_todo_estimate(t.id, -5))
         self.assertIsNone(self.db.update_todo_schedule(t.id, "not-a-date", None))
         self.assertIsNone(self.db.update_todo_schedule(t.id, "2026-08-12", "99:99"))
 
@@ -133,58 +126,9 @@ class TodoDatabaseTest(unittest.TestCase):
         self.db.update_todo_status(t.id, "completed")
         self.assertEqual(self.db.get_due_reminders(now_ts=200.0), [])
 
-    # ── Recurrence ─────────────────────────────────────────────
-
-    def test_repeat_rule_validation(self):
-        good = {"freq": "weekly", "interval": 1, "weekdays": [0, 2, 4], "end_date": None}
-        self.assertIsNotNone(self.db._validate_repeat_rule(good))
-        self.assertIsNone(self.db._validate_repeat_rule({"freq": "daily", "interval": 0}))
-        self.assertIsNone(self.db._validate_repeat_rule({"freq": "monthly", "weekdays": [1]}))
-        self.assertIsNone(self.db._validate_repeat_rule({"freq": "yearly"}))
-        self.assertIsNone(self.db._validate_repeat_rule({"freq": "weekly", "interval": 1, "weekdays": []}))
-        self.assertIsNone(self.db._validate_repeat_rule({"freq": "weekly", "interval": 1, "end_date": "nope"}))
-
-    def test_next_occurrence_calculation(self):
-        weekly = {"freq": "weekly", "interval": 1, "weekdays": [0, 2, 4], "end_date": None}
-        self.assertEqual(self.db._next_occurrence("2026-08-12", weekly), "2026-08-14")  # Wed → Fri
-        daily = {"freq": "daily", "interval": 1, "weekdays": None, "end_date": None}
-        self.assertEqual(self.db._next_occurrence("2026-08-12", daily), "2026-08-13")
-        monthly = {"freq": "monthly", "interval": 1, "weekdays": None, "end_date": None}
-        self.assertEqual(self.db._next_occurrence("2026-01-31", monthly), "2026-02-28")  # clamp
-        ended = {"freq": "daily", "interval": 1, "weekdays": None, "end_date": "2026-08-12"}
-        self.assertIsNone(self.db._next_occurrence("2026-08-12", ended))
-
-    def test_completing_recurring_rolls_next_occurrence(self):
-        t = self.db.create_todo("weekly review")
-        self.db.update_todo_due_date(t.id, "2026-08-12")
-        self.db.update_todo_repeat_rule(
-            t.id, json.dumps({"freq": "weekly", "interval": 1, "weekdays": [0, 2, 4], "end_date": None})
-        )
-        self.db.create_subtask(t.id, "step 1")
-        old_id = t.id
-        new_t = self.db.toggle_todo(old_id)
-        self.assertIsNotNone(new_t)
-        self.assertEqual(new_t.due_date, "2026-08-14")
-        self.assertEqual(new_t.occurrence_number, 2)
-        self.assertEqual(new_t.status, "active")
-        self.assertEqual(len(self.db.get_subtasks_for_todo(new_t.id)), 1)
-        # old occurrence archived, new one visible
-        self.assertNotIn(old_id, [x.id for x in self.db.get_all_todos()])
-        self.assertEqual(new_t.series_id, t.series_id)
-
-    def test_recurring_completion_ends_series(self):
-        t = self.db.create_todo("limited")
-        self.db.update_todo_due_date(t.id, "2026-08-12")
-        self.db.update_todo_repeat_rule(
-            t.id, json.dumps({"freq": "daily", "interval": 1, "weekdays": None, "end_date": "2026-08-12"})
-        )
-        done = self.db.toggle_todo(t.id)
-        self.assertEqual(done.status, "completed")  # no next occurrence → plain complete
-
     def test_plain_complete_and_meta_copy(self):
         t = self.db.create_todo("plain")
         self.db.update_todo_notes(t.id, "n")
-        self.db.update_todo_project(t.id, "p")
         done = self.db.toggle_todo(t.id)
         self.assertEqual(done.status, "completed")
         self.assertTrue(done.completed)
