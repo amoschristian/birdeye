@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'preact/hooks';
+import { useCallback, useEffect, useState } from 'preact/hooks';
 
 const SOUNDS: Record<string, string> = {
   default: '/sounds/default.mp3',
@@ -26,6 +26,18 @@ export function useSound() {
   const [manualMuted, setManualMutedState] = useState(_manualMuted);
   const [eventMuted, setEventMutedState] = useState(_eventMuted);
 
+  // Keep mute in sync across dashboard tabs (panel + desktop/phone).
+  // localStorage writes fire `storage` events in every *other* tab.
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key !== MUTED_STORAGE_KEY) return;
+      _manualMuted = e.newValue === 'true';
+      setManualMutedState(_manualMuted);
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
+
   const setManualMuted = useCallback((value: boolean) => {
     _manualMuted = value;
     setManualMutedState(value);
@@ -42,14 +54,14 @@ export function useSound() {
   }, []);
 
   const toggleMuted = useCallback(() => {
-    // A manual tap can override an event-scoped mute. The manual preference
-    // remains persisted after the event ends.
-    if (_eventMuted) {
+    // The button is a straightforward global mute/unmute: if any mute is on
+    // (manual or calendar-event-scoped) turn it all off, otherwise mute.
+    if (_manualMuted || _eventMuted) {
       setEventMuted(false);
       setManualMuted(false);
-      return;
+    } else {
+      setManualMuted(true);
     }
-    setManualMuted(!_manualMuted);
   }, [setEventMuted, setManualMuted]);
 
   const play = useCallback((soundKey: string) => {
@@ -58,17 +70,23 @@ export function useSound() {
     const path = SOUNDS[soundKey] || SOUNDS.default;
     const audio = new Audio(path);
     audio.volume = 0.3;
-    audio.play().catch(() => {
-      if (!_audioUnlocked) {
-        console.warn('Birdeye: audio autoplay blocked — tap the dashboard to unlock sounds');
-        const unlock = () => {
-          _audioUnlocked = true;
-          if (!_manualMuted && !_eventMuted) audio.play().catch(() => {});
-          document.removeEventListener('pointerdown', unlock);
-        };
-        document.addEventListener('pointerdown', unlock, { once: true });
-      }
-    });
+    audio.play()
+      .then(() => {
+        _audioUnlocked = true;
+      })
+      .catch(() => {
+        // Autoplay blocked (no user gesture yet). Unlock on the next tap so
+        // later notifications can play — but never replay this sound: that
+        // tap might be the MUTE button (pointerdown fires before click).
+        if (!_audioUnlocked) {
+          console.warn('Birdeye: audio autoplay blocked — tap the dashboard to unlock sounds');
+          const unlock = () => {
+            _audioUnlocked = true;
+            document.removeEventListener('pointerdown', unlock);
+          };
+          document.addEventListener('pointerdown', unlock, { once: true });
+        }
+      });
   }, []);
 
   return {
