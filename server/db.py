@@ -408,14 +408,43 @@ class Database:
     }
 
     @staticmethod
-    def _has_explicit_time(substr: str) -> bool:
-        """True when the matched phrase carries a specific clock time.
+    def _parse_explicit_time(text: str) -> str | None:
+        """Extract a wall-clock time from text as 'HH:MM'.
 
-        dateparser resolves bare "today"/"tomorrow" to the current wall-clock
-        time, so we only schedule + remind when the text actually names a time
-        (e.g. "2 pm", "14:00", "09:30").
+        Handles '10am', '10 pm', '2:30pm', '14:00', 'noon', 'midnight'.
+        Done with our own regex because dateparser.search_dates v1.4.1
+        mangles am/pm without a colon ('tomorrow 10am' → current wall-clock).
         """
-        return bool(re.search(r'\d{1,2}:\d{2}|\b\d{1,2}\s*(?:am|pm)\b|\bnoon\b', substr, re.IGNORECASE))
+        m = re.search(
+            r'(\d{1,2}:\d{2})'                    # 14:00 / 9:30
+            r'|\b(\d{1,2})\s*(am|pm)\b'           # 10am / 10 pm / 2:30pm (half handled above)
+            r'|\b(noon|midnight)\b',
+            text, re.IGNORECASE,
+        )
+        if not m:
+            return None
+        if m.group(1):
+            hh, mm = m.group(1).split(':')
+            return f'{int(hh):02d}:{mm}'
+        if m.group(4):
+            return '12:00' if m.group(4).lower() == 'noon' else '00:00'
+        h = int(m.group(2)) % 12
+        if m.group(3).lower() == 'pm':
+            h += 12
+        return f'{h:02d}:00'
+
+    @staticmethod
+    def _is_date_candidate(substr: str) -> bool:
+        """True when a search_dates hit is a genuine date expression.
+
+        Requires a date-indicator word (today/tomorrow/day/month/next…)
+        or a digit ("in 3 days", "Apr 15", "15/04"), and at least 3 chars
+        to reject Indonesian/English false positives like "di", "to", "nya".
+        """
+        words_set = set(substr.lower().split())
+        has_date_word = bool(words_set & Database._DATE_WORDS)
+        has_digit = bool(re.search(r'\d', substr))
+        return len(substr.strip()) >= 3 and (has_date_word or has_digit)
 
     @staticmethod
     def _parse_todo_meta(text: str) -> tuple[str, str | None, str, str | None, str | None, float | None]:
@@ -423,9 +452,11 @@ class Database:
 
         Returns (clean_text, due_date, priority, scheduled_date, scheduled_time, reminder_at).
         Priority tags: !high/!h, !medium/!m, !low/!l (case-insensitive, last win).
-        Date: parsed from remaining text via dateparser.search_dates.
-        When the date carries an explicit time (e.g. "today 2 pm"), the task is
-        scheduled and reminded at that time as well as dated.
+        Date: parsed via dateparser.search_dates; time extracted by our own
+        regex (search_dates drops am/pm without a colon, see _parse_explicit_time).
+        An explicit time schedules the task at that datetime but does NOT
+        auto-set a reminder — schedule and reminder are deliberately
+        independent controls (set the reminder separately, e.g. 10 min before).
         """
 
         priority = "medium"
@@ -445,6 +476,8 @@ class Database:
         # Collapse multiple spaces
         clean = re.sub(r'\s+', ' ', clean).strip()
 
+        explicit_time = Database._parse_explicit_time(clean) if clean else None
+
         # Parse date from clean text using search_dates
         due_date = None
         scheduled_date = scheduled_time = None
@@ -453,18 +486,13 @@ class Database:
             results = search_dates(clean, settings={'PREFER_DATES_FROM': 'future'})
             if results:
                 for substr, dt in results:
-                    # Filter false positives: substring must contain a date-indicator word
-                    # or contain a digit (handles "in 3 days", "Apr 15", "15/04", etc.)
-                    words_set = set(substr.lower().split())
-                    has_date_word = bool(words_set & Database._DATE_WORDS)
-                    has_digit = bool(re.search(r'\d', substr))
-                    if has_date_word or has_digit:
+                    if Database._is_date_candidate(substr):
                         due_date = dt.strftime('%Y-%m-%d')
-                        # An explicit clock time ("2 pm", "14:00") schedules + reminds at it
-                        if Database._has_explicit_time(substr):
+                        # Combine date from search_dates with our own explicit time:
+                        # search_dates itself gives wrong times for am/pm without colon
+                        if explicit_time:
                             scheduled_date = due_date
-                            scheduled_time = dt.strftime('%H:%M')
-                            reminder_at = dt.timestamp()
+                            scheduled_time = explicit_time
                         # Remove the matched date substring from the text
                         clean = clean.replace(substr, '', 1).strip()
                         clean = re.sub(r'\s+', ' ', clean).strip()

@@ -66,6 +66,58 @@ class TodoDatabaseTest(unittest.TestCase):
         t_high = db.create_todo("Fix login !high tomorrow")
         self.assertEqual(t_high.status, "inbox")  # stays inbox until planned
 
+    # ── Natural-language schedule parsing ────────────────────────
+
+    def test_parse_todo_meta_explicit_time(self):
+        """'Fix login tomorrow 10am' must schedule tomorrow at 10:00, not current wall-clock.
+
+        dateparser.search_dates v1.4.1 drops am/pm without a colon
+        ('tomorrow 10am' → today's now), so the time comes from our own
+        regex combined with the date from search_dates.
+        """
+        t = self.db.create_todo("Fix login tomorrow 10am")
+        self.assertIsNotNone(t)
+        import datetime
+        expected = (datetime.date.today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        self.assertEqual(t.due_date, expected)
+        self.assertEqual(t.scheduled_date, expected)
+        self.assertEqual(t.scheduled_time, "10:00")
+        self.assertEqual(t.text, "Fix login")
+
+    def test_bare_date_without_task_rejected(self):
+        """A date-only capture ('tomorrow 10am') with no task name creates nothing."""
+        self.assertIsNone(self.db.create_todo("tomorrow 10am"))
+
+    def test_parse_todo_meta_no_auto_reminder(self):
+        """Schedule and reminder are independent — a time schedules but does not remind."""
+        t = self.db.create_todo("Fix login !high tomorrow 2pm")
+        self.assertIsNotNone(t)
+        self.assertEqual(t.scheduled_time, "14:00")
+        self.assertIsNone(t.reminder_at)
+
+    def test_parse_todo_meta_24h_time(self):
+        t = self.db.create_todo("tanya yoel besok 10:00")
+        self.assertIsNotNone(t)
+        import datetime
+        expected = (datetime.date.today() + datetime.timedelta(days=1)).strftime('%Y-%m-%d')
+        self.assertEqual(t.scheduled_date, expected)
+        self.assertEqual(t.scheduled_time, "10:00")
+
+    def test_parse_todo_meta_no_false_positive(self):
+        """Indonesian filler words ('di', 'nya') must not be treated as dates."""
+        t = self.db.create_todo("kasih tau team hasil discuss di hiding-leads")
+        self.assertIsNotNone(t)
+        self.assertIsNone(t.due_date)
+        self.assertIsNone(t.scheduled_date)
+
+    def test_parse_todo_meta_relative_days(self):
+        t = self.db.create_todo("buy milk in 3 days")
+        self.assertIsNotNone(t)
+        import datetime
+        expected = (datetime.date.today() + datetime.timedelta(days=3)).strftime('%Y-%m-%d')
+        self.assertEqual(t.due_date, expected)
+        self.assertIsNone(t.scheduled_date)
+
     # ── Lifecycle ──────────────────────────────────────────────
 
     def test_status_transitions_and_invalid(self):
