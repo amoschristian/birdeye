@@ -1,33 +1,27 @@
-// THESIS: A launch-control telemetry console for digital attention — calm, spacious,
-// authoritative. Every pixel serves awareness at arm's length on a 7-inch panel.
-// Rejects notification-center card stacks and glowy sci-fi dashboards for the
-// restrained authority of real mission control: navy, amber, cyan, solid indicators.
+// THESIS: A warm night-shift console for attention — cozy enough to live with,
+// precise enough to trust. Deep violet ink, porcelain text, marigold data,
+// periwinkle action. The channel rack is the memorable element: every app has
+// a brand edge, a live activity line, and a count you can read from a metre away.
 //
-// OWN-WORLD: Deep navy (#0B1120) canvas with console-gray (#111827) surfaces.
-// Telemetry amber (#FFB800) for data values only. Accent cyan (#00D4FF) for
-// active states. Solid-lit rectangular status indicators — no glow, no bloom,
-// no drop shadows. System mono for data, system sans for structure. 14px floor.
+// OWN-WORLD: Violet-black canvas, plum surfaces, hairline rules, 8–14px radii,
+// no shadows or glow. Space Grotesk carries structure and sentences; JetBrains
+// Mono carries counts, times, and measured values. Sentence case for actions.
 //
-// STORY: The user glances at the secondary panel and immediately sees: the time,
-// connection status, which apps have unread notifications, and the current
-// notification feed. A tap on a channel selector filters the feed. A tap on a
-// notification marks it read and focuses the source. The bottom bar shows
-// Spotify now-playing and CPU/RAM gauges. Everything is readable without
-// squinting.
+// STORY: The panel sits beside the desk. A glance answers: what time is it, am I
+// connected, which channels moved, what needs me now. A tap filters; a tap opens.
+// The corgi patrols the bottom edge, because this is a companion, not a terminal.
 //
-// FIRST VIEWPORT: 1024×600. Three horizontal bands: 48px status bar (clock
-// + connection + workspace button), flex-1 main console (80px channel selector
-// + telemetry feed with ACTIVE/ALL sub-tabs), 48px audio/comms bar (Spotify
-// + CPU/RAM instruments). Calendar strip renders conditionally at 24px.
-//
-// FORM: Launch Control Center (grounded direction #1, ordered-list rank 1).
-// Seed key: ded25121, roll index 5 → user overrode to this world after re-rolls.
+// FIRST VIEWPORT: 1024×600. 60px status bar, optional 30px calendar strip,
+// flexible console (192px channel rack + feed + optional 224px Do First rail),
+// 60px audio/comms bar.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Volume2, VolumeX } from 'lucide-preact';
+import type { ComponentChildren } from 'preact';
+import { Check, Inbox, Volume2, VolumeX, WifiOff, X } from 'lucide-preact';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ConnectionStatus } from './components/ConnectionStatus';
 import { AppButton } from './components/AppButton';
+import { AppIcon } from './components/AppIcon';
 import { NotificationCard } from './components/NotificationCard';
 import { BottomBar } from './components/BottomBar';
 import { CorgiBar } from './components/CorgiBar';
@@ -49,31 +43,72 @@ interface NotificationGroupData {
   items: Notification[];
 }
 
-function groupNotifications(notifications: Notification[], apps: AppConfig[]): NotificationGroupData[] {
+const GROUP_ORDER = ['work', 'personal'];
+const GROUP_LABELS: Record<string, string> = { work: 'Work', personal: 'Personal' };
+
+function groupNotifications(notifications: Notification[]): NotificationGroupData[] {
   const groups: Map<string, NotificationGroupData> = new Map();
   const order: string[] = [];
 
-  for (const n of notifications) {
-    const info = parseGroupKey(n.app_id, n.summary);
+  for (const notification of notifications) {
+    const info = parseGroupKey(notification.app_id, notification.summary);
     const existing = groups.get(info.key);
     if (existing) {
-      existing.items.push(n);
+      existing.items.push(notification);
     } else {
       order.push(info.key);
       groups.set(info.key, {
         key: info.key,
-        appId: n.app_id,
+        appId: notification.app_id,
         label: info.label,
-        items: [n],
+        items: [notification],
       });
     }
   }
 
-  for (const g of groups.values()) {
-    g.items.sort((a, b) => b.created_at - a.created_at);
+  for (const group of groups.values()) {
+    group.items.sort((a, b) => b.created_at - a.created_at);
   }
 
   return order.map((key) => groups.get(key)!);
+}
+
+function dueLabel(dueDate: string | null, today: string): { text: string; tone: string } | null {
+  if (!dueDate) return null;
+  if (dueDate < today) return { text: 'Overdue', tone: 'text-alert' };
+  if (dueDate === today) return { text: 'Today', tone: 'text-warn' };
+  return null;
+}
+
+function FeedEmpty({
+  icon,
+  title,
+  hint,
+  action,
+}: {
+  icon: ComponentChildren;
+  title: string;
+  hint: string;
+  action?: { label: string; onClick: () => void };
+}) {
+  return (
+    <div class="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
+      <span class="flex h-12 w-12 items-center justify-center rounded-[14px] border border-line/70 bg-surface text-faint">
+        {icon}
+      </span>
+      <p class="text-[24px] font-semibold text-text">{title}</p>
+      <p class="max-w-[300px] text-[18px] leading-relaxed text-muted">{hint}</p>
+      {action && (
+        <button
+          type="button"
+          onClick={action.onClick}
+          class="mt-1 min-h-[44px] rounded-[9px] bg-action px-4 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
+        >
+          {action.label}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export function App() {
@@ -87,67 +122,78 @@ export function App() {
     setStatus, setNotes, setSchedule, setReminder,
     addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder,
   } = useWebSocket(host);
+
   const [activeTab, setActiveTab] = useState<MainTab>('notifications');
   const [notifSubTab, setNotifSubTab] = useState<ActiveAllTab>('active');
   const [filterAppId, setFilterAppId] = useState<string | null>(null);
   const [clearConfirm, setClearConfirm] = useState(false);
-  const [undoState, setUndoState] = useState<{ ids: number[]; timer: ReturnType<typeof setTimeout> | null }>({ ids: [], timer: null });
+  const [readToast, setReadToast] = useState(false);
   const [soundPrompt, setSoundPrompt] = useState<CalendarEvent | null>(null);
   const [soundPromptDeadline, setSoundPromptDeadline] = useState<number | null>(null);
   const [soundPromptSeconds, setSoundPromptSeconds] = useState(10);
   const soundPromptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const readToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const promptedCalendarEventsRef = useRef(new Set<string>());
 
-  // Filter out calendar from sidebar — calendar strip already shows events
-  const enabledApps = apps.filter((a) => a.enabled && a.id !== 'calendar');
+  useEffect(() => {
+    return () => {
+      if (readToastTimerRef.current) clearTimeout(readToastTimerRef.current);
+      if (soundPromptTimerRef.current) clearTimeout(soundPromptTimerRef.current);
+    };
+  }, []);
 
-  // Group apps for channel selector sidebar
-  const GROUP_ORDER = ['work', 'personal'];
-  const GROUP_LABELS: Record<string, string> = { work: 'WORK', personal: 'PERSONAL' };
-  const groupedApps = new Map<string, typeof enabledApps>();
-  const ungrouped: typeof enabledApps = [];
-  for (const a of enabledApps) {
-    if (a.group && GROUP_ORDER.includes(a.group)) {
-      if (!groupedApps.has(a.group)) groupedApps.set(a.group, []);
-      groupedApps.get(a.group)!.push(a);
+  // Calendar is represented by the ticker strip, not a channel row.
+  const enabledApps = apps.filter((app) => app.enabled && app.id !== 'calendar');
+
+  const groupedApps = new Map<string, AppConfig[]>();
+  const ungrouped: AppConfig[] = [];
+  for (const app of enabledApps) {
+    if (app.group && GROUP_ORDER.includes(app.group)) {
+      if (!groupedApps.has(app.group)) groupedApps.set(app.group, []);
+      groupedApps.get(app.group)!.push(app);
     } else {
-      ungrouped.push(a);
+      ungrouped.push(app);
     }
   }
-  for (const [, list] of groupedApps) {
+  for (const list of groupedApps.values()) {
     list.sort((a, b) => a.name.localeCompare(b.name));
   }
   ungrouped.sort((a, b) => a.name.localeCompare(b.name));
 
+  // Notifications arrive newest-first, so the first hit per app is the latest.
+  const lastActivityByApp = new Map<string, number>();
+  const lastSummaryByApp = new Map<string, string>();
+  for (const notification of notifications) {
+    if (lastActivityByApp.has(notification.app_id)) continue;
+    lastActivityByApp.set(notification.app_id, notification.created_at);
+    lastSummaryByApp.set(notification.app_id, notification.summary);
+  }
+
+  const unreadNotifications = notifications.filter((notification) => !notification.is_read);
+  const totalUnread = unreadNotifications.length;
+  const activeChannels = new Set(unreadNotifications.map((notification) => notification.app_id)).size;
+  const focusUnread = unreadNotifications.length;
+
   const appFiltered = filterAppId
-    ? notifications.filter((n) => n.app_id === filterAppId)
+    ? notifications.filter((notification) => notification.app_id === filterAppId)
     : notifications;
-  const activeNotifications = appFiltered.filter((n) => !n.is_read);
+  const activeNotifications = appFiltered.filter((notification) => !notification.is_read);
   const displayedNotifications: Notification[] =
     notifSubTab === 'active' ? activeNotifications : appFiltered;
 
   const activeCount = activeNotifications.length;
   const allCount = appFiltered.length;
+  const selectedApp = filterAppId ? apps.find((app) => app.id === filterAppId) ?? null : null;
 
   const handleFilterClick = (appId: string) => {
-    setFilterAppId((prev) => (prev === appId ? null : appId));
+    setFilterAppId((previous) => (previous === appId ? null : appId));
   };
 
-  // ── Undo mark-read ────────────────────────────────────────
-  const handleMarkReadWithUndo = (id: number) => {
+  const handleMarkRead = (id: number) => {
     markRead(id);
-    // Clear previous undo timer
-    if (undoState.timer) clearTimeout(undoState.timer);
-    const timer = setTimeout(() => setUndoState({ ids: [], timer: null }), 4000);
-    setUndoState({ ids: [...undoState.ids, id], timer });
-  };
-
-  const handleUndo = () => {
-    // Re-mark as unread by sending mark_read again? No — the server
-    // doesn't support un-mark. Optimistically revert in local state only.
-    // For now, just dismiss the undo toast.
-    if (undoState.timer) clearTimeout(undoState.timer);
-    setUndoState({ ids: [], timer: null });
+    setReadToast(true);
+    if (readToastTimerRef.current) clearTimeout(readToastTimerRef.current);
+    readToastTimerRef.current = setTimeout(() => setReadToast(false), 2200);
   };
 
   const handleClearRead = () => {
@@ -227,142 +273,140 @@ export function App() {
     return () => clearInterval(interval);
   }, [soundPromptDeadline]);
 
-  // ── Do First queue (Focus page + Home strip) ───────────────
-  // High-priority due work first, then medium — medium only
-  // surfaces after every high item is done/skipped.
-  // Only active/inbox work — exclude waiting, completed, archived.
+  // Do First queue: high-priority due work first, then medium. Medium only
+  // surfaces after every high item is done or skipped. Active/inbox only.
   const today = (() => {
-    const d = new Date();
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const date = new Date();
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   })();
   const priorityRank: Record<string, number> = { high: 0, medium: 1 };
-  const doFirstTodos = todos
-    .filter((t) =>
-      !t.completed && t.status !== 'waiting' && t.status !== 'archived' &&
-      (t.priority === 'high' || t.priority === 'medium') &&
-      t.due_date !== null && t.due_date <= today
+  const dueNowTodos = todos
+    .filter((todo) =>
+      !todo.completed && todo.status !== 'waiting' && todo.status !== 'archived' &&
+      (todo.priority === 'high' || todo.priority === 'medium') &&
+      todo.due_date !== null && todo.due_date <= today
     )
     .sort((a, b) => {
-      const pa = priorityRank[a.priority] ?? 2;
-      const pb = priorityRank[b.priority] ?? 2;
-      if (pa !== pb) return pa - pb;
+      const priorityA = priorityRank[a.priority] ?? 2;
+      const priorityB = priorityRank[b.priority] ?? 2;
+      if (priorityA !== priorityB) return priorityA - priorityB;
       if (a.due_date !== b.due_date) return (a.due_date || '').localeCompare(b.due_date || '');
       return a.order_index - b.order_index;
-    })
-    .slice(0, 6);
+    });
+  const doFirstTodos = dueNowTodos.slice(0, 6);
+
+  const navItems: { id: MainTab; label: string; count: number }[] = [
+    { id: 'notifications', label: 'Home', count: 0 },
+    { id: 'focus', label: 'Focus', count: focusUnread },
+    { id: 'todos', label: 'Todos', count: dueNowTodos.length },
+  ];
 
   return (
-    <div class="relative h-screen w-screen bg-[#0B1120] text-[#E8F0FE] antialiased flex flex-col overflow-hidden select-none">
-      {/* ── Status bar (48px) ────────────────────────────────── */}
-      <header class="flex items-center justify-between px-4 h-14 shrink-0 border-b border-[#1E3A5F] bg-[#0B1120]">
-        <div class="flex items-center gap-4">
-          <Clock />
-          <ConnectionStatus connected={connected} />
-          <div class="flex gap-1 ml-2">
+    <div class="relative flex h-screen w-screen flex-col overflow-hidden bg-ink text-text antialiased select-none">
+      {/* ── Status bar ─────────────────────────────────────── */}
+      <header class="flex h-[64px] shrink-0 items-center gap-3 border-b border-line/60 bg-ink px-4">
+        <Clock />
+        <ConnectionStatus connected={connected} />
+
+        <nav class="ml-1 flex items-center gap-0.5 rounded-[11px] bg-surface/80 p-1" aria-label="Views">
+          {navItems.map((item) => (
             <button
-              onClick={() => setActiveTab('notifications')}
-              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                activeTab === 'notifications'
-                  ? 'bg-[#1E3A5F] text-[#00D4FF]'
-                  : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
+              key={item.id}
+              type="button"
+              onClick={() => setActiveTab(item.id)}
+              aria-current={activeTab === item.id ? 'page' : undefined}
+              class={`flex min-h-[44px] items-center gap-1.5 rounded-[8px] px-3.5 text-[18px] font-semibold transition-all active:scale-[0.98] ${
+                activeTab === item.id ? 'bg-raised text-text' : 'text-muted hover:text-text'
               }`}
             >
-              HOME
+              {item.label}
+              {item.count > 0 && (
+                <span
+                  class={`rounded-[5px] px-1.5 py-0.5 font-mono text-[14px] tabular-nums ${
+                    activeTab === item.id ? 'bg-signal/15 text-signal' : 'bg-ink/60 text-faint'
+                  }`}
+                >
+                  {item.count > 99 ? '99+' : item.count}
+                </span>
+              )}
             </button>
-            <button
-              onClick={() => setActiveTab('focus')}
-              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                activeTab === 'focus'
-                  ? 'bg-[#1E3A5F] text-[#00D4FF]'
-                  : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
-              }`}
-            >
-              FOCUS
-            </button>
-            <button
-              onClick={() => setActiveTab('todos')}
-              class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                activeTab === 'todos'
-                  ? 'bg-[#1E3A5F] text-[#00D4FF]'
-                  : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
-              }`}
-            >
-              TODOS
-            </button>
-          </div>
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            onClick={toggleSoundMuted}
-            class={`w-11 h-11 flex items-center justify-center border transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-              soundMuted
-                ? 'bg-[#1E3A5F] border-[#00D4FF] text-[#00D4FF]'
-                : 'bg-[#111827] border-[#1E3A5F] text-[#8BA3C7] hover:text-[#E8F0FE] hover:border-[#00D4FF]'
-            }`}
-            type="button"
-            aria-pressed={soundMuted}
-            aria-label={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
-            title={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
-          >
-            {soundMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-          </button>
-          <button
-            onClick={() => switchWorkspace(1)}
-            class="px-5 py-2 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#00D4FF] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-            title="Switch to workspace 1"
-          >
-            WORKSPACE
-          </button>
-        </div>
+          ))}
+        </nav>
+
+        <div class="flex-1" />
+
+        <button
+          type="button"
+          onClick={toggleSoundMuted}
+          aria-pressed={soundMuted}
+          aria-label={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
+          title={soundMuted ? 'Unmute notification alerts' : 'Mute notification alerts'}
+          class={`flex h-11 w-11 items-center justify-center rounded-[9px] border transition-all active:scale-95 ${
+            soundMuted
+              ? 'border-action/40 bg-action/10 text-action'
+              : 'border-line/60 bg-surface text-muted hover:text-text'
+          }`}
+        >
+          {soundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => switchWorkspace(1)}
+          title="Switch to workspace 1"
+          class="flex h-11 items-center rounded-[9px] bg-action px-4 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
+        >
+          Workspace
+        </button>
       </header>
 
-      {/* ── Calendar ticker (24px, conditional) ──────────────── */}
+      {/* ── Calendar ticker ────────────────────────────────── */}
       <CalendarStrip events={calendarEvents} />
 
-      {/* ── Event audio prompt (10s timeout defaults to alerts ON) ─ */}
+      {/* ── Event audio prompt ─────────────────────────────── */}
       {soundPrompt && (
         <div
-          class="absolute top-[84px] right-4 z-50 w-[360px] max-w-[calc(100vw-32px)] border border-[#FF9F43] bg-[#111827] px-4 py-3"
+          class="absolute right-4 top-[108px] z-50 w-[380px] max-w-[calc(100vw-32px)] rounded-[14px] border border-warn/40 bg-surface p-4"
           role="alertdialog"
           aria-labelledby="sound-prompt-title"
           aria-describedby="sound-prompt-description"
         >
           <div class="flex items-center gap-2">
-            <span class="w-2 h-2 shrink-0 bg-[#FF9F43]" />
-            <span id="sound-prompt-title" class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#FF9F43]">
-              EVENT STARTED
+            <span class="h-2 w-2 shrink-0 rounded-full bg-warn" />
+            <span id="sound-prompt-title" class="text-[15px] font-semibold text-warn">
+              Event started
+            </span>
+            <span class="ml-auto font-mono text-[14px] text-faint">
+              Keeping sound on in {soundPromptSeconds}s
             </span>
           </div>
-          <p class="mt-2 text-[18px] font-medium text-[#E8F0FE] font-mono truncate">{soundPrompt.summary}</p>
-          <p id="sound-prompt-description" class="mt-1 text-[16px] text-[#8BA3C7]">
-            Mute notification alerts for this event?
+          <p class="mt-2 truncate text-[22px] font-semibold text-text">{soundPrompt.summary}</p>
+          <p id="sound-prompt-description" class="mt-0.5 text-[16px] text-muted">
+            Mute alerts for this event?
           </p>
-          <div class="mt-3 flex items-center justify-between gap-3">
-            <span class="text-[14px] text-[#4A6080] font-mono">KEEP ON IN {soundPromptSeconds}S</span>
-            <div class="flex gap-2">
-              <button
-                onClick={() => resolveSoundPrompt(true)}
-                class="min-h-[44px] px-4 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#FF9F43] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#FF9F43] focus-visible:outline-offset-2"
-                type="button"
-              >
-                MUTE
-              </button>
-              <button
-                onClick={() => resolveSoundPrompt(false)}
-                class="min-h-[44px] px-4 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
-                type="button"
-              >
-                KEEP ON
-              </button>
-            </div>
+          <div class="mt-3 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => resolveSoundPrompt(true)}
+              class="min-h-[44px] rounded-[9px] border border-line/70 bg-raised px-4 text-[16px] font-semibold text-warn transition-colors hover:brightness-110 active:scale-[0.98]"
+            >
+              Mute for event
+            </button>
+            <button
+              type="button"
+              onClick={() => resolveSoundPrompt(false)}
+              class="min-h-[44px] rounded-[9px] bg-ok px-4 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
+            >
+              Keep sound on
+            </button>
           </div>
         </div>
       )}
 
-      {/* ── Focus Mode (full-width, replaces sidebar+feed+todos) ─── */}
+      {/* ── Focus mode ─────────────────────────────────────── */}
       {activeTab === 'focus' && (
         <FocusMode
-          unreadNotifications={notifications.filter((n) => !n.is_read)}
+          unreadNotifications={notifications.filter((notification) => !notification.is_read)}
           doFirstTodos={doFirstTodos}
           apps={apps}
           onMarkRead={markRead}
@@ -381,192 +425,316 @@ export function App() {
         />
       )}
 
-      {/* ── Home (notifications + do-first side panel) ─────────── */}
+      {/* ── Home ───────────────────────────────────────────── */}
       {activeTab === 'notifications' && (
         <div class="flex flex-1 overflow-hidden">
-          {/* Channel selector sidebar (80px) */}
-          <aside class="w-[88px] shrink-0 overflow-y-auto border-r border-[#1E3A5F] bg-[#0B1120] p-2 flex flex-col gap-1 items-center custom-scrollbar">
-            {/* All channels button */}
+          {/* Channel rack */}
+          <aside class="flex w-[208px] shrink-0 flex-col overflow-y-auto border-r border-line/60 bg-ink px-1.5 pb-2 pt-1 custom-scrollbar">
             <button
+              type="button"
               onClick={() => setFilterAppId(null)}
-              class={`w-[72px] h-[60px] flex flex-col items-center justify-center gap-0.5 border transition-all duration-150 active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                filterAppId === null
-                  ? 'bg-[#1E3A5F] border-[#00D4FF] text-[#00D4FF]'
-                  : 'bg-[#111827] border-[#1E3A5F] text-[#8BA3C7] hover:border-[#00D4FF]'
+              aria-pressed={filterAppId === null}
+              aria-label={`All channels, ${totalUnread} unread`}
+              class={`relative flex min-h-[60px] w-full items-center gap-2 rounded-[10px] py-2 pl-2.5 pr-1.5 text-left transition-all duration-150 active:scale-[0.985] ${
+                filterAppId === null ? 'bg-raised' : 'hover:bg-surface/70'
               }`}
-              aria-label="All channels"
-              title="All channels"
             >
-              <svg viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7">
-                <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-              </svg>
+              <span
+                class={`absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-full transition-colors ${
+                  filterAppId === null ? 'bg-action' : 'bg-transparent'
+                }`}
+                aria-hidden="true"
+              />
+              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-ink/50">
+                <span class="grid h-[18px] w-[18px] grid-cols-2 gap-[2px]" aria-hidden="true">
+                  {[0, 1, 2, 3].map((index) => (
+                    <span
+                      key={index}
+                      class={`rounded-[1.5px] ${
+                        index < Math.min(activeChannels, 4) ? 'bg-action' : 'bg-line'
+                      }`}
+                    />
+                  ))}
+                </span>
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-[16px] font-semibold leading-tight text-text">
+                  All channels
+                </span>
+                <span class="mt-1 block font-mono text-[14px] leading-none text-faint">
+                  {activeChannels} active
+                </span>
+              </span>
+              {totalUnread > 0 ? (
+                <span class="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-[6px] bg-signal px-1 font-mono text-[14px] font-bold tabular-nums text-ink">
+                  {totalUnread > 99 ? '99+' : totalUnread}
+                </span>
+              ) : (
+                <span class="w-7 shrink-0 text-center font-mono text-[14px] text-faint/50">–</span>
+              )}
             </button>
+
+            {enabledApps.length === 0 && (
+              <p class="px-2 py-4 text-[15px] leading-relaxed text-faint">
+                Waiting for your channels to connect.
+              </p>
+            )}
 
             {GROUP_ORDER.map((group) => {
               const list = groupedApps.get(group);
               if (!list || list.length === 0) return null;
+              const groupUnread = list.reduce((sum, app) => sum + app.unread, 0);
+
               return (
-                <div key={group} class="flex flex-col items-center gap-1 w-full">
-                  <div class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
-                    {GROUP_LABELS[group] || group}
+                <div key={group} class="mt-1">
+                  <div class="mb-1 flex items-center gap-2 px-2">
+                    <span class="text-[15px] font-semibold tracking-[0.06em] text-faint">
+                      {GROUP_LABELS[group] || group}
+                    </span>
+                    <span class="h-px flex-1 bg-line/40" />
+                    {groupUnread > 0 && (
+                      <span class="font-mono text-[14px] text-faint">{groupUnread}</span>
+                    )}
                   </div>
-                  {list.map((app) => (
+                  <div class="flex flex-col gap-0.5">
+                    {list.map((app) => (
+                      <AppButton
+                        key={app.id}
+                        app={app}
+                        active={filterAppId === app.id}
+                        lastActivity={lastActivityByApp.get(app.id)}
+                        lastSummary={lastSummaryByApp.get(app.id)}
+                        onFilter={handleFilterClick}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {ungrouped.length > 0 && (
+              <div class="mt-1">
+                <div class="mb-1 flex items-center gap-2 px-2">
+                  <span class="text-[15px] font-semibold tracking-[0.06em] text-faint">Other</span>
+                  <span class="h-px flex-1 bg-line/40" />
+                </div>
+                <div class="flex flex-col gap-0.5">
+                  {ungrouped.map((app) => (
                     <AppButton
                       key={app.id}
                       app={app}
                       active={filterAppId === app.id}
+                      lastActivity={lastActivityByApp.get(app.id)}
+                      lastSummary={lastSummaryByApp.get(app.id)}
                       onFilter={handleFilterClick}
                     />
                   ))}
                 </div>
-              );
-            })}
-            {ungrouped.length > 0 && (
-              <>
-                <div class="text-[14px] font-semibold uppercase tracking-[0.08em] text-[#4A6080] pt-2 pb-1 border-t border-[#162035] mt-1 w-full text-center">
-                  OTHER
-                </div>
-                {ungrouped.map((app) => (
-                  <AppButton
-                    key={app.id}
-                    app={app}
-                    active={filterAppId === app.id}
-                    onFilter={handleFilterClick}
-                  />
-                ))}
-              </>
+              </div>
             )}
           </aside>
 
-          {/* Telemetry feed */}
-          <main class="flex-1 overflow-y-auto flex flex-col custom-scrollbar bg-[#0B1120]">
-            {/* Sub-tab bar */}
-            <div class="flex gap-1 px-3 py-2 shrink-0 items-center border-b border-[#162035]">
-              <button
-                onClick={() => setNotifSubTab('active')}
-                class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                  notifSubTab === 'active'
-                    ? 'bg-[#00D4FF] text-[#0B1120]'
-                    : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
-                }`}
-              >
-                ACTIVE{activeCount > 0 && ` ${activeCount}`}
-              </button>
-              <button
-                onClick={() => setNotifSubTab('all')}
-                class={`px-4 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
-                  notifSubTab === 'all'
-                    ? 'bg-[#00D4FF] text-[#0B1120]'
-                    : 'bg-[#111827] text-[#8BA3C7] hover:text-[#E8F0FE]'
-                }`}
-              >
-                ALL{allCount > 0 && ` ${allCount}`}
-              </button>
-              <div class="flex-1" />
-              {notifSubTab === 'active' && activeCount > 0 && (
+          {/* Feed */}
+          <main class="flex flex-1 flex-col overflow-hidden bg-ink">
+            <div class="flex min-h-[60px] shrink-0 items-center gap-2 border-b border-line/60 px-4 py-1.5">
+              <h1 class="shrink-0 text-[27px] font-semibold tracking-[-0.01em] text-text">Inbox</h1>
+
+              <div class="flex shrink-0 items-center rounded-[11px] bg-surface p-0.5">
                 <button
-                  onClick={() => markAllRead(filterAppId || undefined)}
-                  class="px-3 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
-                >
-                  READ ALL
-                </button>
-              )}
-              {notifSubTab === 'all' && notifications.some((n) => n.is_read) && (
-                <button
-                  onClick={handleClearRead}
-                  class={`px-3 py-1.5 text-[16px] font-semibold tracking-[0.06em] uppercase transition-all focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-2 ${
-                    clearConfirm
-                      ? 'bg-[#FF4757] text-white animate-pulse'
-                      : 'bg-[#FF4757] text-white hover:brightness-110 active:brightness-125'
+                  type="button"
+                  onClick={() => setNotifSubTab('active')}
+                  class={`flex min-h-[44px] items-center gap-2 rounded-[9px] px-3 text-[15px] font-semibold transition-colors ${
+                    notifSubTab === 'active' ? 'bg-raised text-text' : 'text-muted hover:text-text'
                   }`}
                 >
-                  {clearConfirm ? 'CONFIRM?' : 'CLEAR'}
+                  Active
+                  <span class={`font-mono text-[14px] ${notifSubTab === 'active' ? 'text-signal' : 'text-faint'}`}>
+                    {activeCount}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNotifSubTab('all')}
+                  class={`flex min-h-[44px] items-center gap-2 rounded-[9px] px-3 text-[15px] font-semibold transition-colors ${
+                    notifSubTab === 'all' ? 'bg-raised text-text' : 'text-muted hover:text-text'
+                  }`}
+                >
+                  All
+                  <span class={`font-mono text-[14px] ${notifSubTab === 'all' ? 'text-signal' : 'text-faint'}`}>
+                    {allCount}
+                  </span>
+                </button>
+              </div>
+
+              {selectedApp && (
+                <button
+                  type="button"
+                  onClick={() => setFilterAppId(null)}
+                  class="flex h-11 max-w-[145px] shrink-0 items-center gap-2 rounded-[8px] border border-line/60 bg-surface px-2.5 text-[15px] text-muted transition-colors hover:text-text"
+                  title="Clear channel filter"
+                >
+                  <AppIcon
+                    appId={selectedApp.id}
+                    class="h-4 w-4"
+                    emoji={selectedApp.icon}
+                    name={selectedApp.name}
+                  />
+                  <span class="truncate">{selectedApp.name}</span>
+                  <X size={14} class="shrink-0" />
+                </button>
+              )}
+
+              <div class="flex-1" />
+
+              {notifSubTab === 'active' && activeCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => markAllRead(filterAppId || undefined)}
+                  aria-label="Mark all notifications as read"
+                  class="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[9px] border border-ok/25 bg-ok/10 px-2.5 text-[15px] font-semibold text-ok transition-colors hover:bg-ok/15 active:scale-[0.98]"
+                >
+                  <Check size={16} />
+                  Read all
+                </button>
+              )}
+
+              {notifSubTab === 'all' && notifications.some((notification) => notification.is_read) && (
+                <button
+                  type="button"
+                  onClick={handleClearRead}
+                  class={`flex min-h-[44px] shrink-0 items-center rounded-[9px] border px-2.5 text-[15px] font-semibold transition-colors active:scale-[0.98] ${
+                    clearConfirm
+                      ? 'border-alert bg-alert text-ink'
+                      : 'border-alert/25 bg-alert/10 text-alert hover:bg-alert/15'
+                  }`}
+                >
+                  {clearConfirm ? 'Confirm clear' : 'Clear read'}
                 </button>
               )}
             </div>
 
-            {/* Notification feed */}
             <div class="flex-1 overflow-y-auto custom-scrollbar">
-              {!connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[18px]">
-                  Connecting…
-                </div>
-              )}
-              {connected && displayedNotifications.length === 0 && (
-                <div class="flex items-center justify-center h-full text-[#8BA3C7] text-[18px]">
-                  {notifSubTab === 'active' ? 'No active notifications' : 'No notifications'}
-                </div>
-              )}
-              {displayedNotifications.length > 0 && (
+              {displayedNotifications.length === 0 ? (
+                !connected ? (
+                  <FeedEmpty
+                    icon={<WifiOff size={28} />}
+                    title="Reconnecting"
+                    hint="Trying to reach the Birdeye server. Saved notifications will appear when it is back."
+                  />
+                ) : selectedApp ? (
+                  <FeedEmpty
+                    icon={<Inbox size={28} />}
+                    title={`Nothing from ${selectedApp.name}`}
+                    hint="This channel is quiet. Switch back to every channel to see the rest of your feed."
+                    action={{ label: 'Show all channels', onClick: () => setFilterAppId(null) }}
+                  />
+                ) : notifSubTab === 'active' ? (
+                  <FeedEmpty
+                    icon={<Inbox size={28} />}
+                    title="All quiet"
+                    hint="Nothing unread right now. New messages will land here."
+                  />
+                ) : (
+                  <FeedEmpty
+                    icon={<Inbox size={28} />}
+                    title="No notifications yet"
+                    hint="Messages from your connected apps will collect here."
+                  />
+                )
+              ) : (
                 <div role="list" class="flex flex-col">
                   {!filterAppId
-                    ? groupNotifications(displayedNotifications, apps).map((group) => (
+                    ? groupNotifications(displayedNotifications).map((group) => (
                         <NotificationGroup
                           key={group.key}
                           appId={group.appId}
                           label={group.label}
-                          app={apps.find((a) => a.id === group.appId)}
+                          app={apps.find((app) => app.id === group.appId)}
                           notifications={group.items}
-                          onMarkRead={handleMarkReadWithUndo}
+                          onMarkRead={handleMarkRead}
                           onFocus={focusApp}
                         />
                       ))
-                    : displayedNotifications.map((n) => (
+                    : displayedNotifications.map((notification) => (
                         <NotificationCard
-                          key={n.id}
-                          notification={n}
-                          onMarkRead={handleMarkReadWithUndo}
+                          key={notification.id}
+                          notification={notification}
+                          onMarkRead={handleMarkRead}
                           onFocus={focusApp}
-                          emoji={apps.find((a) => a.id === n.app_id)?.icon}
+                          emoji={apps.find((app) => app.id === notification.app_id)?.icon}
                         />
                       ))}
-                </div>
-              )}
-              {/* Undo toast */}
-              {undoState.ids.length > 0 && (
-                <div class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-[#1E3A5F] border border-[#00D4FF] px-4 py-2 flex items-center gap-3 shadow-lg">
-                  <span class="text-[16px] text-[#E8F0FE]">Marked as read</span>
-                  <button
-                    onClick={handleUndo}
-                    class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] hover:brightness-125"
-                  >
-                    UNDO
-                  </button>
                 </div>
               )}
             </div>
           </main>
 
-          {/* Do First side panel */}
+          {/* Do First rail */}
           {doFirstTodos.length > 0 && (
-            <aside class="w-56 shrink-0 overflow-y-auto border-l border-[#1E3A5F] bg-[#0B1120] flex flex-col custom-scrollbar">
-              <div
-                class="px-3 py-2 shrink-0 border-b border-[#1E3A5F] flex items-center gap-2 cursor-pointer hover:bg-[#111827] transition-colors"
+            <aside class="flex w-[224px] shrink-0 flex-col overflow-hidden border-l border-line/60 bg-ink">
+              <button
+                type="button"
                 onClick={() => setActiveTab('todos')}
+                class="flex h-12 shrink-0 items-center gap-2 border-b border-line/60 px-4 text-left transition-colors hover:bg-surface/50"
               >
-                <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: '#FF4757' }} />
-                <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#FF4757]">DO FIRST</span>
-              </div>
-              <div class="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar">
+                <span class="h-2 w-2 shrink-0 rounded-full bg-alert" />
+                <span class="text-[15px] font-semibold text-alert">Do first</span>
+                <span class="ml-auto font-mono text-[14px] text-faint">{dueNowTodos.length}</span>
+              </button>
+
+              <div class="flex-1 overflow-y-auto px-1.5 py-1.5 custom-scrollbar">
                 {doFirstTodos.map((todo) => {
-                  const subs = todo.subtasks || [];
-                  const done = subs.filter((s) => s.completed).length;
-                  const total = subs.length;
+                  const subtasks = todo.subtasks || [];
+                  const done = subtasks.filter((subtask) => subtask.completed).length;
+                  const total = subtasks.length;
+                  const due = dueLabel(todo.due_date, today);
+
                   return (
                     <div
                       key={todo.id}
-                      class="flex items-start gap-2 py-2 border-b border-[#162035] last:border-b-0 min-h-[44px]"
+                      class="flex items-start gap-1 rounded-[9px] px-1 py-1.5 transition-colors hover:bg-surface/50"
                     >
-                      <span class="flex-1 min-w-0">
-                        <span class="text-[18px] leading-snug text-[#E8F0FE] block">
+                      <button
+                        type="button"
+                        onClick={() => toggleTodo(todo.id)}
+                        aria-label={`Mark "${todo.text}" complete`}
+                        class="flex h-11 w-11 -ml-1 shrink-0 items-center justify-center rounded-[8px] transition-colors active:bg-raised"
+                      >
+                        <span class="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border-2 border-line transition-colors" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab('todos')}
+                        class="min-w-0 flex-1 pb-1 pr-1 text-left"
+                      >
+                        <span class="block text-[19px] leading-snug text-text line-clamp-2">
                           {todo.text}
                         </span>
-                        {total > 0 && (
-                          <span class="font-mono text-[14px] text-[#FFB800] mt-0.5 block tabular-nums">
-                            {Math.round((done / total) * 100)}%
-                          </span>
-                        )}
-                      </span>
+                        <span class="mt-1 flex items-center gap-2">
+                          <span
+                            class={`h-1.5 w-1.5 shrink-0 rounded-full ${
+                              todo.priority === 'high' ? 'bg-alert' : 'bg-warn'
+                            }`}
+                          />
+                          {due && (
+                            <span class={`text-[14px] font-semibold ${due.tone}`}>{due.text}</span>
+                          )}
+                          {total > 0 && (
+                            <span class="flex items-center gap-1">
+                              <span class="h-[3px] w-9 overflow-hidden rounded-full bg-line/70">
+                                <span
+                                  class="block h-full rounded-full bg-signal"
+                                  style={{ width: `${Math.round((done / total) * 100)}%` }}
+                                />
+                              </span>
+                              <span class="font-mono text-[14px] text-faint">
+                                {done}/{total}
+                              </span>
+                            </span>
+                          )}
+                        </span>
+                      </button>
                     </div>
                   );
                 })}
@@ -576,9 +744,9 @@ export function App() {
         </div>
       )}
 
-      {/* ── Todos page ─────────────────────────────────────────── */}
+      {/* ── Todos ──────────────────────────────────────────── */}
       {activeTab === 'todos' && (
-        <div class="flex flex-col flex-1 overflow-hidden">
+        <div class="flex flex-1 flex-col overflow-hidden">
           <TodoPage
             todos={todos}
             onAdd={addTodo}
@@ -600,38 +768,49 @@ export function App() {
         </div>
       )}
 
-      {/* ── Todo reminder banner ───────────────────────────────── */}
+      {/* ── Read confirmation ──────────────────────────────── */}
+      {readToast && (
+        <div class="pointer-events-none absolute bottom-[84px] left-1/2 z-30 -translate-x-1/2 animate-toast-in">
+          <div class="flex items-center gap-2 rounded-[10px] border border-line/70 bg-raised px-4 py-2.5">
+            <Check size={14} class="text-ok" />
+            <span class="text-[16px] text-text">Marked as read</span>
+          </div>
+        </div>
+      )}
+
+      {/* ── Todo reminders ─────────────────────────────────── */}
       {todoReminders.length > 0 && (
-        <div class="absolute bottom-[120px] left-1/2 -translate-x-1/2 z-40 flex flex-col gap-1 w-[440px] max-w-[92vw]">
-          {todoReminders.map((r) => (
-            <div key={r.id} class="bg-[#1E3A5F] border border-[#FF9F43] px-3 py-2 flex items-center gap-3">
-              <span class="w-1.5 h-1.5 shrink-0" style={{ backgroundColor: '#FF9F43' }} />
-              <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#FF9F43] shrink-0">
-                REMINDER
-              </span>
-              <span class="flex-1 min-w-0 text-[16px] text-[#E8F0FE] font-mono truncate">{r.text}</span>
+        <div class="absolute bottom-[144px] left-1/2 z-40 flex w-[460px] max-w-[92vw] -translate-x-1/2 flex-col gap-1.5">
+          {todoReminders.map((reminder) => (
+            <div
+              key={reminder.id}
+              class="flex items-center gap-3 rounded-[10px] border border-warn/40 bg-surface px-3 py-2"
+            >
+              <span class="h-2 w-2 shrink-0 rounded-full bg-warn" />
+              <span class="shrink-0 text-[14px] font-semibold text-warn">Reminder</span>
+              <span class="min-w-0 flex-1 truncate text-[18px] text-text">{reminder.text}</span>
               <button
+                type="button"
                 onClick={() => setActiveTab('todos')}
-                class="text-[15px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF] active:brightness-125 shrink-0 px-2 py-1"
+                class="shrink-0 px-1 py-1 text-[15px] font-semibold text-action active:brightness-125"
               >
-                OPEN
+                Open
               </button>
               <button
-                onClick={() => dismissReminder(r.id)}
-                class="text-[15px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7] active:text-[#E8F0FE] shrink-0 px-2 py-1"
+                type="button"
+                onClick={() => dismissReminder(reminder.id)}
                 aria-label="Dismiss reminder"
+                class="shrink-0 rounded-[6px] px-1 py-1 text-muted active:text-text"
               >
-                ✕
+                <X size={14} />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      {/* ── Corgi patrol strip (66px) ──────────────────────── */}
       <CorgiBar />
 
-      {/* ── Audio/comms bar (48px) ──────────────────────────── */}
       <BottomBar
         spotifyData={spotifyData}
         onSpotifyCommand={spotifyCommand}

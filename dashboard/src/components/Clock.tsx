@@ -1,30 +1,33 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
+
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+function pad(value: number): string {
+  return String(value).padStart(2, '0');
+}
 
 export function Clock() {
-  const [time, setTime] = useState(formatTime());
+  const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const interval = setInterval(() => setTime(formatTime()), 10000);
+    const interval = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  function formatTime(): string {
-    const now = new Date();
-    return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-  }
-
-  function formatDate(): string {
-    const now = new Date();
-    const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    return `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]}`;
-  }
+  const time = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+  const date = `${DAYS[now.getDay()]} ${now.getDate()} ${MONTHS[now.getMonth()]}`;
 
   return (
-    <span class="flex items-baseline gap-3 select-none">
-      <span class="text-[32px] font-bold text-[#FFB800] tabular-nums font-mono leading-none">{time}</span>
-      <span class="text-[16px] font-semibold uppercase tracking-[0.08em] text-[#4A6080]">{formatDate()}</span>
+    <span
+      class="flex select-none items-baseline gap-2.5"
+      aria-label={`${date}, ${time}`}
+    >
+      <span class="font-mono text-[44px] font-medium leading-none tracking-[-0.05em] tabular-nums text-signal">
+        {time}
+      </span>
+      <span class="text-[16px] font-medium text-muted">{date}</span>
     </span>
   );
 }

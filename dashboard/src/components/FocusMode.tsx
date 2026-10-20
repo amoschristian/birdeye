@@ -55,16 +55,16 @@ function todayStr(): string {
 function formatDateBadge(dueDate: string | null): { text: string; isOverdue: boolean; isToday: boolean } {
   if (!dueDate) return { text: '', isOverdue: false, isToday: false };
   const today = todayStr();
-  if (dueDate < today) return { text: 'OVERDUE', isOverdue: true, isToday: false };
-  if (dueDate === today) return { text: 'TODAY', isOverdue: false, isToday: true };
+  if (dueDate < today) return { text: 'Overdue', isOverdue: true, isToday: false };
+  if (dueDate === today) return { text: 'Today', isOverdue: false, isToday: true };
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const tomorrowStr = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
-  if (dueDate === tomorrowStr) return { text: 'TOMORROW', isOverdue: false, isToday: false };
+  if (dueDate === tomorrowStr) return { text: 'Tomorrow', isOverdue: false, isToday: false };
 
   const d = new Date(dueDate + 'T00:00:00');
-  const days = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
+  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   return { text: `${days[d.getDay()]} ${d.getDate()}`, isOverdue: false, isToday: false };
 }
 
@@ -85,7 +85,7 @@ function DragHandle() {
 function CheckedIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <path d="M2 5L4 7L8 3" stroke="#0B1120" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 5L4 7L8 3" stroke="#121021" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>
   );
 }
@@ -410,24 +410,24 @@ export function FocusMode({
   // ── Priority color ────────────────────────────────────────
 
   const priorityColor = visibleTodo?.priority === 'high'
-    ? '#FF4757'
+    ? '#FF7186'
     : visibleTodo?.priority === 'medium'
-    ? '#8BA3C7'
-    : '#00D4FF';
+    ? '#A79DBE'
+    : '#8F86FF';
 
   // ── Render: ALL CLEAR ─────────────────────────────────────
 
   if (allClear) {
     return (
-      <div class="flex-1 flex items-center justify-center bg-[#0B1120]">
+      <div class="flex-1 flex items-center justify-center bg-[#121021]">
         <div class="flex flex-col items-center gap-6 text-center px-8 animate-fade-in">
-          <span class="text-[28px] font-bold text-[#FFB800] font-mono leading-none">ALL CLEAR</span>
-          <div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-[18px] text-[#8BA3C7] font-mono">
+          <span class="text-[34px] font-semibold leading-none text-[#FFB65C]">All clear</span>
+          <div class="flex flex-wrap justify-center gap-x-6 gap-y-1 text-[21px] text-[#A79DBE] font-mono">
             {sessionCleared > 0 && <span>{sessionCleared} cleared</span>}
             {sessionFocused > 0 && <span>{sessionFocused} focused</span>}
             {sessionCompleted > 0 && <span>{sessionCompleted} done</span>}
             {sessionCleared === 0 && sessionFocused === 0 && sessionCompleted === 0 && (
-              <span class="text-[#4A6080]">No activity this session</span>
+              <span class="text-[#8A81A4]">No activity this session</span>
             )}
           </div>
         </div>
@@ -443,13 +443,13 @@ export function FocusMode({
       {fullWidth && (
         <div class="flex flex-col items-center gap-3 w-full max-w-lg">
           <div class="flex items-center justify-between w-full shrink-0">
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">◄ DISMISS</span>
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">OPEN ►</span>
+            <span class="text-[17px] font-semibold tracking-[0.01em] text-[#8A81A4]">◄ Dismiss</span>
+            <span class="text-[17px] font-semibold tracking-[0.01em] text-[#8A81A4]">Open ►</span>
           </div>
 
           <div
             ref={cardRef}
-            class={`w-full bg-[#111827] border border-[#1E3A5F] flex flex-col max-h-[320px] select-none cursor-grab ${
+            class={`w-full bg-[#1C1932] border border-[#3A335C] flex flex-col max-h-[320px] select-none cursor-grab ${
               animating === 'left' ? '-translate-x-full opacity-0' :
               animating === 'right' ? 'translate-x-full opacity-0' : ''
             }`}
@@ -465,30 +465,28 @@ export function FocusMode({
             }}
           >
             <div class="flex items-center gap-3 px-5 pt-4 pb-2 shrink-0">
-              <div class="text-[#8BA3C7]">
+              <div class="text-[#A79DBE]">
                 <AppIcon appId={currentNotif!.app_id} class="w-7 h-7" emoji={apps.find((a) => a.id === currentNotif!.app_id)?.icon} />
               </div>
-              <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">
+              <span class="text-[19px] font-semibold tracking-[0.01em] text-[#A79DBE]">
                 {currentNotif!.app_name}
               </span>
               {currentNotif!.is_important && (
-                <span class="ml-2 text-[12px] font-bold uppercase tracking-[0.12em] text-[#FF4757] border border-[#FF4757] px-1.5 py-0.5 leading-none">
-                  IMPORTANT
-                </span>
+                <span class="ml-2 text-[15px] font-bold tracking-[0.02em] text-[#FF7186] border border-[#FF7186] px-1.5 py-0.5 leading-none">Important</span>
               )}
-              <span class="ml-auto font-mono text-[14px] text-[#4A6080]">
+              <span class="ml-auto font-mono text-[17px] text-[#8A81A4]">
                 {formatRelativeTime(currentNotif!.created_at)}
               </span>
             </div>
 
-            <p class="text-[22px] font-medium leading-tight text-[#FFB800] font-mono px-5 pb-2 line-clamp-2 shrink-0">
+            <p class="text-[28px] font-medium leading-tight text-[#FFB65C] px-5 pb-2 line-clamp-2 shrink-0">
               {currentNotif!.summary}
             </p>
 
             {currentNotif!.body && (
               <div class="flex-1 min-h-0 mx-5 mb-4 overflow-y-auto max-h-[160px] custom-scrollbar"
                    style="touch-action: pan-y">
-                <p class="text-[16px] text-[#8BA3C7] leading-relaxed pb-2">
+                <p class="text-[19px] text-[#A79DBE] leading-relaxed pb-2">
                   {currentNotif!.body}
                 </p>
               </div>
@@ -501,13 +499,13 @@ export function FocusMode({
       {!fullWidth && currentNotif && (
         <div class="flex flex-col min-h-0 flex-1 justify-center">
           <div class="flex items-center justify-between shrink-0 py-1">
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">◄ DISMISS</span>
-            <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#4A6080]">OPEN ►</span>
+            <span class="text-[17px] font-semibold tracking-[0.01em] text-[#8A81A4]">◄ Dismiss</span>
+            <span class="text-[17px] font-semibold tracking-[0.01em] text-[#8A81A4]">Open ►</span>
           </div>
 
           <div
             ref={cardRef}
-            class={`bg-[#111827] border border-[#1E3A5F] flex flex-col select-none cursor-grab shrink-0 ${
+            class={`bg-[#1C1932] border border-[#3A335C] flex flex-col select-none cursor-grab shrink-0 ${
               animating === 'left' ? '-translate-x-full opacity-0' :
               animating === 'right' ? 'translate-x-full opacity-0' : ''
             }`}
@@ -523,30 +521,28 @@ export function FocusMode({
             }}
           >
             <div class="flex items-center gap-2 px-3 pt-3 pb-1 shrink-0">
-              <div class="text-[#8BA3C7] shrink-0">
+              <div class="text-[#A79DBE] shrink-0">
                 <AppIcon appId={currentNotif.app_id} class="w-5 h-5" emoji={apps.find((a) => a.id === currentNotif.app_id)?.icon} />
               </div>
-              <span class="text-[14px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7] truncate">
+              <span class="text-[17px] font-semibold tracking-[0.01em] text-[#A79DBE] truncate">
                 {currentNotif.app_name}
               </span>
               {currentNotif.is_important && (
-                <span class="shrink-0 ml-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-[#FF4757] border border-[#FF4757] px-1 py-0.5 leading-none">
-                  IMP
-                </span>
+                <span class="shrink-0 ml-1.5 text-[14px] font-bold tracking-[0.02em] text-[#FF7186] border border-[#FF7186] px-1 py-0.5 leading-none">Important</span>
               )}
-              <span class="ml-auto font-mono text-[14px] text-[#4A6080] shrink-0">
+              <span class="ml-auto font-mono text-[17px] text-[#8A81A4] shrink-0">
                 {formatRelativeTime(currentNotif.created_at)}
               </span>
             </div>
 
-            <p class="text-[18px] font-medium leading-snug text-[#FFB800] font-mono px-3 pb-1 line-clamp-2 shrink-0">
+            <p class="text-[21px] font-medium leading-snug text-[#FFB65C] px-3 pb-1 line-clamp-2 shrink-0">
               {currentNotif.summary}
             </p>
 
             {currentNotif.body && (
               <div class="mx-3 mb-3 overflow-y-auto max-h-[80px] custom-scrollbar"
                    style="touch-action: pan-y">
-                <p class="text-[16px] text-[#8BA3C7] leading-relaxed">
+                <p class="text-[19px] text-[#A79DBE] leading-relaxed">
                   {currentNotif.body}
                 </p>
               </div>
@@ -564,46 +560,46 @@ export function FocusMode({
 
     return (
       <div class={`flex flex-col flex-1 min-w-0 min-h-0 ${fullWidth ? 'max-w-[500px] mx-auto w-full px-4' : ''}`}>
-        {/* ── "NO NOTIFICATIONS" label (when todo-only) ──────────── */}
+        {/* ── "No notifications" label (when todo-only) ──────────── */}
         {fullWidth && !hasUnread && (
-          <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#4A6080] text-center shrink-0 py-2">
-            NO NOTIFICATIONS
+          <span class="text-[19px] font-semibold tracking-[0.01em] text-[#8A81A4] text-center shrink-0 py-2">
+            No notifications
           </span>
         )}
 
         {/* ── Task header ─────────────────────────────────────────── */}
-        <div class={`shrink-0 ${fullWidth ? 'border border-[#1E3A5F] bg-[#111827] px-4 pt-3 pb-2' : 'border-b border-[#1E3A5F] px-3 py-2'}`}>
+        <div class={`shrink-0 ${fullWidth ? 'border border-[#3A335C] bg-[#1C1932] px-4 pt-3 pb-2' : 'border-b border-[#3A335C] px-3 py-2'}`}>
           <div class="flex items-start gap-2">
             <span
               class="w-5 h-5 border-2 shrink-0 mt-0.5"
               style={{ borderColor: priorityColor, backgroundColor: visibleTodo.completed ? priorityColor : 'transparent' }}
             />
-            <span class="text-[20px] font-medium text-[#E8F0FE] leading-snug font-mono break-words flex-1 min-w-0">
+            <span class="text-[26px] font-medium text-[#F4EFE7] leading-snug break-words flex-1 min-w-0">
               {visibleTodo.text}
             </span>
           </div>
           <div class="flex items-center gap-2 mt-1 ml-7">
             <span
-              class="text-[14px] font-semibold uppercase tracking-[0.06em]"
+              class="text-[17px] font-semibold capitalize tracking-[0.01em]"
               style={{ color: priorityColor }}
             >
               {visibleTodo.priority}
             </span>
             <span
-              class="text-[14px] font-semibold uppercase tracking-[0.06em]"
+              class="text-[17px] font-semibold capitalize tracking-[0.01em]"
               style={{
                 color:
-                  visibleTodo.status === 'waiting' ? '#FF9F43'
-                  : visibleTodo.status === 'inbox' ? '#8BA3C7'
-                  : visibleTodo.status === 'completed' ? '#26DE81'
-                  : '#00D4FF',
+                  visibleTodo.status === 'waiting' ? '#FFA26B'
+                  : visibleTodo.status === 'inbox' ? '#A79DBE'
+                  : visibleTodo.status === 'completed' ? '#7BE3A6'
+                  : '#8F86FF',
               }}
             >
-              · {visibleTodo.status.toUpperCase()}
+              · {visibleTodo.status}
             </span>
             {dateBadge?.text && (
-              <span class={`text-[14px] font-semibold uppercase tracking-[0.06em] ${
-                dateBadge.isOverdue ? 'text-[#FF4757]' : dateBadge.isToday ? 'text-[#FF9F43]' : 'text-[#8BA3C7]'
+              <span class={`text-[17px] font-semibold tracking-[0.01em] ${
+                dateBadge.isOverdue ? 'text-[#FF7186]' : dateBadge.isToday ? 'text-[#FFA26B]' : 'text-[#A79DBE]'
               }`}>
                 · {dateBadge.text}
               </span>
@@ -631,13 +627,13 @@ export function FocusMode({
                 autofocus
                 maxLength={500}
                 placeholder="Note / source reference…"
-                class="flex-1 min-w-0 bg-[#0B1120] text-[#E8F0FE] text-[16px] px-2 py-1 border border-[#00D4FF] placeholder-[#4A6080] outline-none font-mono"
+                class="flex-1 min-w-0 bg-[#121021] text-[#F4EFE7] text-[19px] px-2 py-1 border border-[#8F86FF] placeholder-[#8A81A4] outline-none"
               />
             </div>
           ) : (
             <button
               onClick={() => setEditingNote(true)}
-              class="mt-1 ml-7 max-w-full truncate text-left text-[15px] text-[#8BA3C7] font-mono px-2 py-1 border border-[#1E3A5F] bg-[#0B1120] active:border-[#00D4FF] transition-colors"
+              class="mt-1 ml-7 max-w-full truncate text-left text-[18px] text-[#A79DBE] px-2 py-1 border border-[#3A335C] bg-[#121021] active:border-[#8F86FF] transition-colors"
             >
               {visibleTodo.notes ? visibleTodo.notes : '＋ NOTE / SOURCE…'}
             </button>
@@ -650,8 +646,8 @@ export function FocusMode({
           class="flex-1 overflow-y-auto min-h-0 px-2 py-1 custom-scrollbar"
         >
           {totalCount === 0 && (
-            <p class="text-[16px] text-[#4A6080] text-center mt-4 select-none uppercase tracking-[0.06em] font-semibold">
-              NO STEPS YET
+            <p class="text-[19px] text-[#8A81A4] text-center mt-4 select-none tracking-[0.01em] font-semibold">
+              No steps yet
             </p>
           )}
           {subtasks.map((s) => (
@@ -659,13 +655,13 @@ export function FocusMode({
               key={s.id}
               data-subtask-id={s.id}
               data-order={s.order_index}
-              class={`flex items-start gap-1.5 py-2 px-1 border-b border-[#162035] min-h-[44px] ${
+              class={`flex items-start gap-1.5 py-2 px-1 border-b border-[#2A2447] min-h-[44px] ${
                 s.completed ? 'opacity-50' : ''
               }`}
             >
               {/* Drag handle */}
               <span
-                class="drag-handle text-[#4A6080] active:text-[#8BA3C7] transition-colors cursor-grab active:cursor-grabbing shrink-0 flex items-center justify-center w-[28px] h-[44px] -mt-[4px] -ml-[4px]"
+                class="drag-handle text-[#8A81A4] active:text-[#A79DBE] transition-colors cursor-grab active:cursor-grabbing shrink-0 flex items-center justify-center w-[28px] h-[44px] -mt-[4px] -ml-[4px]"
                 style="touch-action: none"
                 aria-label="Drag to reorder"
                 title="Drag to reorder"
@@ -676,14 +672,14 @@ export function FocusMode({
               {/* Checkbox */}
               <button
                 onClick={(e) => { e.stopPropagation(); handleToggleSubtask(s); }}
-                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] -ml-[4px] focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1"
+                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] -ml-[4px] focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
                 aria-label={s.completed ? 'Mark incomplete' : 'Mark complete'}
               >
                 <span
                   class={`w-[18px] h-[18px] border-2 shrink-0 flex items-center justify-center transition-colors ${
                     s.completed
-                      ? 'bg-[#26DE81] border-[#26DE81]'
-                      : 'border-[#1E3A5F]'
+                      ? 'bg-[#7BE3A6] border-[#7BE3A6]'
+                      : 'border-[#3A335C]'
                   }`}
                 >
                   {s.completed && <CheckedIcon />}
@@ -699,12 +695,12 @@ export function FocusMode({
                   onKeyDown={handleEditKeyDown}
                   onBlur={handleCommitEditSubtask}
                   onClick={(e) => e.stopPropagation()}
-                  class="flex-1 bg-[#111827] text-[#E8F0FE] text-[18px] px-1.5 py-0.5 border border-[#00D4FF] outline-none min-w-0 font-mono"
+                  class="flex-1 bg-[#1C1932] text-[#F4EFE7] text-[21px] px-1.5 py-0.5 border border-[#8F86FF] outline-none min-w-0"
                   autofocus
                 />
               ) : (
-                <span class={`flex-1 min-w-0 py-[10px] text-[18px] leading-snug font-mono break-words select-none ${
-                  s.completed ? 'text-[#4A6080] line-through' : 'text-[#E8F0FE]'
+                <span class={`flex-1 min-w-0 py-[10px] text-[21px] leading-snug break-words select-none ${
+                  s.completed ? 'text-[#8A81A4] line-through' : 'text-[#F4EFE7]'
                 }`}>
                   {s.text}
                 </span>
@@ -713,7 +709,7 @@ export function FocusMode({
               {/* Edit */}
               <button
                 onClick={(e) => handleStartEditSubtask(s, e)}
-                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] text-[#4A6080] active:text-[#00D4FF] transition-colors focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-1"
+                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] text-[#8A81A4] active:text-[#8F86FF] transition-colors focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
                 aria-label="Edit step"
                 title="Edit step"
               >
@@ -725,7 +721,7 @@ export function FocusMode({
               {/* Delete */}
               <button
                 onClick={(e) => { e.stopPropagation(); handleDeleteSubtask(s); }}
-                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] -mr-[4px] text-[#4A6080] active:text-[#FF4757] transition-colors focus-visible:outline-2 focus-visible:outline-[#FF4757] focus-visible:outline-offset-1"
+                class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -mt-[4px] -mr-[4px] text-[#8A81A4] active:text-[#FF7186] transition-colors focus-visible:outline-2 focus-visible:outline-[#FF7186] focus-visible:outline-offset-1"
                 aria-label="Delete step"
                 title="Delete step"
               >
@@ -739,16 +735,16 @@ export function FocusMode({
 
         {/* ── Progress ───────────────────────────────────────────── */}
         {totalCount > 0 && (
-          <div class="shrink-0 px-3 py-1 border-t border-[#162035]">
-            <span class="font-mono text-[13px] text-[#FFB800]">
-              {completedCount}/{totalCount} STEPS
+          <div class="shrink-0 px-3 py-1 border-t border-[#2A2447]">
+            <span class="font-mono text-[16px] text-[#FFB65C]">
+              {completedCount}/{totalCount} steps
             </span>
           </div>
         )}
 
         {/* ── Add subtask input ──────────────────────────────────── */}
         {canAddSubtask && (
-          <div class={`shrink-0 flex gap-1 px-2 py-1 min-h-[44px] border-t border-[#162035] ${fullWidth ? 'border border-[#1E3A5F] bg-[#111827] mt-1' : ''}`}>
+          <div class={`shrink-0 flex gap-1 px-2 py-1 min-h-[44px] border-t border-[#2A2447] ${fullWidth ? 'border border-[#3A335C] bg-[#1C1932] mt-1' : ''}`}>
             <input
               ref={addInputRef}
               type="text"
@@ -756,60 +752,50 @@ export function FocusMode({
               onInput={(e) => setSubtaskText((e.target as HTMLInputElement).value)}
               onKeyDown={handleAddKeyDown}
               placeholder="Add step…"
-              class="flex-1 bg-[#0B1120] text-[#E8F0FE] text-[18px] px-2 py-1 border border-[#1E3A5F] placeholder-[#4A6080] outline-none focus:border-[#00D4FF] transition-colors min-h-[44px] font-mono"
+              class="flex-1 bg-[#121021] text-[#F4EFE7] text-[21px] px-2 py-1 border border-[#3A335C] placeholder-[#8A81A4] outline-none focus:border-[#8F86FF] transition-colors min-h-[44px]"
               maxLength={200}
             />
             <button
               onClick={handleAddSubtask}
               disabled={!subtaskText.trim() || totalCount >= 20}
-              class="px-3 py-1 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#00D4FF] text-[#0B1120] active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 min-h-[44px] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-            >
-              ADD
-            </button>
+              class="px-3 py-1 text-[19px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 min-h-[44px] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
+            >Add</button>
           </div>
         )}
 
         {/* ── DONE / SKIP ─────────────────────────────────────────── */}
-        <div class={`shrink-0 flex flex-col gap-2 px-2 py-2 ${fullWidth ? '' : 'border-t border-[#1E3A5F]'}`}>
+        <div class={`shrink-0 flex flex-col gap-2 px-2 py-2 ${fullWidth ? '' : 'border-t border-[#3A335C]'}`}>
           <div class={`flex gap-2 ${fullWidth ? 'justify-center' : ''}`}>
             {visibleTodo.completed ? (
               <button
                 onClick={handleTodoReopen}
-                class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#00D4FF] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                class={`px-6 py-2 text-[21px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-2 ${
                   fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
                 }`}
-              >
-                REOPEN
-              </button>
+              >Reopen</button>
             ) : (
               <>
                 <button
                   onClick={handleTodoDone}
-                  class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2 ${
+                  class={`px-6 py-2 text-[21px] font-semibold tracking-[0.01em] bg-[#7BE3A6] text-[#121021] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#7BE3A6] focus-visible:outline-offset-2 ${
                     fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
                   }`}
-                >
-                  DONE
-                </button>
+                >Done</button>
                 <button
                   onClick={handleTodoWait}
-                  class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#FF9F43] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                  class={`px-6 py-2 text-[21px] font-semibold tracking-[0.01em] bg-[#3A335C] text-[#FFA26B] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-2 ${
                     fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
                   }`}
-                >
-                  WAIT
-                </button>
+                >Wait</button>
               </>
             )}
             {!visibleTodo.completed && doFirstTodos.length > 1 && (
               <button
                 onClick={handleTodoSkip}
-                class={`px-6 py-2 text-[18px] font-semibold uppercase tracking-[0.06em] bg-[#1E3A5F] text-[#8BA3C7] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2 ${
+                class={`px-6 py-2 text-[21px] font-semibold tracking-[0.01em] bg-[#3A335C] text-[#A79DBE] active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-2 ${
                   fullWidth ? 'flex-1 max-w-[200px]' : 'flex-1'
                 }`}
-              >
-                SKIP
-              </button>
+              >Skip</button>
             )}
           </div>
 
@@ -820,8 +806,8 @@ export function FocusMode({
                   key={i}
                   class={`block w-2 h-2 transition-colors duration-200 ${
                     i === (todoSkipKey % doFirstTodos.length)
-                      ? 'bg-[#FFB800]'
-                      : 'bg-[#1E3A5F]'
+                      ? 'bg-[#FFB65C]'
+                      : 'bg-[#3A335C]'
                   }`}
                 />
               ))}
@@ -835,11 +821,11 @@ export function FocusMode({
   // ── Layout decisions ────────────────────────────────────────
 
   return (
-    <div class="flex-1 flex bg-[#0B1120] overflow-hidden">
+    <div class="flex-1 flex bg-[#121021] overflow-hidden">
       {/* ── SPLIT: notifications + task breakdown ─────────────── */}
       {showSplit && (
         <>
-          <div class="flex-1 flex flex-col border-r border-[#1E3A5F] overflow-hidden px-2 py-2">
+          <div class="flex-1 flex flex-col border-r border-[#3A335C] overflow-hidden px-2 py-2">
             {renderNotificationPanel(false)}
           </div>
           <div class="flex-1 flex flex-col overflow-hidden">

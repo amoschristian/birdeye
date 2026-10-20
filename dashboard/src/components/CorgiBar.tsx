@@ -26,7 +26,7 @@ const SCALE = 0.3;
 const SPRITE_W = Math.round(CELL_W * SCALE); // 58
 const SPRITE_H = Math.round(CELL_H * SCALE); // 62
 const STRIP_H = SPRITE_H + 4;
-const BOTTOM_BAR_H = 56;
+const BOTTOM_BAR_H = 64;
 
 const ROW = {
   idle: 0,

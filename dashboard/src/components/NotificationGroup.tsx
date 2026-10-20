@@ -1,6 +1,9 @@
 import { h } from 'preact';
 import { useRef, useState, useCallback } from 'preact/hooks';
+import { Check } from 'lucide-preact';
 import type { Notification, AppConfig } from '../types';
+import { appBrandColor } from '../utils/appVisuals';
+import { formatRelativeTime } from '../utils/time';
 import { AppIcon } from './AppIcon';
 import { NotificationCard } from './NotificationCard';
 
@@ -13,14 +16,6 @@ interface Props {
   onFocus: (appId: string) => void;
 }
 
-function formatRelativeTime(ts: number): string {
-  const diff = Date.now() / 1000 - ts;
-  if (diff < 60) return 'now';
-  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
-  return `${Math.floor(diff / 86400)}d`;
-}
-
 export function NotificationGroup({ appId, label, app, notifications, onMarkRead, onFocus }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [readAllFired, setReadAllFired] = useState(false);
@@ -28,19 +23,20 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
   const onMarkReadRef = useRef(onMarkRead);
   onMarkReadRef.current = onMarkRead;
 
-  const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id);
+  const unreadIds = notifications.filter((notification) => !notification.is_read).map((notification) => notification.id);
   const unreadCount = unreadIds.length;
-  const importantCount = notifications.filter((n) => !n.is_read && n.is_important).length;
+  const importantCount = notifications.filter((notification) => !notification.is_read && notification.is_important).length;
 
   const appDisplay = app?.name || appId;
   const latest = notifications[0];
+  const brand = appBrandColor(appId);
 
   const handleToggle = useCallback(() => {
-    setExpanded((prev) => !prev);
+    setExpanded((previous) => !previous);
   }, []);
 
-  const handleReadAll = useCallback((e: Event) => {
-    e.stopPropagation();
+  const handleReadAll = useCallback((event: Event) => {
+    event.stopPropagation();
     if (readAllFired) return;
     setReadAllFired(true);
     for (const id of unreadIds) {
@@ -50,46 +46,73 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
     setTimeout(() => setReadAllFired(false), 600);
   }, [unreadIds, readAllFired]);
 
-  // ── Collapsed ──────────────────────────────────────────
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button')) return;
+    event.preventDefault();
+    handleToggle();
+  };
+
   if (!expanded) {
     return (
-      <div class="relative overflow-hidden border-b border-[#162035] select-none">
+      <div class="relative overflow-hidden border-b border-line/40">
+        <span
+          class="absolute bottom-0 left-0 top-0 w-[3px]"
+          style={{ backgroundColor: brand, opacity: unreadCount > 0 ? 0.8 : 0.25 }}
+          aria-hidden="true"
+        />
+
         <div
           role="button"
           tabIndex={0}
           onClick={handleToggle}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault();
-              handleToggle();
-            }
-          }}
-          class="relative flex items-center gap-3 px-4 py-3 min-h-[56px] bg-[#111827] hover:bg-[#1A2535] cursor-pointer transition-colors active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
+          onKeyDown={handleKeyDown}
           aria-expanded={false}
+          class="flex min-h-[84px] cursor-pointer items-center gap-3 py-2.5 pl-5 pr-3 transition-colors hover:bg-surface/50 active:bg-surface/70 focus-visible:outline-2 focus-visible:outline-action focus-visible:outline-offset-[-2px]"
         >
-          <div class="shrink-0 text-[#8BA3C7]">
-            <AppIcon appId={appId} class="w-7 h-7" emoji={app?.icon} />
-          </div>
-          <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#E8F0FE]">{appDisplay}</span>
-          <span class="text-[20px] font-medium text-[#FFB800] font-mono">{label}</span>
-          {importantCount > 0 && (
-            <span class="font-mono text-[18px] font-bold text-[#FF4757] tabular-nums">!{importantCount}</span>
-          )}
-          {unreadCount > 0 && (
-            <span class="font-mono text-[20px] font-bold text-[#FFB800] tabular-nums">{unreadCount}</span>
-          )}
-          <div class="flex-1" />
-          <span class="text-[20px] text-[#8BA3C7] truncate max-w-52 font-mono">{latest.summary}</span>
-          <span class="font-mono text-[16px] text-[#4A6080] tabular-nums shrink-0">
-            {formatRelativeTime(latest.created_at)}
+          <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[9px] border border-line/40 bg-ink/60">
+            <AppIcon appId={appId} class="h-[26px] w-[26px]" emoji={app?.icon} name={appDisplay} />
           </span>
+
+          <div class="min-w-0 flex-1">
+            <div class="flex items-baseline gap-1.5">
+              <span class="truncate text-[17px] font-semibold text-text">{appDisplay}</span>
+              {label && <span class="truncate text-[17px] text-muted">· {label}</span>}
+              {importantCount > 0 && (
+                <span
+                  class="shrink-0 rounded-[4px] border border-alert/40 px-1.5 py-0.5 font-mono text-[14px] font-semibold leading-none text-alert"
+                  title={`${importantCount} important`}
+                >
+                  !{importantCount}
+                </span>
+              )}
+            </div>
+            <p class="mt-1 truncate text-[20px] text-muted">{latest.summary}</p>
+          </div>
+
+          <div class="flex shrink-0 flex-col items-end gap-1">
+            <span class="font-mono text-[15px] text-faint">
+              {formatRelativeTime(latest.created_at)}
+            </span>
+            {unreadCount > 0 ? (
+              <span class="rounded-[5px] bg-signal/15 px-1.5 py-0.5 font-mono text-[14px] font-semibold text-signal">
+                {unreadCount} new
+              </span>
+            ) : (
+              <span class="text-[14px] text-faint">read</span>
+            )}
+          </div>
+
           {unreadCount > 0 && (
             <button
+              type="button"
               onClick={handleReadAll}
-              class="shrink-0 px-3 py-1.5 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
+              class="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-[8px] border border-ok/25 bg-ok/10 px-3 text-[15px] font-semibold text-ok transition-colors hover:bg-ok/15 active:scale-[0.98]"
               aria-label={`Mark all ${unreadCount} as read`}
             >
-              READ
+              <Check size={18} />
+              Read
             </button>
           )}
         </div>
@@ -97,44 +120,53 @@ export function NotificationGroup({ appId, label, app, notifications, onMarkRead
     );
   }
 
-  // ── Expanded ───────────────────────────────────────────
   return (
-    <div class="border-b border-[#162035]">
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={handleToggle}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleToggle();
-          }
-        }}
-        class="flex items-center gap-2 px-3 py-2.5 bg-[#1E3A5F] cursor-pointer select-none active:brightness-110 focus-visible:outline-2 focus-visible:outline-[#00D4FF] focus-visible:outline-offset-2"
-        aria-expanded={true}
-      >
-        <div class="shrink-0 text-[#00D4FF]">
-          <AppIcon appId={appId} class="w-7 h-7" emoji={app?.icon} />
+    <div class="border-b border-line/40">
+      <div class="relative overflow-hidden bg-raised/60">
+        <span
+          class="absolute bottom-0 left-0 top-0 w-[3px]"
+          style={{ backgroundColor: brand, opacity: 0.9 }}
+          aria-hidden="true"
+        />
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={handleToggle}
+          onKeyDown={handleKeyDown}
+          aria-expanded={true}
+          class="flex min-h-[64px] cursor-pointer items-center gap-3 py-2 pl-5 pr-3 transition-colors hover:bg-raised active:brightness-110 focus-visible:outline-2 focus-visible:outline-action focus-visible:outline-offset-[-2px]"
+        >
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] border border-line/60 bg-ink/60">
+            <AppIcon appId={appId} class="h-5 w-5" emoji={app?.icon} name={appDisplay} />
+          </span>
+
+          <span class="min-w-0 flex-1 truncate text-[17px] font-semibold text-text">
+            {appDisplay}
+            {label && <span class="font-normal text-muted"> · {label}</span>}
+          </span>
+
+          <span class="shrink-0 font-mono text-[15px] text-faint">{notifications.length}</span>
+
+          {unreadCount > 0 && (
+            <button
+              type="button"
+              onClick={handleReadAll}
+              class="flex min-h-[48px] shrink-0 items-center gap-1.5 rounded-[8px] border border-ok/25 bg-ok/10 px-3 text-[15px] font-semibold text-ok transition-colors hover:bg-ok/15 active:scale-[0.98]"
+              aria-label={`Mark all ${unreadCount} as read`}
+            >
+              <Check size={18} />
+              Read all
+            </button>
+          )}
+
+          <span class="shrink-0 px-1 text-[15px] font-medium text-muted">Collapse</span>
         </div>
-        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#00D4FF]">{label}</span>
-        <span class="font-mono text-[16px] text-[#8BA3C7]">{notifications.length}</span>
-        <div class="flex-1" />
-        {unreadCount > 0 && (
-          <button
-            onClick={handleReadAll}
-            class="shrink-0 px-3 py-1.5 mr-2 text-[16px] font-semibold uppercase tracking-[0.06em] bg-[#26DE81] text-[#0B1120] hover:brightness-110 active:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-[#26DE81] focus-visible:outline-offset-2"
-            aria-label={`Mark all ${unreadCount} as read`}
-          >
-            READ ALL
-          </button>
-        )}
-        <span class="text-[16px] font-semibold uppercase tracking-[0.06em] text-[#8BA3C7]">COLLAPSE</span>
       </div>
 
-      {notifications.map((n) => (
+      {notifications.map((notification) => (
         <NotificationCard
-          key={n.id}
-          notification={n}
+          key={notification.id}
+          notification={notification}
           onMarkRead={onMarkRead}
           onFocus={onFocus}
           emoji={app?.icon}
