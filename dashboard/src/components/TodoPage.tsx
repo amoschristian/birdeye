@@ -239,6 +239,20 @@ export function TodoPage(props: TodoPageProps) {
     if (isFromMatrix) props.onSetStatus(todoId, 'inbox');
   };
 
+  // Sortable dispatches `end` only on the list the drag started from, so the
+  // destination has to be read off the event — not inferred from which list's
+  // handler happened to run.
+  const handleDragEnd = (
+    todoId: number,
+    from: QuadrantId | 'inbox',
+    to: QuadrantId | 'inbox',
+    newIndex: number
+  ) => {
+    const crossed = from !== to;
+    if (to === 'inbox') handleDropToInbox(todoId, newIndex, crossed);
+    else handleDropToQuadrant(todoId, to, newIndex, crossed);
+  };
+
   const renderRow = (todo: TodoItem) => (
     <TodoRow
       key={todo.id}
@@ -297,7 +311,7 @@ export function TodoPage(props: TodoPageProps) {
                 <SortableZone
                   key={`${quadrant.id}-${items.map((todo) => todo.id).join(',')}`}
                   quadrantId={quadrant.id}
-                  onDropToQuadrant={handleDropToQuadrant}
+                  onDragEnd={handleDragEnd}
                 >
                   {items.length === 0 ? (
                     <p class="mt-6 select-none text-center text-[16px] font-medium text-faint">
@@ -322,7 +336,7 @@ export function TodoPage(props: TodoPageProps) {
 
           <SortableInbox
             key={inboxItems.map((todo) => todo.id).join(',')}
-            onDropToInbox={handleDropToInbox}
+            onDragEnd={handleDragEnd}
           >
             {inboxItems.length === 0 ? (
               <p class="mt-6 select-none text-center text-[16px] font-medium text-faint">
@@ -369,18 +383,27 @@ const DRAG_OPTIONS = {
   touchStartThreshold: 3,
 } as const;
 
+type DropTarget = QuadrantId | 'inbox';
+type DragEndHandler = (todoId: number, from: DropTarget, to: DropTarget, index: number) => void;
+
+function destinationOf(element: EventTarget | null): DropTarget {
+  const el = element as HTMLElement | null;
+  const quadrant = el?.closest('[data-quadrant-id]')?.getAttribute('data-quadrant-id');
+  return (quadrant as QuadrantId | null) ?? 'inbox';
+}
+
 function SortableZone({
   quadrantId,
-  onDropToQuadrant,
+  onDragEnd,
   children,
 }: {
   quadrantId: QuadrantId;
-  onDropToQuadrant: (todoId: number, quadrant: QuadrantId, index: number, crossed: boolean) => void;
+  onDragEnd: DragEndHandler;
   children: any;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const onDropRef = useRef(onDropToQuadrant);
-  onDropRef.current = onDropToQuadrant;
+  const onEndRef = useRef(onDragEnd);
+  onEndRef.current = onDragEnd;
 
   useEffect(() => {
     if (!listRef.current) return;
@@ -388,14 +411,12 @@ function SortableZone({
     const sortable = Sortable.create(listRef.current, {
       ...DRAG_OPTIONS,
       onEnd: (event) => {
-        // SortableJS fires onEnd on both the source and the target list. Only
-        // the list the card landed in may decide what happened.
-        if (event.to !== listRef.current) return;
+        if (event.from !== listRef.current) return;
 
         const todoId = parseInt(event.item.dataset.todoId || '', 10);
         if (!todoId || Number.isNaN(todoId)) return;
         const newIndex = event.newDraggableIndex ?? event.newIndex ?? 0;
-        onDropRef.current(todoId, quadrantId, newIndex, event.from !== event.to);
+        onEndRef.current(todoId, quadrantId, destinationOf(event.to), newIndex);
       },
     });
 
@@ -414,15 +435,15 @@ function SortableZone({
 }
 
 function SortableInbox({
-  onDropToInbox,
+  onDragEnd,
   children,
 }: {
-  onDropToInbox: (todoId: number, index: number, fromMatrix: boolean) => void;
+  onDragEnd: DragEndHandler;
   children: any;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const onDropRef = useRef(onDropToInbox);
-  onDropRef.current = onDropToInbox;
+  const onEndRef = useRef(onDragEnd);
+  onEndRef.current = onDragEnd;
 
   useEffect(() => {
     if (!listRef.current) return;
@@ -430,14 +451,12 @@ function SortableInbox({
     const sortable = Sortable.create(listRef.current, {
       ...DRAG_OPTIONS,
       onEnd: (event) => {
-        // Only act when the card actually landed in the pen — otherwise the
-        // quadrant that received it would be undone by this handler.
-        if (event.to !== listRef.current) return;
+        if (event.from !== listRef.current) return;
 
         const todoId = parseInt(event.item.dataset.todoId || '', 10);
         if (!todoId || Number.isNaN(todoId)) return;
         const newIndex = event.newDraggableIndex ?? event.newIndex ?? 0;
-        onDropRef.current(todoId, newIndex, event.from !== event.to);
+        onEndRef.current(todoId, 'inbox', destinationOf(event.to), newIndex);
       },
     });
 

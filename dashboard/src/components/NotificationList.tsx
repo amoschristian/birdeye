@@ -30,6 +30,7 @@ export function AppNotificationList({
   onReadAll,
   onOpenArchive,
   onOpenApp,
+  onOpenNotification,
 }: {
   app: AppConfig;
   unread: Notification[];
@@ -39,6 +40,7 @@ export function AppNotificationList({
   onReadAll: () => void;
   onOpenArchive: () => void;
   onOpenApp: () => void;
+  onOpenNotification: (notification: Notification) => void;
 }) {
   return (
     <main class="flex flex-1 flex-col overflow-hidden bg-ink">
@@ -97,6 +99,7 @@ export function AppNotificationList({
               notification={notification}
               action="read"
               onRead={onMarkRead}
+              onOpen={() => onOpenNotification(notification)}
             />
           ))
         )}
@@ -195,24 +198,41 @@ function Row({
   action,
   onRead,
   onDelete,
+  onOpen,
 }: {
   notification: Notification;
   app?: AppConfig;
   action: 'read' | 'delete';
   onRead?: (id: number) => void;
   onDelete?: (id: number) => void;
+  onOpen?: () => void;
 }) {
   const isUnread = action === 'read';
+  const openable = action === 'read' && onOpen !== undefined;
   const room = notificationLabel(notification);
   const sender = notificationSender(notification);
   const showSender = sender !== '' && sender.toLowerCase() !== room.toLowerCase();
   const brand = appBrandColor(notification.app_id);
 
+  // The row opens the source app; Read is its own target and must not bubble.
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (!openable) return;
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('button')) return;
+    event.preventDefault();
+    onOpen?.();
+  };
+
   return (
     <div
-      class={`relative flex items-start gap-3.5 border-b border-line/40 py-3.5 pl-5 pr-4 ${
+      role={openable ? 'button' : undefined}
+      tabIndex={openable ? 0 : undefined}
+      onClick={openable ? onOpen : undefined}
+      onKeyDown={openable ? handleKeyDown : undefined}
+      class={`relative flex items-start gap-3.5 border-b border-line/40 py-3.5 pl-5 pr-4 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-action ${
         isUnread ? 'bg-surface/25' : ''
-      }`}
+      } ${openable ? 'cursor-pointer transition-colors active:bg-raised' : ''}`}
     >
       <span
         class="absolute inset-y-0 left-0 w-[3px]"
@@ -270,7 +290,10 @@ function Row({
       {action === 'read' ? (
         <button
           type="button"
-          onClick={() => onRead?.(notification.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRead?.(notification.id);
+          }}
           aria-label="Mark as read, moves it to the archive"
           class="flex h-[46px] shrink-0 items-center gap-1.5 self-center rounded-[9px] border border-ok/40 bg-ok/10 px-3.5 text-[16px] font-semibold text-ok transition-colors active:scale-[0.97]"
         >
@@ -280,7 +303,10 @@ function Row({
       ) : (
         <button
           type="button"
-          onClick={() => onDelete?.(notification.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete?.(notification.id);
+          }}
           aria-label="Delete notification"
           class="flex h-11 w-11 shrink-0 items-center justify-center self-center rounded-[9px] border border-line/45 text-faint transition-colors active:scale-95 active:text-alert"
         >

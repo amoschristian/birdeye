@@ -400,6 +400,9 @@ export function App() {
               onReadAll={handleReadAllForApp}
               onOpenArchive={() => setArchiveOpen(true)}
               onOpenApp={handleOpenAppSource}
+              onOpenNotification={(notification) =>
+                focusApp(notification.app_id, notification.notif_id ?? undefined)
+              }
             />
           ) : (
             <main class="flex flex-1 flex-col overflow-hidden bg-ink">
