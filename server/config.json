@@ -46,21 +46,6 @@
       ],
       "sound": "default"
     },
-    "telegram-desktop": {
-      "name": "Telegram",
-      "type": "native",
-      "group": "personal",
-      "urlPattern": null,
-      "domain": "telegram.org",
-      "windowClass": "TelegramDesktop",
-      "desktopId": "telegram-desktop_telegram-desktop.desktop",
-      "icon": "\ud83d\udcf1",
-      "enabled": true,
-      "matchKeywords": [
-        "telegram"
-      ],
-      "sound": "default"
-    },
     "whatsapp": {
       "name": "WhatsApp",
       "type": "browser",

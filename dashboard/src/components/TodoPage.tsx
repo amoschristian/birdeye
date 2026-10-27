@@ -22,37 +22,19 @@ interface TodoPageProps {
 }
 
 type QuadrantId = 'do-first' | 'schedule' | 'decide' | 'eliminate';
-type TodoView = 'inbox' | 'today' | 'upcoming' | 'matrix';
 
-interface QuadrantDef {
-  id: QuadrantId;
-  label: string;
-  accent: string;
-}
-
-const QUADRANTS: QuadrantDef[] = [
-  { id: 'do-first', label: 'Do first', accent: '#FF7186' },
-  { id: 'schedule', label: 'Schedule', accent: '#8F86FF' },
-  { id: 'decide', label: 'Decide', accent: '#7BE3A6' },
-  { id: 'eliminate', label: 'Eliminate', accent: '#8A81A4' },
+const QUADRANTS: { id: QuadrantId; label: string; accent: string }[] = [
+  { id: 'do-first', label: 'Do first', accent: 'var(--color-alert)' },
+  { id: 'schedule', label: 'Schedule', accent: 'var(--color-action)' },
+  { id: 'decide', label: 'Decide', accent: 'var(--color-ok)' },
+  { id: 'eliminate', label: 'Eliminate', accent: 'var(--color-faint)' },
 ];
 
-const VIEW_TABS: { id: TodoView; label: string }[] = [
-  { id: 'inbox', label: 'Inbox' },
-  { id: 'today', label: 'Today' },
-  { id: 'upcoming', label: 'Upcoming' },
-  { id: 'matrix', label: 'Matrix' },
+const PRIORITIES: { value: 'high' | 'medium' | 'low'; label: string; color: string }[] = [
+  { value: 'high', label: 'High', color: 'var(--color-alert)' },
+  { value: 'medium', label: 'Medium', color: 'var(--color-muted)' },
+  { value: 'low', label: 'Low', color: 'var(--color-action)' },
 ];
-
-const STATUS_ORDER: TodoStatus[] = ['inbox', 'active', 'waiting', 'completed'];
-
-const STATUS_META: Record<TodoStatus, { label: string; color: string }> = {
-  inbox: { label: 'Inbox', color: '#A79DBE' },
-  active: { label: 'Active', color: '#8F86FF' },
-  waiting: { label: 'Waiting', color: '#FFA26B' },
-  completed: { label: 'Done', color: '#7BE3A6' },
-  archived: { label: 'Archived', color: '#8A81A4' },
-};
 
 // ── Date helpers ────────────────────────────────────────────────
 
@@ -71,69 +53,56 @@ function daysFromNow(n: number): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-function formatDateBadge(dueDate: string | null): { text: string; isOverdue: boolean; isToday: boolean } {
-  if (!dueDate) return { text: '', isOverdue: false, isToday: false };
-  const today = todayStr();
-  if (dueDate < today) return { text: 'Overdue', isOverdue: true, isToday: false };
-  if (dueDate === today) return { text: 'Today', isOverdue: false, isToday: true };
-
-  const tomorrowStr = daysFromNow(1);
-  if (dueDate === tomorrowStr) return { text: 'Tomorrow', isOverdue: false, isToday: false };
-
-  const d = new Date(dueDate + 'T00:00:00');
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  return { text: `${days[d.getDay()]} ${d.getDate()}`, isOverdue: false, isToday: false };
+/** The single date a task carries. Older rows may only hold a schedule date. */
+function todoDate(todo: TodoItem): string | null {
+  return todo.due_date || todo.scheduled_date || null;
 }
 
-function formatSchedule(todo: TodoItem): string | null {
-  if (!todo.scheduled_date) return null;
-  const d = new Date(todo.scheduled_date + 'T00:00:00');
+function formatDateBadge(date: string | null): { text: string; isOverdue: boolean; isToday: boolean } {
+  if (!date) return { text: '', isOverdue: false, isToday: false };
+  const today = todayStr();
+  if (date < today) return { text: 'Overdue', isOverdue: true, isToday: false };
+  if (date === today) return { text: 'Today', isOverdue: false, isToday: true };
+  if (date === daysFromNow(1)) return { text: 'Tomorrow', isOverdue: false, isToday: false };
+
+  const d = new Date(date + 'T00:00:00');
   const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const date = `${days[d.getDay()]} ${d.getDate()}`;
-  return todo.scheduled_time ? `${date} ${todo.scheduled_time}` : date;
+  return { text: `${days[d.getDay()]} ${d.getDate()}`, isOverdue: false, isToday: false };
 }
 
 function formatReminderLabel(reminderAt: number | null): string | null {
   if (!reminderAt) return null;
   const d = new Date(reminderAt * 1000);
-  const now = new Date();
   const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  const today = todayStr();
   const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-  if (day === today) return `Today ${hm}`;
+  if (day === todayStr()) return `Today ${hm}`;
   if (day === daysFromNow(1)) return `Tomorrow ${hm}`;
-  const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-  return `${d.getDate()} ${months[d.getMonth()]} ${hm}`;
+  return `${d.getDate()} ${hm}`;
 }
 
-/** Epoch seconds for schedule (date + time), defaulting to now+1h if unset. */
-function scheduleEpoch(todo: TodoItem): number {
-  const date = todo.scheduled_date || todayStr();
+/** Epoch seconds for the task's date plus its optional time. */
+function whenEpoch(todo: TodoItem): number {
+  const date = todoDate(todo) || todayStr();
   const time = todo.scheduled_time || '17:00';
   return new Date(`${date}T${time}:00`).getTime() / 1000;
 }
 
-/** True when the todo has a scheduled date AND a concrete time (not just a date). */
-function hasScheduledTime(todo: TodoItem): boolean {
-  return !!(todo.scheduled_date && todo.scheduled_time);
-}
-
 function priorityGlyph(priority: string): { char: string; color: string } {
-  if (priority === 'high') return { char: 'H', color: '#FF7186' };
-  if (priority === 'low') return { char: 'L', color: '#8F86FF' };
-  return { char: 'M', color: '#A79DBE' };
+  if (priority === 'high') return { char: 'H', color: 'var(--color-alert)' };
+  if (priority === 'low') return { char: 'L', color: 'var(--color-action)' };
+  return { char: 'M', color: 'var(--color-muted)' };
 }
 
-function isPlanned(t: TodoItem): boolean {
-  return t.status === 'active' || t.status === 'waiting' || t.status === 'completed';
+/** Filed = has left the holding pen. `waiting` only exists on older rows. */
+function isFiled(todo: TodoItem): boolean {
+  return todo.status === 'active' || todo.status === 'waiting' || todo.status === 'completed';
 }
 
 function getQuadrant(todo: TodoItem): QuadrantId {
-  const p = todo.priority;
-  const d = todo.due_date;
-  if (p === 'high' && d && d <= todayStr()) return 'do-first';
-  if (p === 'high') return 'schedule';
-  if (d) return 'decide';
+  const date = todoDate(todo);
+  if (todo.priority === 'high' && date && date <= todayStr()) return 'do-first';
+  if (todo.priority === 'high') return 'schedule';
+  if (date) return 'decide';
   return 'eliminate';
 }
 
@@ -141,7 +110,13 @@ function sortByOrder(a: TodoItem, b: TodoItem): number {
   return a.order_index - b.order_index;
 }
 
-// ── Picker menu hook (dropdown with upward flip near screen bottom) ──
+function orderIndexFor(items: TodoItem[], newIndex: number): number {
+  if (newIndex <= 0) return items.length > 0 ? items[0].order_index - 10 : 100;
+  if (newIndex >= items.length) {
+    return items.length > 0 ? items[items.length - 1].order_index + 10 : 100;
+  }
+  return Math.floor((items[newIndex - 1].order_index + items[newIndex].order_index) / 2);
+}
 
 function usePicker() {
   const [open, setOpen] = useState(false);
@@ -160,8 +135,8 @@ function usePicker() {
   const toggle = (e: Event) => {
     e.stopPropagation();
     if (!open && ref.current) {
-      const r = ref.current.getBoundingClientRect();
-      setDir(r.bottom > window.innerHeight - 240 ? 'up' : 'down');
+      const rect = ref.current.getBoundingClientRect();
+      setDir(rect.bottom > window.innerHeight - 260 ? 'up' : 'down');
     }
     setOpen(!open);
   };
@@ -172,49 +147,28 @@ function usePicker() {
 function CheckIcon() {
   return (
     <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-      <path d="M2 5L4 7L8 3" stroke="#121021" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M2 5L4 7L8 3" stroke="#121021" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
     </svg>
   );
 }
 
 // ── Main component ───────────────────────────────────────────────
+// One screen, two regions: the matrix on the left, the holding pen on the
+// right. Both must be mounted for drag-to-file to work, which is why this is
+// not a pair of tabs. Task editing happens in a dialog, because neither region
+// is wide enough for a form.
 
 export function TodoPage(props: TodoPageProps) {
   const { todos, onAdd } = props;
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [view, setView] = useState<TodoView>('inbox');
-  const [text, setText] = useState('');
   const [captureText, setCaptureText] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [openTodoId, setOpenTodoId] = useState<number | null>(null);
 
-  const toggleExpand = (id: number) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const openTodo = openTodoId !== null ? todos.find((todo) => todo.id === openTodoId) ?? null : null;
 
-  const openAddModal = () => {
-    setText('');
-    setShowAddModal(true);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  };
-
-  const closeAddModal = () => {
-    setShowAddModal(false);
-    setText('');
-  };
-
-  const handleAdd = () => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    onAdd(trimmed);
-    setText('');
-    setShowAddModal(false);
-  };
+  // The task can be archived from inside the dialog; close it when it goes.
+  useEffect(() => {
+    if (openTodoId !== null && !openTodo) setOpenTodoId(null);
+  }, [openTodoId, openTodo]);
 
   const handleCapture = () => {
     const trimmed = captureText.trim();
@@ -223,90 +177,54 @@ export function TodoPage(props: TodoPageProps) {
     setCaptureText('');
   };
 
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') handleAdd();
-    if (e.key === 'Escape') closeAddModal();
+  const inboxItems = todos.filter((todo) => todo.status === 'inbox').sort(sortByOrder);
+  const filedItems = todos.filter(isFiled);
+
+  const groups: Record<QuadrantId, TodoItem[]> = {
+    'do-first': [],
+    schedule: [],
+    decide: [],
+    eliminate: [],
   };
-
-  // ── View membership ────────────────────────────────────────
-  // List views are manually ordered (order_index) — drag to arrange.
-  const today = todayStr();
-  const inboxItems = todos.filter((t) => t.status === 'inbox').sort(sortByOrder);
-  const todayItems = todos
-    .filter((t) =>
-      t.status !== 'completed' && t.status !== 'archived' &&
-      ((t.due_date && t.due_date <= today) || (t.scheduled_date && t.scheduled_date <= today))
-    )
-    .sort(sortByOrder);
-  const upcomingItems = todos
-    .filter((t) =>
-      t.status !== 'completed' && t.status !== 'archived' &&
-      ((t.due_date && t.due_date > today) || (t.scheduled_date && t.scheduled_date > today))
-    )
-    .sort(sortByOrder);
-  const matrixItems = todos.filter(isPlanned);
-
-  const viewItems: Record<TodoView, TodoItem[]> = {
-    inbox: inboxItems,
-    today: todayItems,
-    upcoming: upcomingItems,
-    matrix: matrixItems,
-  };
-
-  const counts: Record<TodoView, number> = {
-    inbox: inboxItems.length,
-    today: todayItems.length,
-    upcoming: upcomingItems.length,
-    matrix: matrixItems.length,
-  };
-
-  // ── Matrix quadrant grouping ───────────────────────────────
-  const groups: Record<QuadrantId, TodoItem[]> = { 'do-first': [], 'schedule': [], 'decide': [], 'eliminate': [] };
-  for (const t of matrixItems) {
-    groups[getQuadrant(t)].push(t);
+  for (const todo of filedItems) {
+    groups[getQuadrant(todo)].push(todo);
   }
-  for (const q of Object.keys(groups) as QuadrantId[]) {
-    groups[q].sort((a, b) => {
+  for (const quadrant of Object.keys(groups) as QuadrantId[]) {
+    groups[quadrant].sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
-      const aDate = a.due_date || '9999-99-99';
-      const bDate = b.due_date || '9999-99-99';
-      if (aDate !== bDate) return aDate.localeCompare(bDate);
+      const dateA = todoDate(a) || '9999-99-99';
+      const dateB = todoDate(b) || '9999-99-99';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
       return a.order_index - b.order_index;
     });
   }
 
-  const handleDropToQuadrant = (todoId: number, targetQuadrant: QuadrantId, newIndex: number, isCrossQuadrant: boolean) => {
-    const targetItems = groups[targetQuadrant].filter(t => t.id !== todoId);
-    let newOrderIndex: number;
-    if (newIndex <= 0) {
-      newOrderIndex = targetItems.length > 0 ? targetItems[0].order_index - 10 : 100;
-    } else if (newIndex >= targetItems.length) {
-      newOrderIndex = targetItems.length > 0 ? targetItems[targetItems.length - 1].order_index + 10 : 100;
-    } else {
-      const prevItem = targetItems[newIndex - 1];
-      const nextItem = targetItems[newIndex];
-      newOrderIndex = Math.floor((prevItem.order_index + nextItem.order_index) / 2);
-    }
-
-    props.onReorder(todoId, newOrderIndex);
+  // Dropping into a quadrant IS the filing action: it writes the priority and
+  // date that place a task there, so the quadrant and the fields cannot drift.
+  const handleDropToQuadrant = (
+    todoId: number,
+    quadrant: QuadrantId,
+    newIndex: number,
+    isCrossQuadrant: boolean
+  ) => {
+    const items = groups[quadrant].filter((todo) => todo.id !== todoId);
+    props.onReorder(todoId, orderIndexFor(items, newIndex));
 
     if (!isCrossQuadrant) return;
 
-    // Dragging into a quadrant IS the planning action
     props.onSetStatus(todoId, 'active');
-    const nextWeek = daysFromNow(7);
-    switch (targetQuadrant) {
+    switch (quadrant) {
       case 'do-first':
         props.onSetPriority(todoId, 'high');
-        props.onSetDueDate(todoId, today);
+        props.onSetDueDate(todoId, todayStr());
         break;
       case 'schedule':
         props.onSetPriority(todoId, 'high');
-        props.onSetDueDate(todoId, nextWeek);
+        props.onSetDueDate(todoId, daysFromNow(7));
         break;
       case 'decide':
         props.onSetPriority(todoId, 'medium');
-        props.onSetDueDate(todoId, nextWeek);
+        props.onSetDueDate(todoId, daysFromNow(7));
         break;
       case 'eliminate':
         props.onSetPriority(todoId, 'low');
@@ -315,227 +233,149 @@ export function TodoPage(props: TodoPageProps) {
     }
   };
 
-  // Drag within a list view = manual ordering (views are exclusive tabs, so
-  // cross-view drags can't occur — ordering is order_index-based)
-  const handleListDrop = (todoId: number, toView: TodoView, newIndex: number) => {
-    const targetItems = viewItems[toView].filter(t => t.id !== todoId);
-    let newOrderIndex: number;
-    if (newIndex <= 0) {
-      newOrderIndex = targetItems.length > 0 ? targetItems[0].order_index - 10 : 100;
-    } else if (newIndex >= targetItems.length) {
-      newOrderIndex = targetItems.length > 0 ? targetItems[targetItems.length - 1].order_index + 10 : 100;
-    } else {
-      newOrderIndex = Math.floor((targetItems[newIndex - 1].order_index + targetItems[newIndex].order_index) / 2);
-    }
-    props.onReorder(todoId, newOrderIndex);
+  const handleDropToInbox = (todoId: number, newIndex: number, isFromMatrix: boolean) => {
+    const items = inboxItems.filter((todo) => todo.id !== todoId);
+    props.onReorder(todoId, orderIndexFor(items, newIndex));
+    if (isFromMatrix) props.onSetStatus(todoId, 'inbox');
   };
 
-  // ── Empty-state copy per view ──────────────────────────────
-  const EMPTY_COPY: Record<TodoView, { title: string; hint: string }> = {
-    inbox: { title: 'Inbox clear', hint: 'Capture new work above — plain text lands here' },
-    today: { title: 'Nothing due today', hint: 'Overdue, due-today, or scheduled-today tasks appear here' },
-    upcoming: { title: 'No upcoming work', hint: 'Future-dated tasks will appear here' },
-    matrix: { title: 'No planned tasks', hint: 'Plan inbox tasks (set status/priority/date) to see them here' },
-  };
+  const renderRow = (todo: TodoItem) => (
+    <TodoRow
+      key={todo.id}
+      todo={todo}
+      onOpen={() => setOpenTodoId(todo.id)}
+      onToggle={props.onToggle}
+      onSetPriority={props.onSetPriority}
+    />
+  );
 
   return (
-    <div class="relative flex flex-1 flex-col overflow-hidden">
-      {/* ── View tabs ───────────────────────────────────────── */}
-      <div class="flex gap-1 px-2 py-2 shrink-0 border-b border-[#2A2447] items-center">
-        {VIEW_TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setView(tab.id)}
-            class={`min-h-[44px] rounded-[8px] px-3 py-1.5 text-[18px] font-semibold tracking-[0.01em] transition-all active:brightness-125 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-2 ${
-              view === tab.id
-                ? 'bg-[#8F86FF] text-[#121021]'
-                : 'bg-[#1C1932] text-[#A79DBE] hover:text-[#F4EFE7]'
-            }`}
-          >
-            {tab.label}{counts[tab.id] > 0 ? ` ${counts[tab.id]}` : ''}
-          </button>
-        ))}
+    <div class="flex flex-1 flex-col overflow-hidden">
+      {/* ── Capture ─────────────────────────────────────────── */}
+      <div class="flex shrink-0 gap-2 border-b border-line/60 px-3 py-2">
+        <input
+          type="text"
+          value={captureText}
+          onInput={(e) => setCaptureText((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCapture();
+          }}
+          placeholder="Capture a task… plain text lands in the inbox"
+          maxLength={200}
+          class="min-h-[44px] flex-1 rounded-[9px] border border-line/60 bg-ink px-3 text-[19px] text-text outline-none transition-colors placeholder:text-faint focus:border-action"
+        />
+        <button
+          type="button"
+          onClick={handleCapture}
+          disabled={!captureText.trim()}
+          class="min-h-[44px] shrink-0 rounded-[9px] bg-action px-4 text-[17px] font-semibold text-ink transition-all active:scale-[0.98] disabled:opacity-40"
+        >
+          Add
+        </button>
       </div>
 
-      {view === 'matrix' ? (
-        /* ── MATRIX: 2×2 Eisenhower grid ─────────────────── */
-        <div class="flex-1 grid grid-cols-2 grid-rows-2 overflow-hidden gap-px bg-[#3A335C]">
-          {QUADRANTS.map((q) => {
-            const items = groups[q.id];
+      <div class="flex min-h-0 flex-1">
+        {/* ── Matrix ────────────────────────────────────────── */}
+        <div class="grid flex-1 grid-cols-2 grid-rows-2 gap-px overflow-hidden bg-line/60">
+          {QUADRANTS.map((quadrant) => {
+            const items = groups[quadrant.id];
+
             return (
-              <div key={q.id} class="bg-[#121021] flex flex-col overflow-hidden relative">
-                <div class="px-3 py-2 shrink-0 border-b flex items-center gap-2 select-none" style={{ borderColor: q.accent }}>
-                  <span class="w-2 h-2 shrink-0" style={{ backgroundColor: q.accent }} />
-                  <span class="text-[17px] font-semibold tracking-[0.01em]" style={{ color: q.accent }}>
-                    {q.label}
+              <div key={quadrant.id} class="relative flex flex-col overflow-hidden bg-ink">
+                <div class="flex shrink-0 items-center gap-2 px-3 py-2">
+                  <span
+                    class="h-2 w-2 shrink-0 rounded-full"
+                    style={{ backgroundColor: quadrant.accent }}
+                    aria-hidden="true"
+                  />
+                  <span class="text-[16px] font-semibold" style={{ color: quadrant.accent }}>
+                    {quadrant.label}
                   </span>
-                  {items.length > 0 && (
-                    <span class="ml-auto font-mono text-[17px] text-[#8A81A4]">{items.length}</span>
-                  )}
+                  <span class="ml-auto font-mono text-[14px] text-faint">{items.length}</span>
                 </div>
+
                 <SortableZone
-                  key={`${q.id}-${items.map(t => t.id).join(',')}`}
-                  quadrantId={q.id}
-                  items={items}
+                  key={`${quadrant.id}-${items.map((todo) => todo.id).join(',')}`}
+                  quadrantId={quadrant.id}
                   onDropToQuadrant={handleDropToQuadrant}
                 >
                   {items.length === 0 ? (
-                    <p class="text-[18px] text-[#8A81A4] text-center mt-8 select-none font-medium">
-                      No items
+                    <p class="mt-6 select-none text-center text-[16px] font-medium text-faint">
+                      Drop a task here
                     </p>
                   ) : (
-                    items.map((todo) => (
-                      <TodoRow
-                        key={todo.id}
-                        todo={todo}
-                        expanded={expandedIds.has(todo.id)}
-                        onToggleExpand={toggleExpand}
-                        {...rowHandlers(props)}
-                      />
-                    ))
+                    items.map(renderRow)
                   )}
                 </SortableZone>
               </div>
             );
           })}
         </div>
-      ) : (
-        /* ── LIST VIEWS: INBOX / TODAY / UPCOMING ────────── */
-        <div class="flex-1 flex flex-col overflow-hidden">
-          {view === 'inbox' && (
-            <div class="flex gap-1 px-2 py-1 border-b border-[#2A2447] shrink-0">
-              <input
-                type="text"
-                value={captureText}
-                onInput={(e) => setCaptureText((e.target as HTMLInputElement).value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleCapture(); }}
-                placeholder="Capture task… (plain text = inbox)"
-                class="flex-1 bg-[#121021] text-[#F4EFE7] text-[21px] px-2 py-1 border border-[#3A335C] placeholder-[#8A81A4] outline-none focus:border-[#8F86FF] transition-colors min-h-[44px]"
-                maxLength={200}
-              />
-              <button
-                onClick={handleCapture}
-                disabled={!captureText.trim()}
-                class="px-3 py-1 text-[19px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 min-h-[44px] focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-              >Add</button>
-            </div>
-          )}
 
-          <div class="flex-1 overflow-y-auto custom-scrollbar">
-            {viewItems[view].length === 0 ? (
-              <div class="flex flex-col items-center justify-center h-full gap-1 select-none">
-                <span class="text-[21px] font-semibold text-[#8A81A4]">
-                  {EMPTY_COPY[view].title}
-                </span>
-                <span class="text-[17px] text-[#8A81A4]">{EMPTY_COPY[view].hint}</span>
-              </div>
-            ) : (
-              <SortableList
-                view={view}
-                onListDrop={handleListDrop}
-              >
-                {viewItems[view].map((todo) => (
-                  <TodoRow
-                    key={todo.id}
-                    todo={todo}
-                    expanded={expandedIds.has(todo.id)}
-                    onToggleExpand={toggleExpand}
-                    {...rowHandlers(props)}
-                  />
-                ))}
-              </SortableList>
-            )}
+        {/* ── Holding pen ───────────────────────────────────── */}
+        <aside class="flex w-[384px] shrink-0 flex-col overflow-hidden border-l border-line/60 bg-ink">
+          <div class="flex h-12 shrink-0 items-center gap-2 border-b border-line/60 px-3">
+            <span class="text-[15px] font-semibold text-muted">Inbox</span>
+            <span class="font-mono text-[14px] text-faint">{inboxItems.length}</span>
+            <span class="ml-auto text-[14px] text-faint">drag into a quadrant</span>
           </div>
-        </div>
-      )}
 
-      {/* Add button — floating */}
-      <button
-        onClick={openAddModal}
-        class="absolute bottom-20 right-4 flex h-14 w-14 items-center justify-center rounded-[14px] bg-[#8F86FF] text-[#121021] active:brightness-125 transition-all text-3xl font-bold z-10 focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-        aria-label="Add task"
-        title="Add task"
-      >
-        +
-      </button>
-
-      {/* Add task modal */}
-      {showAddModal && (
-        <div
-          class="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(18,16,33,0.82)' }}
-          onClick={closeAddModal}
-        >
-          <div
-            class="w-[440px] max-w-[92vw] flex flex-col gap-3 rounded-[14px] border border-[#3A335C] bg-[#1C1932] p-5"
-            onClick={(e) => e.stopPropagation()}
+          <SortableInbox
+            key={inboxItems.map((todo) => todo.id).join(',')}
+            onDropToInbox={handleDropToInbox}
           >
-            <h3 class="text-[20px] font-semibold text-[#8F86FF] border-b border-[#3A335C] pb-2">
-              New task
-            </h3>
-            <input
-              ref={inputRef}
-              type="text"
-              value={text}
-              onInput={(e) => setText((e.target as HTMLInputElement).value)}
-              onKeyDown={handleKeyDown}
-              placeholder="What needs doing?"
-              class="flex-1 bg-[#121021] text-[#F4EFE7] text-[21px] px-3 py-2 border border-[#3A335C] placeholder-[#8A81A4] outline-none focus:border-[#8F86FF] transition-colors min-h-[48px]"
-            />
-            <p class="text-[19px] text-[#A79DBE] -mt-1 leading-snug">
-              Plain text lands in <span class="text-[#A79DBE] font-semibold">Inbox</span>.{' '}
-              <span class="text-[#FF7186] font-semibold">!high</span>{' '}
-              <span class="text-[#A79DBE] font-semibold">!medium</span>{' '}
-              <span class="text-[#8F86FF] font-semibold">!low</span> set priority. Natural dates work too — add a time and it schedules a reminder: "Fix login !high tomorrow 2pm"
-            </p>
-            <div class="flex gap-2 justify-end">
-              <button
-                onClick={closeAddModal}
-                class="min-h-[44px] rounded-[9px] px-4 py-2 text-[17px] font-semibold tracking-[0.01em] bg-[#121021] text-[#A79DBE] hover:bg-[#3A335C] transition-colors focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-2"
-              >Cancel</button>
-              <button
-                onClick={handleAdd}
-                disabled={!text.trim()}
-                class="min-h-[44px] rounded-[9px] px-4 py-2 text-[17px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] hover:brightness-110 active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-white focus-visible:outline-offset-2"
-              >Add task</button>
-            </div>
-          </div>
-        </div>
+            {inboxItems.length === 0 ? (
+              <p class="mt-6 select-none text-center text-[16px] font-medium text-faint">
+                Nothing waiting
+              </p>
+            ) : (
+              inboxItems.map(renderRow)
+            )}
+          </SortableInbox>
+        </aside>
+      </div>
+
+      {openTodo && (
+        <TodoDialog
+          todo={openTodo}
+          onClose={() => setOpenTodoId(null)}
+          onEdit={props.onEdit}
+          onDelete={(id) => {
+            props.onDelete(id);
+            setOpenTodoId(null);
+          }}
+          onSetPriority={props.onSetPriority}
+          onSetDueDate={props.onSetDueDate}
+          onSetNotes={props.onSetNotes}
+          onSetSchedule={props.onSetSchedule}
+          onSetReminder={props.onSetReminder}
+          addSubtask={props.addSubtask}
+          toggleSubtask={props.toggleSubtask}
+          editSubtask={props.editSubtask}
+          deleteSubtask={props.deleteSubtask}
+        />
       )}
     </div>
   );
 }
 
-// Build the handler bundle passed to every row (keeps JSX terse)
-function rowHandlers(props: TodoPageProps) {
-  return {
-    onToggle: props.onToggle,
-    onEdit: props.onEdit,
-    onDelete: props.onDelete,
-    onSetPriority: props.onSetPriority,
-    onSetDueDate: props.onSetDueDate,
-    onSetStatus: props.onSetStatus,
-    onSetNotes: props.onSetNotes,
-    onSetSchedule: props.onSetSchedule,
-    onSetReminder: props.onSetReminder,
-    addSubtask: props.addSubtask,
-    toggleSubtask: props.toggleSubtask,
-    editSubtask: props.editSubtask,
-    deleteSubtask: props.deleteSubtask,
-  };
-}
+// ── Drag zones ───────────────────────────────────────────────────
 
-// ── Matrix drag zone ─────────────────────────────────────────────
+const DRAG_OPTIONS = {
+  group: 'todos',
+  animation: 150,
+  delay: 50,
+  delayOnTouchOnly: true,
+  touchStartThreshold: 3,
+} as const;
 
 function SortableZone({
   quadrantId,
-  items,
   onDropToQuadrant,
   children,
 }: {
   quadrantId: QuadrantId;
-  items: TodoItem[];
-  onDropToQuadrant: (todoId: number, targetQuadrant: QuadrantId, newIndex: number, isCrossQuadrant: boolean) => void;
+  onDropToQuadrant: (todoId: number, quadrant: QuadrantId, index: number, crossed: boolean) => void;
   children: any;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
@@ -546,26 +386,16 @@ function SortableZone({
     if (!listRef.current) return;
 
     const sortable = Sortable.create(listRef.current, {
-      group: 'todos',
-      animation: 150,
-      delay: 50,
-      delayOnTouchOnly: true,
-      touchStartThreshold: 3,
-      // Expanded detail sections are inputs/buttons — never drag them
-      filter: '.todo-detail, .todo-detail *',
-      // Without this SortableJS preventDefaults pointerdown for filtered
-      // elements, which breaks tap-to-focus on inputs in .todo-detail
-      preventOnFilter: false,
-      onEnd: (evt) => {
-        const todoId = parseInt(evt.item.dataset.todoId || '', 10);
-        const targetContainer = evt.to as HTMLElement;
-        const targetQuadrant = (targetContainer.closest('[data-quadrant-id]') as HTMLElement)?.dataset?.quadrantId as QuadrantId | undefined;
-        const actualTarget = targetQuadrant || quadrantId;
-        const isCrossQuadrant = evt.from !== evt.to;
-        const newIndex = evt.newDraggableIndex ?? evt.newIndex ?? 0;
-        if (!todoId || isNaN(todoId)) return;
+      ...DRAG_OPTIONS,
+      onEnd: (event) => {
+        // SortableJS fires onEnd on both the source and the target list. Only
+        // the list the card landed in may decide what happened.
+        if (event.to !== listRef.current) return;
 
-        onDropRef.current(todoId, actualTarget, newIndex, isCrossQuadrant);
+        const todoId = parseInt(event.item.dataset.todoId || '', 10);
+        if (!todoId || Number.isNaN(todoId)) return;
+        const newIndex = event.newDraggableIndex ?? event.newIndex ?? 0;
+        onDropRef.current(todoId, quadrantId, newIndex, event.from !== event.to);
       },
     });
 
@@ -576,47 +406,38 @@ function SortableZone({
     <div
       ref={listRef}
       data-quadrant-id={quadrantId}
-      class="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar"
+      class="flex-1 overflow-y-auto px-1.5 py-1 custom-scrollbar"
     >
       {children}
     </div>
   );
 }
 
-// ── List drag zone (INBOX / TODAY / UPCOMING) ────────────────────
-
-function SortableList({
-  view,
-  onListDrop,
+function SortableInbox({
+  onDropToInbox,
   children,
 }: {
-  view: TodoView;
-  onListDrop: (todoId: number, toView: TodoView, newIndex: number) => void;
+  onDropToInbox: (todoId: number, index: number, fromMatrix: boolean) => void;
   children: any;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const onDropRef = useRef(onListDrop);
-  onDropRef.current = onListDrop;
+  const onDropRef = useRef(onDropToInbox);
+  onDropRef.current = onDropToInbox;
 
   useEffect(() => {
     if (!listRef.current) return;
 
     const sortable = Sortable.create(listRef.current, {
-      group: 'todos',
-      animation: 150,
-      delay: 50,
-      delayOnTouchOnly: true,
-      touchStartThreshold: 3,
-      // Expanded detail sections are inputs/buttons — never drag them
-      filter: '.todo-detail, .todo-detail *',
-      // Without this SortableJS preventDefaults pointerdown for filtered
-      // elements, which breaks tap-to-focus on inputs in .todo-detail
-      preventOnFilter: false,
-      onEnd: (evt) => {
-        const todoId = parseInt(evt.item.dataset.todoId || '', 10);
-        if (!todoId || isNaN(todoId)) return;
-        const newIndex = evt.newDraggableIndex ?? evt.newIndex ?? 0;
-        onDropRef.current(todoId, view, newIndex);
+      ...DRAG_OPTIONS,
+      onEnd: (event) => {
+        // Only act when the card actually landed in the pen — otherwise the
+        // quadrant that received it would be undone by this handler.
+        if (event.to !== listRef.current) return;
+
+        const todoId = parseInt(event.item.dataset.todoId || '', 10);
+        if (!todoId || Number.isNaN(todoId)) return;
+        const newIndex = event.newDraggableIndex ?? event.newIndex ?? 0;
+        onDropRef.current(todoId, newIndex, event.from !== event.to);
       },
     });
 
@@ -624,316 +445,115 @@ function SortableList({
   }, []);
 
   return (
-    <div
-      ref={listRef}
-      data-view={view}
-      class="flex-1 overflow-y-auto px-2 py-1 custom-scrollbar"
-    >
+    <div ref={listRef} class="flex-1 overflow-y-auto px-1.5 py-1 custom-scrollbar">
       {children}
     </div>
   );
 }
 
-// ── Todo row ─────────────────────────────────────────────────────
+// ── Row ──────────────────────────────────────────────────────────
 
 function TodoRow({
   todo,
-  expanded,
-  onToggleExpand,
+  onOpen,
   onToggle,
-  onEdit,
-  onDelete,
   onSetPriority,
-  onSetDueDate,
-  onSetStatus,
-  onSetNotes,
-  onSetSchedule,
-  onSetReminder,
-  addSubtask,
-  toggleSubtask,
-  editSubtask,
-  deleteSubtask,
 }: {
   todo: TodoItem;
-  expanded: boolean;
-  onToggleExpand: (id: number) => void;
+  onOpen: () => void;
   onToggle: (id: number) => void;
-  onEdit: (id: number, text: string) => void;
-  onDelete: (id: number) => void;
   onSetPriority: (id: number, priority: 'high' | 'medium' | 'low') => void;
-  onSetDueDate: (id: number, dueDate: string | null) => void;
-  onSetStatus: (id: number, status: TodoStatus) => void;
-  onSetNotes: (id: number, notes: string) => void;
-  onSetSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
-  onSetReminder: (id: number, reminderAt: number | null) => void;
-  addSubtask: (todoId: number, text: string) => void;
-  toggleSubtask: (id: number) => void;
-  editSubtask: (id: number, text: string) => void;
-  deleteSubtask: (id: number) => void;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [editText, setEditText] = useState(todo.text);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const editInputRef = useRef<HTMLInputElement>(null);
-  const datePickerRef = useRef<HTMLDivElement>(null);
-  const statusPicker = usePicker();
-
-  // Dismiss date picker on outside click
-  useEffect(() => {
-    if (!showDatePicker) return;
-    const handler = (e: MouseEvent) => {
-      if (datePickerRef.current && !datePickerRef.current.contains(e.target as Node)) {
-        setShowDatePicker(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [showDatePicker]);
-
-  const startEdit = (e: Event) => {
-    e.stopPropagation();
-    setEditText(todo.text);
-    setEditing(true);
-    requestAnimationFrame(() => editInputRef.current?.focus());
-  };
-
-  const commitEdit = () => {
-    const trimmed = editText.trim();
-    if (trimmed && trimmed !== todo.text) {
-      onEdit(todo.id, trimmed);
-    }
-    setEditing(false);
-  };
-
-  const cancelEdit = () => setEditing(false);
-
-  const handleEditKeyDown = (e: KeyboardEvent) => {
-    if (e.key === 'Enter') commitEdit();
-    if (e.key === 'Escape') cancelEdit();
-  };
-
-  const cyclePriority = (e: Event) => {
-    e.stopPropagation();
+  const cyclePriority = (event: Event) => {
+    event.stopPropagation();
     const order: Array<'high' | 'medium' | 'low'> = ['medium', 'high', 'low'];
-    const idx = order.indexOf(todo.priority);
-    onSetPriority(todo.id, order[(idx + 1) % order.length]);
+    onSetPriority(todo.id, order[(order.indexOf(todo.priority) + 1) % order.length]);
   };
 
-  const dateBadge = formatDateBadge(todo.scheduled_date || todo.due_date);
-  const schedBadge = formatSchedule(todo);
-  const remLabel = formatReminderLabel(todo.reminder_at);
-  const statusMeta = STATUS_META[todo.status];
-  const pGlyph = priorityGlyph(todo.priority);
-
-  // One date display: the compact badge reflects the scheduled date when set,
-  // otherwise the due date — and clicking it edits whichever one it shows.
-  const setDisplayDate = (dateStr: string | null) => {
-    if (todo.scheduled_date) {
-      onSetSchedule(todo.id, dateStr, dateStr ? todo.scheduled_time : null);
-    } else {
-      onSetDueDate(todo.id, dateStr);
-    }
-  };
-
-  const applyQuickDate = (e: Event, dateStr: string | null) => {
-    e.stopPropagation();
-    setDisplayDate(dateStr);
-    setShowDatePicker(false);
-  };
+  const badge = formatDateBadge(todoDate(todo));
+  const glyph = priorityGlyph(todo.priority);
 
   return (
-    <div data-todo-id={todo.id} class={`group border-b border-[#2A2447] ${todo.completed ? 'opacity-60' : ''}`}>
-      {/* ── Compact row ───────────────────────────────────── */}
-      <div class="flex items-start gap-1.5 py-1 px-1 min-h-[44px]">
-        {/* Complete checkbox */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggle(todo.id); }}
-          class="shrink-0 flex items-center justify-center w-[44px] h-[44px] -ml-1 -mt-0.5 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
-          aria-label={todo.completed ? 'Mark incomplete' : 'Mark complete'}
+    <div
+      data-todo-id={todo.id}
+      class={`flex items-start gap-1 border-b border-line/30 py-1 pl-1 pr-1 ${
+        todo.completed ? 'opacity-60' : ''
+      }`}
+    >
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggle(todo.id);
+        }}
+        aria-label={todo.completed ? 'Mark incomplete' : 'Mark complete'}
+        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[8px] active:bg-raised"
+      >
+        <span
+          class={`flex h-[18px] w-[18px] items-center justify-center rounded-[4px] border-2 transition-colors ${
+            todo.completed ? 'border-ok bg-ok' : 'border-line'
+          }`}
         >
-          <span
-            class={`w-[18px] h-[18px] border-2 shrink-0 flex items-center justify-center transition-colors ${
-              todo.completed ? 'bg-[#7BE3A6] border-[#7BE3A6]' : 'border-[#3A335C]'
-            }`}
-          >
-            {todo.completed && <CheckIcon />}
-          </span>
-        </button>
+          {todo.completed && <CheckIcon />}
+        </span>
+      </button>
 
-        {/* Priority glyph */}
-        <button
-          onClick={cyclePriority}
-          class="font-mono text-[19px] font-bold shrink-0 hover:brightness-125 transition-all focus-visible:outline-2 focus-visible:outline-offset-1 px-0.5 mt-2"
-          style={{ color: pGlyph.color }}
-          aria-label={`Priority: ${todo.priority}`}
-          title={todo.priority}
+      <button
+        type="button"
+        onClick={cyclePriority}
+        aria-label={`Priority: ${todo.priority}`}
+        title={`Priority: ${todo.priority}`}
+        class="mt-2.5 w-[18px] shrink-0 font-mono text-[18px] font-bold active:brightness-125"
+        style={{ color: glyph.color }}
+      >
+        {glyph.char}
+      </button>
+
+      <button type="button" onClick={onOpen} class="min-w-0 flex-1 py-2 text-left">
+        <span
+          class={`block select-none break-words text-[19px] leading-snug ${
+            todo.completed ? 'text-faint line-through' : 'text-text'
+          }`}
         >
-          {pGlyph.char}
-        </button>
+          {todo.text}
+        </span>
+      </button>
 
-        {/* Status pill */}
-        <div ref={statusPicker.ref} class="relative shrink-0 mt-1">
-          <button
-            onClick={statusPicker.toggle}
-            class="font-mono text-[15px] font-bold tracking-[0.02em] px-1.5 py-1 border transition-colors focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
-            style={{ color: statusMeta.color, borderColor: statusMeta.color, background: `${statusMeta.color}14` }}
-            aria-label={`Status: ${todo.status}`}
-          >
-            {statusMeta.label}
-          </button>
-          {statusPicker.open && (
-            <div class={`absolute z-30 ${statusPicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 bg-[#1C1932] border border-[#3A335C] p-1 flex flex-col gap-1 min-w-[130px]`}>
-              {STATUS_ORDER.map((s) => (
-                <button
-                  key={s}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSetStatus(todo.id, s);
-                    statusPicker.setOpen(false);
-                  }}
-                  class={`text-[18px] text-left px-2 py-1.5 font-mono font-semibold tracking-[0.01em] hover:bg-[#272146] ${
-                    todo.status === s ? '' : 'text-[#A79DBE]'
-                  }`}
-                  style={todo.status === s ? { color: STATUS_META[s].color } : undefined}
-                >
-                  {STATUS_META[s].label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+      <span
+        class={`mt-2 shrink-0 rounded-[6px] px-1.5 py-1 font-mono text-[15px] font-semibold ${
+          badge.isOverdue
+            ? 'bg-alert/15 text-alert'
+            : badge.isToday
+            ? 'bg-warn/15 text-warn'
+            : todoDate(todo)
+            ? 'bg-surface text-muted'
+            : 'bg-surface text-faint'
+        }`}
+      >
+        {badge.text || '+ date'}
+      </span>
 
-        {/* Text / edit / expand */}
-        {editing ? (
-          <input
-            ref={editInputRef}
-            type="text"
-            value={editText}
-            onInput={(e) => setEditText((e.target as HTMLInputElement).value)}
-            onKeyDown={handleEditKeyDown}
-            onBlur={commitEdit}
-            onClick={(e) => e.stopPropagation()}
-            class="flex-1 bg-[#1C1932] text-[#F4EFE7] text-[21px] px-1.5 py-0.5 border border-[#8F86FF] outline-none min-w-0 mt-0.5"
-          />
-        ) : (
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggleExpand(todo.id); }}
-            class="flex-1 min-w-0 text-left py-2 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
-          >
-            <span
-              class={`text-[21px] leading-snug break-words select-none ${
-                todo.completed ? 'text-[#8A81A4] line-through' : 'text-[#F4EFE7]'
-              }`}
-            >
-              {todo.text}
-            </span>
-          </button>
-        )}
-
-        {/* Due date badge */}
-        <div class="relative shrink-0 mt-1" ref={datePickerRef}>
-          {dateBadge.text ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDatePicker(!showDatePicker); }}
-              class={`font-mono text-[17px] px-1.5 py-0.5 font-semibold tracking-[0.01em] transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 ${
-                dateBadge.isOverdue
-                  ? 'bg-[#FF7186]/15 text-[#FF7186]'
-                  : dateBadge.isToday
-                  ? 'bg-[#FFA26B]/15 text-[#FFA26B]'
-                  : 'bg-[#1C1932] text-[#A79DBE] active:bg-[#3A335C]'
-              }`}
-            >
-              {dateBadge.text}
-            </button>
-          ) : (
-            <button
-              onClick={(e) => { e.stopPropagation(); setShowDatePicker(!showDatePicker); }}
-              class="font-mono text-[17px] px-1.5 py-0.5 font-semibold tracking-[0.01em] bg-[#1C1932] text-[#8A81A4] active:bg-[#3A335C] transition-colors focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
-            >
-              + Date
-            </button>
-          )}
-
-          {showDatePicker && (
-            <div class={`absolute z-30 ${datePickerRef.current && datePickerRef.current.getBoundingClientRect().bottom > window.innerHeight - 240 ? 'bottom-full mb-1' : 'top-full mt-1'} right-0 bg-[#1C1932] border border-[#3A335C] p-1.5 flex flex-col gap-1 min-w-[130px]`}>
-              <button onClick={(e) => applyQuickDate(e, todayStr())} class="text-[19px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Today</button>
-              <button onClick={(e) => applyQuickDate(e, daysFromNow(1))} class="text-[19px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Tomorrow</button>
-              <button onClick={(e) => applyQuickDate(e, daysFromNow(7))} class="text-[19px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Next week</button>
-              <div class="px-2 py-1">
-                <input
-                  type="date"
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => {
-                    const val = (e.target as HTMLInputElement).value;
-                    if (val) {
-                      e.stopPropagation();
-                      setDisplayDate(val);
-                      setShowDatePicker(false);
-                    }
-                  }}
-                  class="font-mono text-[19px] bg-[#121021] text-[#F4EFE7] border border-[#3A335C] px-1 py-0.5 outline-none w-full"
-                />
-              </div>
-              {(todo.due_date || todo.scheduled_date) && (
-                <button onClick={(e) => applyQuickDate(e, null)} class="text-[19px] text-left px-2 py-1 hover:bg-[#272146] text-[#FF7186] font-mono">Clear</button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Expand */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onToggleExpand(todo.id); }}
-          class="text-[#8A81A4] active:text-[#8F86FF] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1 text-[19px] mt-1.5"
-          aria-label={expanded ? 'Collapse details' : 'Expand details'}
-        >
-          {expanded ? '▴' : '▾'}
-        </button>
-
-        {/* Edit */}
-        <button
-          onClick={startEdit}
-          class="text-[#8A81A4] active:text-[#8F86FF] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1 text-[21px] mt-1"
-          aria-label="Edit todo"
-        >
-          ✎
-        </button>
-
-        {/* Archive (soft delete) */}
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(todo.id); }}
-          class="text-[#8A81A4] active:text-[#FF7186] transition-all px-1 shrink-0 focus-visible:outline-2 focus-visible:outline-[#FF7186] focus-visible:outline-offset-1 text-[21px] mt-1"
-          aria-label="Archive todo"
-          title="Archive"
-        >
-          ✕
-        </button>
-      </div>
-
-      {/* ── Expanded detail ────────────────────────────────── */}
-      {expanded && (
-        <TodoDetail
-          key={todo.id}
-          todo={todo}
-          onSetStatus={onSetStatus}
-          onSetNotes={onSetNotes}
-          onSetSchedule={onSetSchedule}
-          onSetReminder={onSetReminder}
-          addSubtask={addSubtask}
-          toggleSubtask={toggleSubtask}
-          editSubtask={editSubtask}
-          deleteSubtask={deleteSubtask}
-        />
-      )}
+      <button
+        type="button"
+        onClick={onOpen}
+        aria-label="Open task"
+        class="mt-1 flex h-9 w-8 shrink-0 items-center justify-center text-[18px] text-faint active:text-action"
+      >
+        ⋯
+      </button>
     </div>
   );
 }
 
-// ── Expanded detail panel ────────────────────────────────────────
+// ── Task dialog ──────────────────────────────────────────────────
 
-function TodoDetail({
+function TodoDialog({
   todo,
-  onSetStatus,
+  onClose,
+  onEdit,
+  onDelete,
+  onSetPriority,
+  onSetDueDate,
   onSetNotes,
   onSetSchedule,
   onSetReminder,
@@ -943,7 +563,11 @@ function TodoDetail({
   deleteSubtask,
 }: {
   todo: TodoItem;
-  onSetStatus: (id: number, status: TodoStatus) => void;
+  onClose: () => void;
+  onEdit: (id: number, text: string) => void;
+  onDelete: (id: number) => void;
+  onSetPriority: (id: number, priority: 'high' | 'medium' | 'low') => void;
+  onSetDueDate: (id: number, dueDate: string | null) => void;
   onSetNotes: (id: number, notes: string) => void;
   onSetSchedule: (id: number, scheduledDate: string | null, scheduledTime: string | null) => void;
   onSetReminder: (id: number, reminderAt: number | null) => void;
@@ -952,341 +576,357 @@ function TodoDetail({
   editSubtask: (id: number, text: string) => void;
   deleteSubtask: (id: number) => void;
 }) {
+  const [textDraft, setTextDraft] = useState(todo.text);
   const [notesDraft, setNotesDraft] = useState(todo.notes);
   const [subtaskText, setSubtaskText] = useState('');
   const [editingSubtaskId, setEditingSubtaskId] = useState<number | null>(null);
   const [editingSubtaskText, setEditingSubtaskText] = useState('');
-  const [schedDateDraft, setSchedDateDraft] = useState(todo.scheduled_date || todayStr());
-  const [schedTimeDraft, setSchedTimeDraft] = useState(todo.scheduled_time || '');
-  const [customReminder, setCustomReminder] = useState('');
-  const schedulePicker = usePicker();
   const reminderPicker = usePicker();
-  const statusPicker = usePicker();
+
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') closeRef.current();
+    };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, []);
 
   const subtasks = (todo.subtasks || []).slice().sort((a, b) => {
     if (a.completed !== b.completed) return a.completed ? 1 : -1;
     return a.order_index - b.order_index;
   });
-  const remLabel = formatReminderLabel(todo.reminder_at);
-  const schedLabel = formatSchedule(todo);
-  const statusMeta = STATUS_META[todo.status];
-
-  const commitNotes = () => {
-    if (notesDraft !== todo.notes) onSetNotes(todo.id, notesDraft);
-  };
+  const reminderLabel = formatReminderLabel(todo.reminder_at);
+  const date = todoDate(todo);
+  const badge = formatDateBadge(date);
 
   const nowEpoch = () => Date.now() / 1000;
 
-  // Relative-offset reminder: N minutes before the todo's schedule.
-  const reminderBeforeSchedule = (minutesBefore: number): number => {
-    const sched = scheduleEpoch(todo);
-    const candidate = sched - minutesBefore * 60;
-    return candidate > nowEpoch() ? candidate : sched;
+  const beforeDue = (minutes: number): number => {
+    const at = whenEpoch(todo);
+    const candidate = at - minutes * 60;
+    return candidate > nowEpoch() ? candidate : at;
   };
 
-  const [customReminderOffset, setCustomReminderOffset] = useState(10);
-
-  const tomorrowAt9 = (): number => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(9, 0, 0, 0);
-    return d.getTime() / 1000;
-  };
-
-  const reminderAtCustom = (): number => {
-    const mins = Math.max(0, customReminderOffset);
-    return reminderBeforeSchedule(mins);
+  const commitText = () => {
+    if (textDraft.trim() && textDraft.trim() !== todo.text) onEdit(todo.id, textDraft.trim());
   };
 
   const handleAddSubtask = () => {
-    const t = subtaskText.trim();
-    if (!t) return;
-    if ((todo.subtasks || []).length >= 20) return;
-    addSubtask(todo.id, t);
+    const text = subtaskText.trim();
+    if (!text || (todo.subtasks || []).length >= 20) return;
+    addSubtask(todo.id, text);
     setSubtaskText('');
   };
 
-  const handleStartEditSubtask = (s: SubtaskItem, e: Event) => {
-    e.stopPropagation();
-    setEditingSubtaskId(s.id);
-    setEditingSubtaskText(s.text);
-  };
-
-  const handleCommitEditSubtask = () => {
-    const t = editingSubtaskText.trim();
-    if (t && editingSubtaskId !== null) editSubtask(editingSubtaskId, t);
-    setEditingSubtaskId(null);
-    setEditingSubtaskText('');
-  };
-
-  const metaRow = 'flex items-center gap-2 min-h-[44px] border-b border-[#2A2447] px-2';
-  const fieldLabel = 'w-[64px] shrink-0 text-[16px] font-semibold tracking-[0.02em] text-[#8A81A4]';
+  const field = 'flex items-start gap-3 border-b border-line/30 px-4 py-2';
+  const label = 'w-[76px] shrink-0 pt-2 text-[15px] font-semibold text-faint';
 
   return (
-    <div class="todo-detail border-b border-[#2A2447] bg-[#17142B]">
-      {/* Notes */}
-      <div class={metaRow}>
-        <span class={fieldLabel}>Notes</span>
-        <input
-          type="text"
-          value={notesDraft}
-          onInput={(e) => setNotesDraft((e.target as HTMLInputElement).value)}
-          onBlur={commitNotes}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-          placeholder="Context, links, what to check…"
-          maxLength={500}
-          class="flex-1 bg-transparent text-[19px] text-[#A79DBE] outline-none placeholder-[#8A81A4] min-w-0"
-        />
-      </div>
-
-      {/* Schedule / reminder */}
-      <div class={`${metaRow} gap-1`}>
-        {/* Schedule */}
-        <div ref={schedulePicker.ref} class="relative shrink-0">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-6"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Task"
+      onClick={onClose}
+    >
+      <div
+        class="flex max-h-[88vh] w-[580px] max-w-[94vw] flex-col overflow-hidden rounded-[14px] border border-line bg-surface"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {/* Title */}
+        <div class="flex items-center gap-2 border-b border-line/60 px-4 py-3">
+          <input
+            type="text"
+            value={textDraft}
+            onInput={(event) => setTextDraft((event.target as HTMLInputElement).value)}
+            onBlur={commitText}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+            }}
+            maxLength={200}
+            class="min-w-0 flex-1 border-b border-transparent bg-transparent text-[21px] font-semibold text-text outline-none focus:border-action"
+          />
           <button
-            onClick={schedulePicker.toggle}
-            class="font-mono text-[16px] font-semibold tracking-[0.01em] px-1.5 py-1 border border-[#3A335C] bg-[#1C1932] text-[#A79DBE] active:bg-[#3A335C] transition-colors"
-            title="Schedule when to work on this"
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            class="flex h-11 w-11 shrink-0 items-center justify-center rounded-[9px] text-[18px] text-faint active:bg-raised active:text-text"
           >
-            {schedLabel ? `◷ ${schedLabel}` : '◷ Schedule'}
+            ✕
           </button>
-          {schedulePicker.open && (
-            <div class={`absolute z-30 ${schedulePicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 bg-[#1C1932] border border-[#3A335C] p-1.5 flex flex-col gap-1 min-w-[200px]`}>
-              <div class="flex gap-1">
-                <button onClick={(e) => { e.stopPropagation(); onSetSchedule(todo.id, todayStr(), null); schedulePicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Today</button>
-                <button onClick={(e) => { e.stopPropagation(); onSetSchedule(todo.id, daysFromNow(1), null); schedulePicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Tomorrow</button>
-                <button onClick={(e) => { e.stopPropagation(); onSetSchedule(todo.id, daysFromNow(7), null); schedulePicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Next week</button>
-              </div>
-              <div class="flex items-center gap-1 px-2">
-                <input
-                  type="date"
-                  value={schedDateDraft}
-                  onInput={(e) => setSchedDateDraft((e.target as HTMLInputElement).value)}
-                  onClick={(e) => e.stopPropagation()}
-                  class="font-mono text-[17px] bg-[#121021] text-[#F4EFE7] border border-[#3A335C] px-1 py-0.5 outline-none flex-1 min-w-0"
-                />
-                <input
-                  type="time"
-                  value={schedTimeDraft}
-                  onInput={(e) => setSchedTimeDraft((e.target as HTMLInputElement).value)}
-                  onClick={(e) => e.stopPropagation()}
-                  class="font-mono text-[17px] bg-[#121021] text-[#F4EFE7] border border-[#3A335C] px-1 py-0.5 outline-none"
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSetSchedule(todo.id, schedDateDraft || null, schedTimeDraft || null);
-                    schedulePicker.setOpen(false);
-                  }}
-                  class="px-2 py-1 text-[16px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125"
-                >Set</button>
-              </div>
-              {todo.scheduled_date && (
-                <button onClick={(e) => { e.stopPropagation(); onSetSchedule(todo.id, null, null); schedulePicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#FF7186] font-mono">Clear</button>
-              )}
-            </div>
-          )}
         </div>
 
-        {/* Reminder */}
-        <div ref={reminderPicker.ref} class="relative shrink-0">
-          <button
-            onClick={reminderPicker.toggle}
-            class={`font-mono text-[16px] font-semibold tracking-[0.01em] px-1.5 py-1 border transition-colors ${
-              remLabel
-                ? 'border-[#FFA26B] bg-[#FFA26B]/15 text-[#FFA26B]'
-                : 'border-[#3A335C] bg-[#1C1932] text-[#A79DBE] active:bg-[#3A335C]'
-            }`}
-            title="Remind when it's time to work on this"
-          >
-            {remLabel ? `⏰ ${remLabel}` : '⏰ Remind'}
-          </button>
-          {reminderPicker.open && (
-            <div class={`absolute z-30 ${reminderPicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} left-0 max-h-[70vh] min-w-[230px] flex flex-col gap-1 overflow-y-auto rounded-[10px] border border-[#3A335C] bg-[#1C1932] p-1.5 custom-scrollbar`}>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, null); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">None</button>
-              <div class="h-px bg-[#2A2447] my-0.5" />
-              {/* Relative-to-now options */}
-              <div class="px-2 pb-0.5 text-[15px] font-semibold tracking-[0.02em] text-[#8A81A4]">Relative</div>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, nowEpoch() + 600); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">In 10 min</button>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, nowEpoch() + 1800); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">In 30 min</button>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, nowEpoch() + 3600); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">In 1 hour</button>
-              <div class="h-px bg-[#2A2447] my-0.5" />
-              {/* Relative-to-schedule options */}
-              <div class="px-2 pb-0.5 text-[15px] font-semibold tracking-[0.02em] text-[#8A81A4]">Before schedule{hasScheduledTime(todo) ? ` (${todo.scheduled_time})` : ''}</div>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, reminderBeforeSchedule(10)); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">10 min before</button>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, reminderBeforeSchedule(30)); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">30 min before</button>
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, reminderBeforeSchedule(60)); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">1 hour before</button>
-              <div class="flex items-center gap-1 px-2 py-0.5">
-                <span class="text-[17px] text-[#A79DBE] font-mono shrink-0">Custom</span>
-                <input
-                  type="number"
-                  min="0"
-                  max="720"
-                  value={customReminderOffset}
-                  onInput={(e) => setCustomReminderOffset(parseInt((e.target as HTMLInputElement).value, 10) || 0)}
-                  onClick={(e) => e.stopPropagation()}
-                  class="font-mono text-[17px] bg-[#121021] text-[#F4EFE7] border border-[#3A335C] px-1 py-0.5 outline-none w-[64px] text-right"
-                />
-                <span class="text-[17px] text-[#A79DBE] font-mono">min before</span>
+        <div class="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+          {/* Priority */}
+          <div class={field}>
+            <span class={label}>Priority</span>
+            <div class="flex gap-1.5 pt-1">
+              {PRIORITIES.map((option) => (
                 <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSetReminder(todo.id, reminderAtCustom());
-                    reminderPicker.setOpen(false);
-                  }}
-                  class="px-2 py-1 text-[16px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125 ml-auto"
-                >Set</button>
-              </div>
-              <div class="h-px bg-[#2A2447] my-0.5" />
-              <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, tomorrowAt9()); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#F4EFE7] font-mono">Tomorrow 09:00</button>
-              <div class="h-px bg-[#2A2447] my-0.5" />
-              {/* Absolute custom datetime */}
-              <div class="flex items-center gap-1 px-2">
-                <input
-                  type="datetime-local"
-                  value={customReminder}
-                  onInput={(e) => setCustomReminder((e.target as HTMLInputElement).value)}
-                  onClick={(e) => e.stopPropagation()}
-                  class="font-mono text-[17px] bg-[#121021] text-[#F4EFE7] border border-[#3A335C] px-1 py-0.5 outline-none flex-1 min-w-0"
-                />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (customReminder) {
-                      onSetReminder(todo.id, new Date(customReminder).getTime() / 1000);
-                      reminderPicker.setOpen(false);
-                    }
-                  }}
-                  class="px-2 py-1 text-[16px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125"
-                >Set</button>
-              </div>
-              {todo.reminder_at && (
-                <button onClick={(e) => { e.stopPropagation(); onSetReminder(todo.id, null); reminderPicker.setOpen(false); }} class="text-[18px] text-left px-2 py-1 hover:bg-[#272146] text-[#FF7186] font-mono">Clear</button>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Status (in detail too, for waiting/completed toggling) */}
-        <div ref={statusPicker.ref} class="relative shrink-0 ml-auto">
-          <button
-            onClick={statusPicker.toggle}
-            class="font-mono text-[16px] font-semibold tracking-[0.01em] px-1.5 py-1 border transition-colors"
-            style={{ color: statusMeta.color, borderColor: statusMeta.color, background: `${statusMeta.color}14` }}
-          >
-            {statusMeta.label}
-          </button>
-          {statusPicker.open && (
-            <div class={`absolute z-30 ${statusPicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'} right-0 bg-[#1C1932] border border-[#3A335C] p-1 flex flex-col gap-1 min-w-[130px]`}>
-              {STATUS_ORDER.map((s) => (
-                <button
-                  key={s}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSetStatus(todo.id, s);
-                    statusPicker.setOpen(false);
-                  }}
-                  class={`text-[18px] text-left px-2 py-1.5 font-mono font-semibold tracking-[0.01em] hover:bg-[#272146] ${
-                    todo.status === s ? '' : 'text-[#A79DBE]'
+                  key={option.value}
+                  type="button"
+                  onClick={() => onSetPriority(todo.id, option.value)}
+                  class={`min-h-[40px] rounded-[8px] border px-3 text-[16px] font-semibold transition-colors active:scale-[0.98] ${
+                    todo.priority === option.value
+                      ? 'border-current'
+                      : 'border-line text-muted'
                   }`}
-                  style={todo.status === s ? { color: STATUS_META[s].color } : undefined}
+                  style={
+                    todo.priority === option.value
+                      ? { color: option.color, backgroundColor: `${option.color}1a` }
+                      : undefined
+                  }
                 >
-                  {STATUS_META[s].label}
+                  {option.label}
                 </button>
               ))}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Source context (manual attachment only) */}
-      {(todo.source_app || todo.source_sender || todo.source_url) && (
-        <div class="px-2 py-1.5 border-b border-[#2A2447] flex items-center gap-2 min-h-[36px]">
-          <span class="text-[16px] font-semibold tracking-[0.02em] text-[#8A81A4] shrink-0">Source</span>
-          {todo.source_app && <span class="text-[18px] text-[#A79DBE] font-mono">{todo.source_app}</span>}
-          {todo.source_sender && <span class="text-[18px] text-[#F4EFE7] font-mono">{todo.source_sender}</span>}
-          {todo.source_url && (
-            <span class="text-[17px] text-[#8F86FF] font-mono truncate min-w-0">{todo.source_url}</span>
-          )}
-        </div>
-      )}
-
-      {/* Subtasks */}
-      <div class="px-2 py-1">
-        {subtasks.length === 0 && (
-          <p class="text-[17px] text-[#8A81A4] font-medium py-1">No steps</p>
-        )}
-        {subtasks.map((s) => (
-          <div key={s.id} class={`flex items-start gap-1.5 py-1 border-b border-[#2A2447] min-h-[40px] ${s.completed ? 'opacity-50' : ''}`}>
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleSubtask(s.id); }}
-              class="shrink-0 flex items-center justify-center w-[40px] h-[40px] -ml-1 focus-visible:outline-2 focus-visible:outline-[#8F86FF] focus-visible:outline-offset-1"
-              aria-label={s.completed ? 'Mark incomplete' : 'Mark complete'}
-            >
-              <span
-                class={`w-[16px] h-[16px] border-2 shrink-0 flex items-center justify-center transition-colors ${
-                  s.completed ? 'bg-[#7BE3A6] border-[#7BE3A6]' : 'border-[#3A335C]'
-                }`}
-              >
-                {s.completed && <CheckIcon />}
-              </span>
-            </button>
-
-            {editingSubtaskId === s.id ? (
-              <input
-                type="text"
-                value={editingSubtaskText}
-                onInput={(e) => setEditingSubtaskText((e.target as HTMLInputElement).value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCommitEditSubtask();
-                  if (e.key === 'Escape') setEditingSubtaskId(null);
-                }}
-                onBlur={handleCommitEditSubtask}
-                onClick={(e) => e.stopPropagation()}
-                class="flex-1 bg-[#1C1932] text-[#F4EFE7] text-[19px] px-1.5 py-0.5 border border-[#8F86FF] outline-none min-w-0"
-                autofocus
-              />
-            ) : (
-              <button
-                onClick={(e) => handleStartEditSubtask(s, e)}
-                class={`flex-1 min-w-0 text-left py-[8px] text-[19px] leading-snug break-words select-none ${
-                  s.completed ? 'text-[#8A81A4] line-through' : 'text-[#F4EFE7]'
-                }`}
-              >
-                {s.text}
-              </button>
-            )}
-
-            <button
-              onClick={(e) => { e.stopPropagation(); deleteSubtask(s.id); }}
-              class="shrink-0 flex items-center justify-center w-[40px] h-[40px] text-[#8A81A4] active:text-[#FF7186] transition-colors focus-visible:outline-2 focus-visible:outline-[#FF7186] focus-visible:outline-offset-1"
-              aria-label="Delete step"
-            >
-              <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                <path d="M3 3L11 11M11 3L3 11" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-              </svg>
-            </button>
           </div>
-        ))}
 
-        {(todo.subtasks || []).length < 20 && (
-          <div class="flex gap-1 py-1 min-h-[44px] items-center">
+          {/* Due */}
+          <div class={field}>
+            <span class={label}>Due</span>
+            <div class="flex flex-wrap items-center gap-1.5 pt-1">
+              {[
+                { text: 'Today', value: todayStr() },
+                { text: 'Tomorrow', value: daysFromNow(1) },
+                { text: 'Next week', value: daysFromNow(7) },
+              ].map((option) => (
+                <button
+                  key={option.text}
+                  type="button"
+                  onClick={() => onSetDueDate(todo.id, option.value)}
+                  class={`min-h-[40px] rounded-[8px] border px-3 font-mono text-[15px] font-semibold transition-colors active:scale-[0.98] ${
+                    date === option.value
+                      ? 'border-warn bg-warn/15 text-warn'
+                      : 'border-line text-muted'
+                  }`}
+                >
+                  {option.text}
+                </button>
+              ))}
+
+              <input
+                type="date"
+                value={date || ''}
+                onChange={(event) =>
+                  onSetDueDate(todo.id, (event.target as HTMLInputElement).value || null)
+                }
+                class="min-h-[40px] rounded-[8px] border border-line bg-ink px-2 font-mono text-[15px] text-text outline-none"
+              />
+
+              {date && (
+                <button
+                  type="button"
+                  onClick={() => onSetDueDate(todo.id, null)}
+                  class="min-h-[40px] rounded-[8px] border border-line px-3 font-mono text-[15px] font-semibold text-alert"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div class={field}>
+            <span class={label}>Notes</span>
             <input
               type="text"
-              value={subtaskText}
-              onInput={(e) => setSubtaskText((e.target as HTMLInputElement).value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAddSubtask(); }}
-              placeholder="Add step…"
-              maxLength={200}
-              class="flex-1 bg-[#121021] text-[#F4EFE7] text-[19px] px-2 py-1 border border-[#3A335C] placeholder-[#8A81A4] outline-none focus:border-[#8F86FF] transition-colors min-h-[40px]"
+              value={notesDraft}
+              onInput={(event) => setNotesDraft((event.target as HTMLInputElement).value)}
+              onBlur={() => {
+                if (notesDraft !== todo.notes) onSetNotes(todo.id, notesDraft);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+              }}
+              placeholder="Context, links, what to check…"
+              maxLength={500}
+              class="min-w-0 flex-1 border-b border-transparent bg-transparent pt-2 text-[18px] text-muted outline-none placeholder:text-faint focus:border-action"
             />
-            <button
-              onClick={handleAddSubtask}
-              disabled={!subtaskText.trim()}
-              class="px-2.5 py-1 text-[17px] font-semibold tracking-[0.01em] bg-[#8F86FF] text-[#121021] active:brightness-125 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0 min-h-[40px]"
-            >Add</button>
           </div>
-        )}
+
+          {/* Time + reminder */}
+          <div class={field}>
+            <span class={label}>Time</span>
+            <div class="flex flex-wrap items-center gap-2 pt-1">
+              <input
+                type="time"
+                value={todo.scheduled_time || ''}
+                onChange={(event) =>
+                  onSetSchedule(todo.id, date, (event.target as HTMLInputElement).value || null)
+                }
+                class="min-h-[40px] rounded-[8px] border border-line bg-ink px-2 font-mono text-[16px] text-text outline-none"
+              />
+              <span class="text-[14px] text-faint">optional, anchors reminders</span>
+
+              <div ref={reminderPicker.ref} class="relative ml-auto">
+                <button
+                  type="button"
+                  onClick={reminderPicker.toggle}
+                  class={`min-h-[40px] rounded-[8px] border px-3 font-mono text-[15px] font-semibold transition-colors ${
+                    reminderLabel
+                      ? 'border-warn bg-warn/15 text-warn'
+                      : 'border-line text-muted'
+                  }`}
+                >
+                  {reminderLabel ? `⏰ ${reminderLabel}` : '⏰ Remind'}
+                </button>
+
+                {reminderPicker.open && (
+                  <div
+                    class={`absolute right-0 z-30 flex min-w-[210px] flex-col gap-0.5 rounded-[9px] border border-line bg-surface p-1.5 ${
+                      reminderPicker.dir === 'up' ? 'bottom-full mb-1' : 'top-full mt-1'
+                    }`}
+                  >
+                    {[
+                      { text: 'Off', value: null },
+                      { text: 'In 30 min', value: nowEpoch() + 1800 },
+                      { text: 'In 1 hour', value: nowEpoch() + 3600 },
+                      { text: '10 min before it is due', value: beforeDue(10) },
+                      { text: '1 hour before it is due', value: beforeDue(60) },
+                    ].map((option) => (
+                      <button
+                        key={option.text}
+                        type="button"
+                        onClick={() => {
+                          onSetReminder(todo.id, option.value);
+                          reminderPicker.setOpen(false);
+                        }}
+                        class="px-2 py-1.5 text-left font-mono text-[16px] text-text active:bg-raised"
+                      >
+                        {option.text}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div class="px-4 py-2">
+            <p class="mb-1 text-[15px] font-semibold text-faint">
+              Steps {subtasks.length > 0 ? `· ${subtasks.filter((s) => s.completed).length}/${subtasks.length}` : ''}
+            </p>
+
+            {subtasks.map((subtask: SubtaskItem) => (
+              <div
+                key={subtask.id}
+                class={`flex min-h-[40px] items-start gap-1 border-b border-line/25 py-0.5 ${
+                  subtask.completed ? 'opacity-50' : ''
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleSubtask(subtask.id)}
+                  aria-label={subtask.completed ? 'Mark incomplete' : 'Mark complete'}
+                  class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] active:bg-raised"
+                >
+                  <span
+                    class={`flex h-[15px] w-[15px] items-center justify-center rounded-[4px] border-2 ${
+                      subtask.completed ? 'border-ok bg-ok' : 'border-line'
+                    }`}
+                  >
+                    {subtask.completed && <CheckIcon />}
+                  </span>
+                </button>
+
+                {editingSubtaskId === subtask.id ? (
+                  <input
+                    type="text"
+                    value={editingSubtaskText}
+                    onInput={(event) =>
+                      setEditingSubtaskText((event.target as HTMLInputElement).value)
+                    }
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        if (editingSubtaskText.trim())
+                          editSubtask(subtask.id, editingSubtaskText.trim());
+                        setEditingSubtaskId(null);
+                      }
+                      if (event.key === 'Escape') setEditingSubtaskId(null);
+                    }}
+                    onBlur={() => {
+                      if (editingSubtaskText.trim())
+                        editSubtask(subtask.id, editingSubtaskText.trim());
+                      setEditingSubtaskId(null);
+                    }}
+                    class="min-w-0 flex-1 rounded border border-action bg-surface px-1.5 py-1 text-[18px] text-text outline-none"
+                    autofocus
+                  />
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingSubtaskId(subtask.id);
+                      setEditingSubtaskText(subtask.text);
+                    }}
+                    class={`min-w-0 flex-1 break-words py-2 text-left text-[18px] leading-snug ${
+                      subtask.completed ? 'text-faint line-through' : 'text-text'
+                    }`}
+                  >
+                    {subtask.text}
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => deleteSubtask(subtask.id)}
+                  aria-label="Delete step"
+                  class="flex h-10 w-9 shrink-0 items-center justify-center text-[16px] text-faint active:text-alert"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+            {(todo.subtasks || []).length < 20 && (
+              <div class="flex min-h-[44px] items-center gap-1 py-1">
+                <input
+                  type="text"
+                  value={subtaskText}
+                  onInput={(event) => setSubtaskText((event.target as HTMLInputElement).value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') handleAddSubtask();
+                  }}
+                  placeholder="Add step…"
+                  maxLength={200}
+                  class="min-h-[40px] min-w-0 flex-1 rounded-[8px] border border-line bg-ink px-2 text-[18px] text-text outline-none placeholder:text-faint focus:border-action"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddSubtask}
+                  disabled={!subtaskText.trim()}
+                  class="min-h-[40px] shrink-0 rounded-[8px] bg-action px-3 text-[16px] font-semibold text-ink disabled:opacity-40"
+                >
+                  Add
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div class="flex shrink-0 items-center justify-between border-t border-line/60 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => onDelete(todo.id)}
+            class="flex h-11 items-center rounded-[9px] border border-alert/30 bg-alert/10 px-3 text-[15px] font-semibold text-alert active:scale-[0.98]"
+          >
+            Archive task
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            class="flex h-11 items-center rounded-[9px] bg-action px-4 text-[16px] font-semibold text-ink active:scale-[0.98]"
+          >
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

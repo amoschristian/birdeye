@@ -153,7 +153,6 @@ Channel edges use the app's own identity, not a generic accent:
 
 - Discord: `#7C83FF`
 - Google Chat: `#4FC3A1`
-- Telegram: `#57B8E8`
 - WhatsApp: `#63D69B`
 - Calendar: `#FFB65C`
 - Unknown apps: a stable fallback from the accent set, chosen by app id hash

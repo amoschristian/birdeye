@@ -20,15 +20,12 @@ interface UseWebSocketReturn {
   manualSoundMuted: boolean;
   toggleSoundMuted: () => void;
   setEventSoundMuted: (muted: boolean) => void;
-  sessionCleared: number;
-  sessionFocused: number;
-  sessionCompleted: number;
   markRead: (id: number) => void;
+  deleteNotification: (id: number) => void;
   markAllRead: (appId?: string) => void;
   clearRead: () => void;
-  focusApp: (appId: string) => void;
+  focusApp: (appId: string, notifId?: number) => void;
   switchWorkspace: (workspace: number) => void;
-  spotifyCommand: (command: 'play_pause' | 'next' | 'previous' | 'seek', positionMs?: number) => void;
   addTodo: (text: string) => void;
   toggleTodo: (id: number) => void;
   deleteTodo: (id: number) => void;
@@ -69,9 +66,6 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [todoReminders, setTodoReminders] = useState<TodoItem[]>([]);
   const [connected, setConnected] = useState(false);
-  const [sessionCleared, setSessionCleared] = useState(0);
-  const [sessionFocused, setSessionFocused] = useState(0);
-  const [sessionCompleted, setSessionCompleted] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryCountRef = useRef(0);
@@ -139,6 +133,8 @@ export function useWebSocket(host: string): UseWebSocketReturn {
           setNotifications((prev) =>
             prev.map((n) => (n.id === data.id ? { ...n, is_read: true } : n))
           );
+        } else if (data.type === 'notification_deleted') {
+          setNotifications((prev) => prev.filter((n) => n.id !== data.id));
         } else if (data.type === 'focus_ack') {
           console.log(`Focus ${data.appId}: ${data.success ? '✓' : '✗'}`);
         } else if (data.type === 'monitor') {
@@ -232,7 +228,12 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
     );
-    setSessionCleared((prev) => prev + 1);
+  }, [sendMessage]);
+
+  const deleteNotification = useCallback((id: number) => {
+    sendMessage({ action: 'notification_delete', id });
+    // Optimistically drop it; the server echo confirms.
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, [sendMessage]);
 
   const clearRead = useCallback(() => {
@@ -257,13 +258,8 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     sendMessage({ action: 'switch_workspace', workspace });
   }, [sendMessage]);
 
-  const spotifyCommand = useCallback((command: 'play_pause' | 'next' | 'previous' | 'seek', positionMs?: number) => {
-    sendMessage({ action: 'spotify', command, ...(positionMs !== undefined ? { position_ms: positionMs } : {}) });
-  }, [sendMessage]);
-
   const focusApp = useCallback((appId: string, notifId?: number) => {
     sendMessage({ action: 'focus', appId, ...(notifId ? { notifId } : {}) });
-    setSessionFocused((prev) => prev + 1);
   }, [sendMessage]);
 
   const addTodo = useCallback((text: string) => {
@@ -278,13 +274,7 @@ export function useWebSocket(host: string): UseWebSocketReturn {
 
   const toggleTodo = useCallback((id: number) => {
     sendTodoMutation('todo_toggle', { id }, () => {
-      setTodos((prev) => {
-        const todo = prev.find((t) => t.id === id);
-        if (todo && !todo.completed) {
-          setSessionCompleted((prevC) => prevC + 1);
-        }
-        return prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
-      });
+      setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t)));
     });
   }, [sendTodoMutation]);
 
@@ -420,5 +410,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, sessionCleared, sessionFocused, sessionCompleted, markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, switchWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

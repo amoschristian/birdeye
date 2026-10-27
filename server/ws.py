@@ -89,6 +89,15 @@ async def broadcast_notification_read(notification_id: int):
     await _broadcast(_dashboard_conns, payload)
 
 
+async def broadcast_notification_deleted(notification_id: int):
+    """Tell all dashboards a notification was removed."""
+    payload = {
+        "type": "notification_deleted",
+        "id": notification_id,
+    }
+    await _broadcast(_dashboard_conns, payload)
+
+
 async def broadcast_monitor():
     """Broadcast latest monitor snapshot to all dashboards."""
     if not _dashboard_conns:
@@ -482,6 +491,18 @@ async def ws_dashboard(websocket: WebSocket):
                         if notif and notif.notif_id is not None:
                             close_notification_sync(notif.notif_id)
                         await broadcast_notification_read(row_id)
+
+            elif action == "notification_delete":
+                row_id = data.get("id")
+                if row_id is not None:
+                    notif = db.get_notification(row_id)
+                    if db.delete_notification(row_id):
+                        # Close the GNOME notification too, otherwise it lingers
+                        # after the dashboard has dropped it.
+                        if notif and notif.notif_id is not None:
+                            from action_invoker import close_notification_sync
+                            close_notification_sync(notif.notif_id)
+                        await broadcast_notification_deleted(row_id)
 
             elif action == "mark_all_read":
                 app_id = data.get("appId")

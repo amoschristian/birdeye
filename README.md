@@ -20,10 +20,10 @@
 
 ## Features
 
-- **🔔 Notifications** — Browser tabs (Discord, Google Chat, WhatsApp) via Chrome extension + native apps (Telegram, Discord) via D-Bus
+- **🔔 Notifications** — Browser tabs (Discord, Google Chat, WhatsApp) via Chrome extension + native apps (Discord) via D-Bus
 - **✅ Todos** — Eisenhower matrix (Do First / Schedule / Decide / Eliminate) with drag-and-drop, priority tags, due dates, and natural language input. Do First items surface on the Home screen alongside notifications
 - **📊 System monitor** — CPU and RAM gauges in the bottom bar, updating every 2 seconds with green/amber/red thresholds
-- **🎵 Spotify** — Persistent bottom strip with album art, track info, progress bar, and transport controls
+- **🎵 Spotify** — Persistent bottom strip with album art, track info and a progress readout
 - **📅 Calendar** — Upcoming event ticker strip with now-playing and imminent event pins
 - **👆 Touch-first** — All elements ≥ 44px, tap-to-complete todos, swipe-left to mark notifications read, active-state press feedback
 - **🔊 Sound** — Notification chime on new notifications (plays `default.mp3`)
@@ -91,7 +91,6 @@ Open `http://<server-ip>:9732` on your touchscreen. Load the Chrome extension fr
 | Discord Work | Browser tab (title regex) | Extension tab focus |
 | Google Chat | Browser tab (MutationObserver) | Extension tab focus |
 | Calendar | D-Bus notifications | — (strip only) |
-| Telegram | D-Bus notifications | `wmctrl` by window class |
 | WhatsApp | Browser tab | Extension tab focus |
 | Discord Personal | D-Bus notifications | `wmctrl` by window class |
 

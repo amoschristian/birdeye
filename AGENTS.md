@@ -145,7 +145,6 @@ docs/                      # historical implementation plans (all fully implemen
 | Discord Work | browser | work | Title parse `(@N)` | Extension tab focus |
 | Google Chat | browser | work | Content script MutationObserver | Extension tab focus |
 | Calendar | native | work | D-Bus notifications | — (strip only) |
-| Telegram | native | personal | D-Bus notifications | wmctrl by window class |
 | WhatsApp | browser | personal | Title parse | Extension tab focus |
 | Discord Personal | native | personal | D-Bus notifications | wmctrl by window class |
 

@@ -55,6 +55,11 @@ export interface ServerNotificationReadMessage {
   id: number;
 }
 
+export interface ServerNotificationDeletedMessage {
+  type: 'notification_deleted';
+  id: number;
+}
+
 export interface ServerFocusAckMessage {
   type: 'focus_ack';
   appId: string;
@@ -66,6 +71,7 @@ export type ServerMessage =
   | ServerTabsMessage
   | ServerNotificationMessage
   | ServerNotificationReadMessage
+  | ServerNotificationDeletedMessage
   | ServerFocusAckMessage
   | ServerMonitorMessage
   | ServerSpotifyMessage
@@ -85,6 +91,11 @@ export interface ClientMarkReadAction {
   id: number;
 }
 
+export interface ClientNotificationDeleteAction {
+  action: 'notification_delete';
+  id: number;
+}
+
 export interface ClientClearReadAction {
   action: 'clear_read';
 }
@@ -100,7 +111,7 @@ export interface ServerWorkspaceAckMessage {
   success: boolean;
 }
 
-export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
+export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientNotificationDeleteAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
 
 // ── Monitor types ─────────────────────────────────────────────────
 

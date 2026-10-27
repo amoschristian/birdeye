@@ -6,7 +6,6 @@ const iconMap: Record<string, string> = {
   'discord-work': '/icons/discord.png',
   'discord-personal': '/icons/discord.png',
   'google-chat': '/icons/google-chat.png',
-  'telegram-desktop': '/icons/telegram.png',
   'whatsapp': '/icons/whatsapp.png',
 };
 

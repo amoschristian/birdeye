@@ -2,7 +2,6 @@ const APP_BRAND_COLORS: Record<string, string> = {
   "discord-work": "#7c83ff",
   "discord-personal": "#7c83ff",
   "google-chat": "#4fc3a1",
-  "telegram-desktop": "#57b8e8",
   whatsapp: "#63d69b",
   calendar: "#ffb65c",
 };
@@ -19,13 +18,4 @@ function hashString(value: string): number {
 
 export function appBrandColor(appId: string): string {
   return APP_BRAND_COLORS[appId] ?? FALLBACK_BRANDS[hashString(appId) % FALLBACK_BRANDS.length];
-}
-
-/**
- * The rail shows the conversation platform, while the group heading
- * ("Work", "Personal") carries the account distinction. "Discord Work"
- * becomes "Discord" under Work.
- */
-export function appRailLabel(name: string): string {
-  return name.replace(/\s+(Work|Personal)$/i, "");
 }

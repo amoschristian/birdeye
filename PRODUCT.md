@@ -26,14 +26,14 @@ An always-visible secondary display dedicated to awareness, not a notification p
 - Used during focused work — the user glances at it while coding or in meetings
 - Touch interaction for quick actions: mark notifications read, filter by app, focus a browser tab or native window, control Spotify
 - Browser-based apps (Discord, Google Chat, WhatsApp Web) via Chrome extension
-- Native apps (Telegram, Discord desktop, calendar notifications) via D-Bus
+- Native apps (Discord desktop, calendar notifications) via D-Bus
 - Spotify Desktop client via MPRIS D-Bus
 - Audio notification chime plays through the dashboard browser on new notifications
 
 ## Capabilities and Constraints
 
 **Capabilities:**
-- Notification aggregation from browser tabs (Discord, Google Chat, WhatsApp Web) and native apps (Telegram, Discord desktop, calendar reminders)
+- Notification aggregation from browser tabs (Discord, Google Chat, WhatsApp Web) and native apps (Discord desktop, calendar reminders)
 - Todo list with text, priorities (high/medium/low), due dates, drag-to-reorder
 - System resource monitoring: CPU, RAM, disk, network I/O (updates every 2 seconds)
 - Spotify now-playing display with album art, track info, progress bar, and transport controls (play/pause, next, previous)
@@ -61,7 +61,7 @@ An always-visible secondary display dedicated to awareness, not a notification p
 - Workspace switching requires ydotool (Wayland) or wmctrl (X11)
 
 **Terminology:**
-- **App** — a notification source (Discord, Telegram, Google Chat, etc.), configured in `server/config.json`
+- **App** — a notification source (Discord, Google Chat, WhatsApp, etc.), configured in `server/config.json`
 - **Tab** — a browser tab being tracked by the Chrome extension
 - **Notification** — a persisted notification event (from D-Bus or intercepted `new Notification()` call)
 - **Provider** — a JavaScript object in the extension that defines badge detection for a browser-based app

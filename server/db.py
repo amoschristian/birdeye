@@ -229,6 +229,19 @@ class Database:
             logger.error(f"mark_read failed: {e}")
             return False
 
+    def delete_notification(self, notification_id: int) -> bool:
+        """Remove a single notification permanently."""
+        if not self._usable:
+            return False
+        try:
+            conn = self._connect()
+            cur = conn.execute("DELETE FROM notifications WHERE id=?", (notification_id,))
+            conn.commit()
+            return cur.rowcount > 0
+        except sqlite3.Error as e:
+            logger.error(f"delete_notification failed: {e}")
+            return False
+
     def get_all(self, limit: int = 200) -> list[Notification]:
         if not self._usable:
             return []

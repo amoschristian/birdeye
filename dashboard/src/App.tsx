@@ -1,112 +1,54 @@
 // THESIS: A warm night-shift console for attention — cozy enough to live with,
 // precise enough to trust. Deep violet ink, porcelain text, marigold data,
-// periwinkle action. The channel rack is the memorable element: every app has
-// a brand edge, a live activity line, and a count you can read from a metre away.
+// periwinkle action. The board is the memorable element: every conversation in
+// its own tile with a brand edge, the message itself, and a count you can read
+// from a metre away.
 //
 // OWN-WORLD: Violet-black canvas, plum surfaces, hairline rules, 8–14px radii,
 // no shadows or glow. Space Grotesk carries structure and sentences; JetBrains
 // Mono carries counts, times, and measured values. Sentence case for actions.
 //
 // STORY: The panel sits beside the desk. A glance answers: what time is it, am I
-// connected, which channels moved, what needs me now. A tap filters; a tap opens.
-// The corgi patrols the bottom edge, because this is a companion, not a terminal.
+// connected, which rooms moved, what needs me now. A tap opens a room; inside,
+// a tap marks one message read and the header takes you to the source.
 //
-// FIRST VIEWPORT: 1024×600. 60px status bar, optional 30px calendar strip,
-// flexible console (192px channel rack + feed + optional 224px Do First rail),
-// 60px audio/comms bar.
+// FIRST VIEWPORT: 1024×600. 64px status bar, optional 36px calendar strip,
+// flexible console (board + optional 224px Do First rail), 64px audio/comms bar.
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import type { ComponentChildren } from 'preact';
-import { Check, Inbox, Volume2, VolumeX, WifiOff, X } from 'lucide-preact';
+import { Check, Volume2, VolumeX, WifiOff, X } from 'lucide-preact';
 import { useWebSocket } from './hooks/useWebSocket';
 import { ConnectionStatus } from './components/ConnectionStatus';
-import { AppButton } from './components/AppButton';
-import { AppIcon } from './components/AppIcon';
-import { NotificationCard } from './components/NotificationCard';
+import { AppTile } from './components/AppTile';
+import { HomeTodos } from './components/HomeTodos';
+import { AppNotificationList, ArchiveList } from './components/NotificationList';
 import { BottomBar } from './components/BottomBar';
 import { CorgiBar } from './components/CorgiBar';
 import { Clock } from './components/Clock';
 import { CalendarStrip } from './components/CalendarStrip';
 import { TodoPage } from './components/TodoPage';
-import { NotificationGroup } from './components/NotificationGroup';
-import { FocusMode } from './components/FocusMode';
-import type { Notification, AppConfig, CalendarEvent } from './types';
-import { parseGroupKey } from './utils/groupKey';
+import type { CalendarEvent } from './types';
+import { buildAppInboxes } from './utils/appInbox';
 
-type ActiveAllTab = 'active' | 'all';
-type MainTab = 'notifications' | 'todos' | 'focus';
+type MainTab = 'notifications' | 'todos';
 
-interface NotificationGroupData {
-  key: string;
-  appId: string;
-  label: string;
-  items: Notification[];
-}
-
-const GROUP_ORDER = ['work', 'personal'];
-const GROUP_LABELS: Record<string, string> = { work: 'Work', personal: 'Personal' };
-
-function groupNotifications(notifications: Notification[]): NotificationGroupData[] {
-  const groups: Map<string, NotificationGroupData> = new Map();
-  const order: string[] = [];
-
-  for (const notification of notifications) {
-    const info = parseGroupKey(notification.app_id, notification.summary);
-    const existing = groups.get(info.key);
-    if (existing) {
-      existing.items.push(notification);
-    } else {
-      order.push(info.key);
-      groups.set(info.key, {
-        key: info.key,
-        appId: notification.app_id,
-        label: info.label,
-        items: [notification],
-      });
-    }
-  }
-
-  for (const group of groups.values()) {
-    group.items.sort((a, b) => b.created_at - a.created_at);
-  }
-
-  return order.map((key) => groups.get(key)!);
-}
-
-function dueLabel(dueDate: string | null, today: string): { text: string; tone: string } | null {
-  if (!dueDate) return null;
-  if (dueDate < today) return { text: 'Overdue', tone: 'text-alert' };
-  if (dueDate === today) return { text: 'Today', tone: 'text-warn' };
-  return null;
-}
-
-function FeedEmpty({
+function FeedMessage({
   icon,
   title,
   hint,
-  action,
 }: {
   icon: ComponentChildren;
   title: string;
   hint: string;
-  action?: { label: string; onClick: () => void };
 }) {
   return (
-    <div class="flex h-full flex-col items-center justify-center gap-3 px-8 text-center">
-      <span class="flex h-12 w-12 items-center justify-center rounded-[14px] border border-line/70 bg-surface text-faint">
+    <div class="flex h-full flex-col items-center justify-center gap-2.5 px-8 text-center">
+      <span class="flex h-[52px] w-[52px] items-center justify-center rounded-[14px] border border-line/70 bg-surface text-faint">
         {icon}
       </span>
       <p class="text-[24px] font-semibold text-text">{title}</p>
-      <p class="max-w-[300px] text-[18px] leading-relaxed text-muted">{hint}</p>
-      {action && (
-        <button
-          type="button"
-          onClick={action.onClick}
-          class="mt-1 min-h-[44px] rounded-[9px] bg-action px-4 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
-        >
-          {action.label}
-        </button>
-      )}
+      <p class="max-w-[340px] text-[18px] leading-relaxed text-muted">{hint}</p>
     </div>
   );
 }
@@ -116,17 +58,15 @@ export function App() {
   const {
     apps, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected,
     soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted,
-    sessionCleared, sessionFocused, sessionCompleted,
-    markRead, markAllRead, clearRead, focusApp, switchWorkspace, spotifyCommand,
+    markRead, deleteNotification, markAllRead, clearRead, focusApp, switchWorkspace,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
     setStatus, setNotes, setSchedule, setReminder,
     addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder,
   } = useWebSocket(host);
 
   const [activeTab, setActiveTab] = useState<MainTab>('notifications');
-  const [notifSubTab, setNotifSubTab] = useState<ActiveAllTab>('active');
-  const [filterAppId, setFilterAppId] = useState<string | null>(null);
-  const [clearConfirm, setClearConfirm] = useState(false);
+  const [openAppId, setOpenAppId] = useState<string | null>(null);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [readToast, setReadToast] = useState(false);
   const [soundPrompt, setSoundPrompt] = useState<CalendarEvent | null>(null);
   const [soundPromptDeadline, setSoundPromptDeadline] = useState<number | null>(null);
@@ -142,68 +82,65 @@ export function App() {
     };
   }, []);
 
-  // Calendar is represented by the ticker strip, not a channel row.
+  // Calendar is represented by the ticker strip, not a tile.
   const enabledApps = apps.filter((app) => app.enabled && app.id !== 'calendar');
+  const inboxes = buildAppInboxes(notifications, enabledApps);
 
-  const groupedApps = new Map<string, AppConfig[]>();
-  const ungrouped: AppConfig[] = [];
-  for (const app of enabledApps) {
-    if (app.group && GROUP_ORDER.includes(app.group)) {
-      if (!groupedApps.has(app.group)) groupedApps.set(app.group, []);
-      groupedApps.get(app.group)!.push(app);
-    } else {
-      ungrouped.push(app);
+  const totalUnread = inboxes.reduce((sum, inbox) => sum + inbox.unreadCount, 0);
+
+  // Only apps that still exist in the config. Without this, rows for an app that
+  // was removed (Telegram) would linger in the archive forever.
+  const configuredAppIds = new Set(enabledApps.map((app) => app.id));
+  const archived = notifications.filter(
+    (notification) => notification.is_read && configuredAppIds.has(notification.app_id)
+  );
+
+  const openInbox = openAppId ? inboxes.find((inbox) => inbox.appId === openAppId) ?? null : null;
+  const openApp = openInbox ? apps.find((app) => app.id === openInbox.appId) ?? null : null;
+
+  // An app can leave the config between renders; drop the id rather than
+  // leaving it armed to reopen on its own.
+  useEffect(() => {
+    if (openAppId && !openInbox) setOpenAppId(null);
+  }, [openAppId, openInbox]);
+
+  // Reading the last unread walks you back out to the board on its own. The
+  // previous count is seeded per open, so deliberately opening a quiet app does
+  // not just slam shut.
+  const previousUnreadRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!openAppId) {
+      previousUnreadRef.current = null;
+      return;
     }
-  }
-  for (const list of groupedApps.values()) {
-    list.sort((a, b) => a.name.localeCompare(b.name));
-  }
-  ungrouped.sort((a, b) => a.name.localeCompare(b.name));
 
-  // Notifications arrive newest-first, so the first hit per app is the latest.
-  const lastActivityByApp = new Map<string, number>();
-  const lastSummaryByApp = new Map<string, string>();
-  for (const notification of notifications) {
-    if (lastActivityByApp.has(notification.app_id)) continue;
-    lastActivityByApp.set(notification.app_id, notification.created_at);
-    lastSummaryByApp.set(notification.app_id, notification.summary);
-  }
+    const unread = openInbox?.unreadCount ?? 0;
+    const previous = previousUnreadRef.current;
+    previousUnreadRef.current = unread;
 
-  const unreadNotifications = notifications.filter((notification) => !notification.is_read);
-  const totalUnread = unreadNotifications.length;
-  const activeChannels = new Set(unreadNotifications.map((notification) => notification.app_id)).size;
-  const focusUnread = unreadNotifications.length;
+    if (previous !== null && previous > 0 && unread === 0) setOpenAppId(null);
+  }, [openAppId, openInbox?.unreadCount]);
 
-  const appFiltered = filterAppId
-    ? notifications.filter((notification) => notification.app_id === filterAppId)
-    : notifications;
-  const activeNotifications = appFiltered.filter((notification) => !notification.is_read);
-  const displayedNotifications: Notification[] =
-    notifSubTab === 'active' ? activeNotifications : appFiltered;
-
-  const activeCount = activeNotifications.length;
-  const allCount = appFiltered.length;
-  const selectedApp = filterAppId ? apps.find((app) => app.id === filterAppId) ?? null : null;
-
-  const handleFilterClick = (appId: string) => {
-    setFilterAppId((previous) => (previous === appId ? null : appId));
-  };
-
-  const handleMarkRead = (id: number) => {
-    markRead(id);
+  const showReadToast = () => {
     setReadToast(true);
     if (readToastTimerRef.current) clearTimeout(readToastTimerRef.current);
     readToastTimerRef.current = setTimeout(() => setReadToast(false), 2200);
   };
 
-  const handleClearRead = () => {
-    if (!clearConfirm) {
-      setClearConfirm(true);
-      setTimeout(() => setClearConfirm(false), 3000);
-      return;
-    }
-    clearRead();
-    setClearConfirm(false);
+  const handleMarkRead = (id: number) => {
+    markRead(id);
+    showReadToast();
+  };
+
+  const handleReadAllForApp = () => {
+    if (!openInbox) return;
+    markAllRead(openInbox.appId);
+    showReadToast();
+  };
+
+  const handleOpenAppSource = () => {
+    if (!openInbox) return;
+    focusApp(openInbox.appId, openInbox.unread[0]?.notif_id ?? undefined);
   };
 
   const resolveSoundPrompt = (muteForEvent: boolean) => {
@@ -273,33 +210,72 @@ export function App() {
     return () => clearInterval(interval);
   }, [soundPromptDeadline]);
 
-  // Do First queue: high-priority due work first, then medium. Medium only
-  // surfaces after every high item is done or skipped. Active/inbox only.
+  // Home's todo column: overdue first, then due today, then high-priority work
+  // due within the week. Capped so the column never scrolls.
   const today = (() => {
     const date = new Date();
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
   })();
   const priorityRank: Record<string, number> = { high: 0, medium: 1 };
   const dueNowTodos = todos
-    .filter((todo) =>
-      !todo.completed && todo.status !== 'waiting' && todo.status !== 'archived' &&
-      (todo.priority === 'high' || todo.priority === 'medium') &&
-      todo.due_date !== null && todo.due_date <= today
-    )
+    .filter((todo) => {
+      if (todo.completed || todo.status === 'archived') return false;
+      if (todo.priority !== 'high' && todo.priority !== 'medium') return false;
+      const date = todo.due_date || todo.scheduled_date;
+      return date !== null && date <= today;
+    })
     .sort((a, b) => {
       const priorityA = priorityRank[a.priority] ?? 2;
       const priorityB = priorityRank[b.priority] ?? 2;
       if (priorityA !== priorityB) return priorityA - priorityB;
-      if (a.due_date !== b.due_date) return (a.due_date || '').localeCompare(b.due_date || '');
+      const dateA = a.due_date || a.scheduled_date || '';
+      const dateB = b.due_date || b.scheduled_date || '';
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
       return a.order_index - b.order_index;
     });
-  const doFirstTodos = dueNowTodos.slice(0, 6);
+  const homeTodos = dueNowTodos.slice(0, 6);
 
   const navItems: { id: MainTab; label: string; count: number }[] = [
-    { id: 'notifications', label: 'Home', count: 0 },
-    { id: 'focus', label: 'Focus', count: focusUnread },
+    { id: 'notifications', label: 'Home', count: totalUnread },
     { id: 'todos', label: 'Todos', count: dueNowTodos.length },
   ];
+
+  const renderBoard = () => {
+    if (inboxes.length === 0) {
+      return (
+        <FeedMessage
+          icon={<WifiOff size={26} />}
+          title={connected ? 'No channels yet' : 'Reconnecting'}
+          hint={
+            connected
+              ? 'Apps configured in the server appear here as tiles.'
+              : 'Trying to reach the Birdeye server. Saved notifications will appear when it is back.'
+          }
+        />
+      );
+    }
+
+    return (
+      <div class="grid flex-1 auto-rows-fr grid-cols-2 gap-2.5 overflow-hidden p-3">
+        {inboxes.map((inbox) => {
+          const app = enabledApps.find((candidate) => candidate.id === inbox.appId);
+          if (!app) return null;
+
+          return (
+            <AppTile
+              key={inbox.appId}
+              inbox={inbox}
+              app={app}
+              onOpen={() => {
+                setArchiveOpen(false);
+                setOpenAppId(inbox.appId);
+              }}
+            />
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div class="relative flex h-screen w-screen flex-col overflow-hidden bg-ink text-text antialiased select-none">
@@ -403,344 +379,78 @@ export function App() {
         </div>
       )}
 
-      {/* ── Focus mode ─────────────────────────────────────── */}
-      {activeTab === 'focus' && (
-        <FocusMode
-          unreadNotifications={notifications.filter((notification) => !notification.is_read)}
-          doFirstTodos={doFirstTodos}
-          apps={apps}
-          onMarkRead={markRead}
-          onFocus={focusApp}
-          onToggleTodo={toggleTodo}
-          onSetStatus={setStatus}
-          onSetNotes={setNotes}
-          addSubtask={addSubtask}
-          editSubtask={editSubtask}
-          toggleSubtask={toggleSubtask}
-          deleteSubtask={deleteSubtask}
-          reorderSubtask={reorderSubtask}
-          sessionCleared={sessionCleared}
-          sessionFocused={sessionFocused}
-          sessionCompleted={sessionCompleted}
-        />
-      )}
-
       {/* ── Home ───────────────────────────────────────────── */}
       {activeTab === 'notifications' && (
         <div class="flex flex-1 overflow-hidden">
-          {/* Channel rack */}
-          <aside class="flex w-[208px] shrink-0 flex-col overflow-y-auto border-r border-line/60 bg-ink px-1.5 pb-2 pt-1 custom-scrollbar">
-            <button
-              type="button"
-              onClick={() => setFilterAppId(null)}
-              aria-pressed={filterAppId === null}
-              aria-label={`All channels, ${totalUnread} unread`}
-              class={`relative flex min-h-[60px] w-full items-center gap-2 rounded-[10px] py-2 pl-2.5 pr-1.5 text-left transition-all duration-150 active:scale-[0.985] ${
-                filterAppId === null ? 'bg-raised' : 'hover:bg-surface/70'
-              }`}
-            >
-              <span
-                class={`absolute bottom-2.5 left-0 top-2.5 w-[3px] rounded-full transition-colors ${
-                  filterAppId === null ? 'bg-action' : 'bg-transparent'
-                }`}
-                aria-hidden="true"
-              />
-              <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-ink/50">
-                <span class="grid h-[18px] w-[18px] grid-cols-2 gap-[2px]" aria-hidden="true">
-                  {[0, 1, 2, 3].map((index) => (
-                    <span
-                      key={index}
-                      class={`rounded-[1.5px] ${
-                        index < Math.min(activeChannels, 4) ? 'bg-action' : 'bg-line'
-                      }`}
-                    />
-                  ))}
-                </span>
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-[16px] font-semibold leading-tight text-text">
-                  All channels
-                </span>
-                <span class="mt-1 block font-mono text-[14px] leading-none text-faint">
-                  {activeChannels} active
-                </span>
-              </span>
-              {totalUnread > 0 ? (
-                <span class="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-[6px] bg-signal px-1 font-mono text-[14px] font-bold tabular-nums text-ink">
-                  {totalUnread > 99 ? '99+' : totalUnread}
-                </span>
-              ) : (
-                <span class="w-7 shrink-0 text-center font-mono text-[14px] text-faint/50">–</span>
-              )}
-            </button>
+          {archiveOpen ? (
+            <ArchiveList
+              items={archived}
+              apps={apps}
+              onBack={() => setArchiveOpen(false)}
+              onDelete={deleteNotification}
+              onEmpty={clearRead}
+            />
+          ) : openInbox && openApp ? (
+            <AppNotificationList
+              app={openApp}
+              unread={openInbox.unread}
+              archivedCount={archived.length}
+              onBack={() => setOpenAppId(null)}
+              onMarkRead={handleMarkRead}
+              onReadAll={handleReadAllForApp}
+              onOpenArchive={() => setArchiveOpen(true)}
+              onOpenApp={handleOpenAppSource}
+            />
+          ) : (
+            <main class="flex flex-1 flex-col overflow-hidden bg-ink">
+              <div class="flex min-h-[60px] shrink-0 items-center gap-2 border-b border-line/60 px-4 py-1.5">
+                <h1 class="shrink-0 text-[27px] font-semibold tracking-[-0.01em] text-text">
+                  Inbox
+                </h1>
+                <span class="shrink-0 font-mono text-[14px] text-faint">{totalUnread} unread</span>
 
-            {enabledApps.length === 0 && (
-              <p class="px-2 py-4 text-[15px] leading-relaxed text-faint">
-                Waiting for your channels to connect.
-              </p>
-            )}
+                <span class="mx-1 h-6 w-px shrink-0 bg-line/40" aria-hidden="true" />
 
-            {GROUP_ORDER.map((group) => {
-              const list = groupedApps.get(group);
-              if (!list || list.length === 0) return null;
-              const groupUnread = list.reduce((sum, app) => sum + app.unread, 0);
+                <div class="flex-1" />
 
-              return (
-                <div key={group} class="mt-1">
-                  <div class="mb-1 flex items-center gap-2 px-2">
-                    <span class="text-[15px] font-semibold tracking-[0.06em] text-faint">
-                      {GROUP_LABELS[group] || group}
+                {archived.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setArchiveOpen(true)}
+                    aria-label={`Open archive, ${archived.length} read notifications`}
+                    class="flex h-11 shrink-0 items-center gap-1.5 rounded-[9px] border border-line/55 bg-surface/70 px-3 text-[15px] font-semibold text-muted transition-colors active:scale-[0.98]"
+                  >
+                    Archive
+                    <span class="font-mono text-[14px] tabular-nums text-faint">
+                      {archived.length}
                     </span>
-                    <span class="h-px flex-1 bg-line/40" />
-                    {groupUnread > 0 && (
-                      <span class="font-mono text-[14px] text-faint">{groupUnread}</span>
-                    )}
-                  </div>
-                  <div class="flex flex-col gap-0.5">
-                    {list.map((app) => (
-                      <AppButton
-                        key={app.id}
-                        app={app}
-                        active={filterAppId === app.id}
-                        lastActivity={lastActivityByApp.get(app.id)}
-                        lastSummary={lastSummaryByApp.get(app.id)}
-                        onFilter={handleFilterClick}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+                  </button>
+                )}
 
-            {ungrouped.length > 0 && (
-              <div class="mt-1">
-                <div class="mb-1 flex items-center gap-2 px-2">
-                  <span class="text-[15px] font-semibold tracking-[0.06em] text-faint">Other</span>
-                  <span class="h-px flex-1 bg-line/40" />
-                </div>
-                <div class="flex flex-col gap-0.5">
-                  {ungrouped.map((app) => (
-                    <AppButton
-                      key={app.id}
-                      app={app}
-                      active={filterAppId === app.id}
-                      lastActivity={lastActivityByApp.get(app.id)}
-                      lastSummary={lastSummaryByApp.get(app.id)}
-                      onFilter={handleFilterClick}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </aside>
-
-          {/* Feed */}
-          <main class="flex flex-1 flex-col overflow-hidden bg-ink">
-            <div class="flex min-h-[60px] shrink-0 items-center gap-2 border-b border-line/60 px-4 py-1.5">
-              <h1 class="shrink-0 text-[27px] font-semibold tracking-[-0.01em] text-text">Inbox</h1>
-
-              <div class="flex shrink-0 items-center rounded-[11px] bg-surface p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setNotifSubTab('active')}
-                  class={`flex min-h-[44px] items-center gap-2 rounded-[9px] px-3 text-[15px] font-semibold transition-colors ${
-                    notifSubTab === 'active' ? 'bg-raised text-text' : 'text-muted hover:text-text'
-                  }`}
-                >
-                  Active
-                  <span class={`font-mono text-[14px] ${notifSubTab === 'active' ? 'text-signal' : 'text-faint'}`}>
-                    {activeCount}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setNotifSubTab('all')}
-                  class={`flex min-h-[44px] items-center gap-2 rounded-[9px] px-3 text-[15px] font-semibold transition-colors ${
-                    notifSubTab === 'all' ? 'bg-raised text-text' : 'text-muted hover:text-text'
-                  }`}
-                >
-                  All
-                  <span class={`font-mono text-[14px] ${notifSubTab === 'all' ? 'text-signal' : 'text-faint'}`}>
-                    {allCount}
-                  </span>
-                </button>
+                {totalUnread > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => markAllRead()}
+                    aria-label="Mark all notifications as read"
+                    class="flex h-11 shrink-0 items-center gap-1.5 rounded-[9px] border border-ok/25 bg-ok/10 px-2.5 text-[15px] font-semibold text-ok transition-colors active:scale-[0.98]"
+                  >
+                    <Check size={16} />
+                    Mark all read
+                  </button>
+                )}
               </div>
 
-              {selectedApp && (
-                <button
-                  type="button"
-                  onClick={() => setFilterAppId(null)}
-                  class="flex h-11 max-w-[145px] shrink-0 items-center gap-2 rounded-[8px] border border-line/60 bg-surface px-2.5 text-[15px] text-muted transition-colors hover:text-text"
-                  title="Clear channel filter"
-                >
-                  <AppIcon
-                    appId={selectedApp.id}
-                    class="h-4 w-4"
-                    emoji={selectedApp.icon}
-                    name={selectedApp.name}
-                  />
-                  <span class="truncate">{selectedApp.name}</span>
-                  <X size={14} class="shrink-0" />
-                </button>
-              )}
-
-              <div class="flex-1" />
-
-              {notifSubTab === 'active' && activeCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => markAllRead(filterAppId || undefined)}
-                  aria-label="Mark all notifications as read"
-                  class="flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[9px] border border-ok/25 bg-ok/10 px-2.5 text-[15px] font-semibold text-ok transition-colors hover:bg-ok/15 active:scale-[0.98]"
-                >
-                  <Check size={16} />
-                  Read all
-                </button>
-              )}
-
-              {notifSubTab === 'all' && notifications.some((notification) => notification.is_read) && (
-                <button
-                  type="button"
-                  onClick={handleClearRead}
-                  class={`flex min-h-[44px] shrink-0 items-center rounded-[9px] border px-2.5 text-[15px] font-semibold transition-colors active:scale-[0.98] ${
-                    clearConfirm
-                      ? 'border-alert bg-alert text-ink'
-                      : 'border-alert/25 bg-alert/10 text-alert hover:bg-alert/15'
-                  }`}
-                >
-                  {clearConfirm ? 'Confirm clear' : 'Clear read'}
-                </button>
-              )}
-            </div>
-
-            <div class="flex-1 overflow-y-auto custom-scrollbar">
-              {displayedNotifications.length === 0 ? (
-                !connected ? (
-                  <FeedEmpty
-                    icon={<WifiOff size={28} />}
-                    title="Reconnecting"
-                    hint="Trying to reach the Birdeye server. Saved notifications will appear when it is back."
-                  />
-                ) : selectedApp ? (
-                  <FeedEmpty
-                    icon={<Inbox size={28} />}
-                    title={`Nothing from ${selectedApp.name}`}
-                    hint="This channel is quiet. Switch back to every channel to see the rest of your feed."
-                    action={{ label: 'Show all channels', onClick: () => setFilterAppId(null) }}
-                  />
-                ) : notifSubTab === 'active' ? (
-                  <FeedEmpty
-                    icon={<Inbox size={28} />}
-                    title="All quiet"
-                    hint="Nothing unread right now. New messages will land here."
-                  />
-                ) : (
-                  <FeedEmpty
-                    icon={<Inbox size={28} />}
-                    title="No notifications yet"
-                    hint="Messages from your connected apps will collect here."
-                  />
-                )
-              ) : (
-                <div role="list" class="flex flex-col">
-                  {!filterAppId
-                    ? groupNotifications(displayedNotifications).map((group) => (
-                        <NotificationGroup
-                          key={group.key}
-                          appId={group.appId}
-                          label={group.label}
-                          app={apps.find((app) => app.id === group.appId)}
-                          notifications={group.items}
-                          onMarkRead={handleMarkRead}
-                          onFocus={focusApp}
-                        />
-                      ))
-                    : displayedNotifications.map((notification) => (
-                        <NotificationCard
-                          key={notification.id}
-                          notification={notification}
-                          onMarkRead={handleMarkRead}
-                          onFocus={focusApp}
-                          emoji={apps.find((app) => app.id === notification.app_id)?.icon}
-                        />
-                      ))}
-                </div>
-              )}
-            </div>
-          </main>
-
-          {/* Do First rail */}
-          {doFirstTodos.length > 0 && (
-            <aside class="flex w-[224px] shrink-0 flex-col overflow-hidden border-l border-line/60 bg-ink">
-              <button
-                type="button"
-                onClick={() => setActiveTab('todos')}
-                class="flex h-12 shrink-0 items-center gap-2 border-b border-line/60 px-4 text-left transition-colors hover:bg-surface/50"
-              >
-                <span class="h-2 w-2 shrink-0 rounded-full bg-alert" />
-                <span class="text-[15px] font-semibold text-alert">Do first</span>
-                <span class="ml-auto font-mono text-[14px] text-faint">{dueNowTodos.length}</span>
-              </button>
-
-              <div class="flex-1 overflow-y-auto px-1.5 py-1.5 custom-scrollbar">
-                {doFirstTodos.map((todo) => {
-                  const subtasks = todo.subtasks || [];
-                  const done = subtasks.filter((subtask) => subtask.completed).length;
-                  const total = subtasks.length;
-                  const due = dueLabel(todo.due_date, today);
-
-                  return (
-                    <div
-                      key={todo.id}
-                      class="flex items-start gap-1 rounded-[9px] px-1 py-1.5 transition-colors hover:bg-surface/50"
-                    >
-                      <button
-                        type="button"
-                        onClick={() => toggleTodo(todo.id)}
-                        aria-label={`Mark "${todo.text}" complete`}
-                        class="flex h-11 w-11 -ml-1 shrink-0 items-center justify-center rounded-[8px] transition-colors active:bg-raised"
-                      >
-                        <span class="flex h-[18px] w-[18px] items-center justify-center rounded-[5px] border-2 border-line transition-colors" />
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('todos')}
-                        class="min-w-0 flex-1 pb-1 pr-1 text-left"
-                      >
-                        <span class="block text-[19px] leading-snug text-text line-clamp-2">
-                          {todo.text}
-                        </span>
-                        <span class="mt-1 flex items-center gap-2">
-                          <span
-                            class={`h-1.5 w-1.5 shrink-0 rounded-full ${
-                              todo.priority === 'high' ? 'bg-alert' : 'bg-warn'
-                            }`}
-                          />
-                          {due && (
-                            <span class={`text-[14px] font-semibold ${due.tone}`}>{due.text}</span>
-                          )}
-                          {total > 0 && (
-                            <span class="flex items-center gap-1">
-                              <span class="h-[3px] w-9 overflow-hidden rounded-full bg-line/70">
-                                <span
-                                  class="block h-full rounded-full bg-signal"
-                                  style={{ width: `${Math.round((done / total) * 100)}%` }}
-                                />
-                              </span>
-                              <span class="font-mono text-[14px] text-faint">
-                                {done}/{total}
-                              </span>
-                            </span>
-                          )}
-                        </span>
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </aside>
+              {renderBoard()}
+            </main>
           )}
+
+          <HomeTodos
+            items={homeTodos}
+            total={dueNowTodos.length}
+            onToggle={toggleTodo}
+            onToggleSubtask={toggleSubtask}
+            onOpen={() => setActiveTab('todos')}
+          />
         </div>
       )}
 
@@ -811,11 +521,7 @@ export function App() {
 
       <CorgiBar />
 
-      <BottomBar
-        spotifyData={spotifyData}
-        onSpotifyCommand={spotifyCommand}
-        monitorData={monitorData}
-      />
+      <BottomBar spotifyData={spotifyData} monitorData={monitorData} />
     </div>
   );
 }
