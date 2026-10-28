@@ -16,6 +16,7 @@ import notif_banner
 from dbus_listener import DBusListener
 from spotify import spotify_listener
 from cal_listener import calendar_listener
+import jev
 from notif_importance import classify_importance
 import state
 from ws import router as ws_router
@@ -176,6 +177,7 @@ async def lifespan(app: FastAPI):
                 # Broadcast to dashboards
                 from ws import broadcast_notification
                 await broadcast_notification(notification)
+                jev.start(notification, app)
 
     bridge_task = asyncio.create_task(_bridge_dbus())
 

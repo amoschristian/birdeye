@@ -12,6 +12,9 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).resolve().parent / "birdeye.db"
 _RETENTION_SECONDS = 7 * 24 * 60 * 60  # 7 days
+# Decisions outlive the notifications they describe: they are the labelled
+# history the attention thresholds get tuned against.
+_DECISION_RETENTION_SECONDS = 90 * 24 * 60 * 60
 
 
 @dataclass
@@ -26,6 +29,10 @@ class Notification:
     notif_id: int | None = None
     x_shell_sender: str = ""
     is_important: bool = False
+    needs_me: float | None = None
+    urgency: float | None = None
+    jev_model: str | None = None
+    decided_at: float | None = None
 
 
 @dataclass
@@ -93,8 +100,34 @@ class Database:
                 created_at REAL NOT NULL,
                 notif_id INTEGER,
                 x_shell_sender TEXT DEFAULT '',
-                is_important INTEGER NOT NULL DEFAULT 0
+                is_important INTEGER NOT NULL DEFAULT 0,
+                needs_me REAL,
+                urgency REAL,
+                jev_model TEXT,
+                decided_at REAL
             );
+
+            -- Decision facts are kept longer than notifications: thresholds
+            -- are tuned against them, and the row is pruned after 7 days.
+            -- Never stores message content.
+            CREATE TABLE IF NOT EXISTS decisions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                notification_id INTEGER NOT NULL,
+                app_id TEXT NOT NULL,
+                needs_me REAL,
+                urgency REAL,
+                model TEXT,
+                band TEXT NOT NULL,
+                pin_needs_me REAL,
+                pin_urgency REAL,
+                scored_at REAL NOT NULL,
+                action TEXT,
+                action_at REAL
+            );
+            CREATE INDEX IF NOT EXISTS idx_decisions_scored_at
+                ON decisions(scored_at);
+            CREATE INDEX IF NOT EXISTS idx_decisions_notification_id
+                ON decisions(notification_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_app_id
                 ON notifications(app_id);
             CREATE INDEX IF NOT EXISTS idx_notifications_created_at
@@ -132,6 +165,18 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_subtasks_todo_id
                 ON subtasks(todo_id);
         """)
+
+        # Migration: decision facts on pre-existing notification rows.
+        existing = {row[1] for row in self._conn.execute("PRAGMA table_info(notifications)")}
+        for column, column_type in [
+            ("needs_me", "REAL"),
+            ("urgency", "REAL"),
+            ("jev_model", "TEXT"),
+            ("decided_at", "REAL"),
+        ]:
+            if column not in existing:
+                self._conn.execute(f"ALTER TABLE notifications ADD COLUMN {column} {column_type}")
+
         self._conn.commit()
 
     @property
@@ -192,7 +237,8 @@ class Database:
                 "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
                 "COALESCE(notif_id, NULL) AS notif_id, "
                 "COALESCE(x_shell_sender, '') AS x_shell_sender, "
-                "COALESCE(is_important, 0) AS is_important "
+                "COALESCE(is_important, 0) AS is_important, "
+                "needs_me, urgency, jev_model, decided_at "
                 "FROM notifications WHERE id=?",
                 (notification_id,),
             ).fetchone()
@@ -209,6 +255,10 @@ class Database:
                 notif_id=row["notif_id"],
                 x_shell_sender=row["x_shell_sender"] or "",
                 is_important=bool(row["is_important"]),
+                needs_me=row["needs_me"],
+                urgency=row["urgency"],
+                jev_model=row["jev_model"],
+                decided_at=row["decided_at"],
             )
         except sqlite3.Error as e:
             logger.error(f"get_notification({notification_id}) failed: {e}")
@@ -228,6 +278,63 @@ class Database:
         except sqlite3.Error as e:
             logger.error(f"mark_read failed: {e}")
             return False
+
+    def set_notification_decision(self, notification_id: int, needs_me: float,
+                                  urgency: float, model: str | None) -> Notification | None:
+        """Store the raw decision facts. The first answer for a row wins."""
+        if not self._usable:
+            return None
+        try:
+            conn = self._connect()
+            cursor = conn.execute(
+                "UPDATE notifications SET needs_me=?, urgency=?, jev_model=?, decided_at=? "
+                "WHERE id=? AND needs_me IS NULL",
+                (needs_me, urgency, model, time.time(), notification_id),
+            )
+            conn.commit()
+            if cursor.rowcount == 0:
+                return None
+            return self.get_notification(notification_id)
+        except sqlite3.Error as e:
+            logger.error(f"set_notification_decision({notification_id}) failed: {e}")
+            return None
+
+    def log_decision(self, *, notification_id: int, app_id: str, needs_me: float,
+                     urgency: float, model: str | None, band: str,
+                     pin_needs_me: float, pin_urgency: float) -> None:
+        """Append the decision to the tuning log. Never stores message content."""
+        if not self._usable:
+            return
+        try:
+            conn = self._connect()
+            now = time.time()
+            conn.execute(
+                "INSERT INTO decisions (notification_id, app_id, needs_me, urgency, "
+                "model, band, pin_needs_me, pin_urgency, scored_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (notification_id, app_id, needs_me, urgency, model, band,
+                 pin_needs_me, pin_urgency, now),
+            )
+            conn.execute("DELETE FROM decisions WHERE scored_at < ?",
+                         (now - _DECISION_RETENTION_SECONDS,))
+            conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"log_decision({notification_id}) failed: {e}")
+
+    def record_decision_action(self, notification_id: int, action: str) -> None:
+        """Record what the user did with the row — the label to tune against."""
+        if not self._usable:
+            return
+        try:
+            conn = self._connect()
+            conn.execute(
+                "UPDATE decisions SET action=?, action_at=? "
+                "WHERE notification_id=? AND action IS NULL",
+                (action, time.time(), notification_id),
+            )
+            conn.commit()
+        except sqlite3.Error as e:
+            logger.error(f"record_decision_action({notification_id}) failed: {e}")
 
     def delete_notification(self, notification_id: int) -> bool:
         """Remove a single notification permanently."""
@@ -251,7 +358,8 @@ class Database:
                 "SELECT id, app_id, app_name, summary, body, is_read, created_at, "
                 "COALESCE(notif_id, NULL) AS notif_id, "
                 "COALESCE(x_shell_sender, '') AS x_shell_sender, "
-                "COALESCE(is_important, 0) AS is_important "
+                "COALESCE(is_important, 0) AS is_important, "
+                "needs_me, urgency, jev_model, decided_at "
                 "FROM notifications ORDER BY created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
@@ -267,6 +375,10 @@ class Database:
                     notif_id=r["notif_id"],
                     x_shell_sender=r["x_shell_sender"] or "",
                     is_important=bool(r["is_important"]),
+                    needs_me=r["needs_me"],
+                    urgency=r["urgency"],
+                    jev_model=r["jev_model"],
+                    decided_at=r["decided_at"],
                 )
                 for r in rows
             ]

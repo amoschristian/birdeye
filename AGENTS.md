@@ -272,6 +272,22 @@ Todo items are persisted in SQLite with support for:
 - Due dates with quick-set picker (today/tomorrow/next week/custom)
 - The "DO FIRST" quadrant (urgent + important) surfaces in the Home view's right panel
 
+## Attention ranking (Jev)
+
+Incoming notifications are ranked by a decision model, not a keyword rule.
+
+- `server/jev.py` asks two typed questions about each new notification: `needs_me` (noul — does it require a reply, decision, or action from the user personally) and `urgency` (score 0–2).
+- Transport is chosen once, in this order: `commandcode-api` (`CMD_API_KEY` — the subscription's Provider API, `POST https://api.commandcode.ai/provider/v1/systemone`, ~1s, no subprocess), then `commandcode` (runs `cmd -p <request> -m typesafe/jev` on the existing CLI login — no credential of its own, ~2s and one process per notification, capped to one in flight). `BIRDEYE_JEV_TRANSPORT=commandcode-api|commandcode|off` forces it; `BIRDEYE_CMD` overrides CLI discovery (nvm's `~/.nvm/versions/node/*/bin/cmd` is probed because the systemd user PATH excludes it).
+- A 1:1 DM or a mention of one of the user's own handles is a **floor**, not an override: `addressed_to_me` lifts the band to `pinned` and the score to at least `ADDRESSED_FLOOR_SCORE` (0.5), while the stored probabilities stay the model's — so the ranking among addressed rows is still the model's. `@all` / `@everyone` are deliberately not a floor (`has_handle_mention`, not `has_direct_mention`). The state also carries `is_dm`, since a DM title is just a person's name.
+- Jev has no zero-data-retention upstream, so the Provider API refuses `x-cmd-zdr: 1` with `422 cmd_zdr_no_providers`; the server never sends that header.
+- The two probabilities are the only persisted facts (`notifications.needs_me`, `urgency`, `jev_model`, `decided_at`). The chip, `attention_score` and `attention_band` are derived at read time by `jev.attention_of`, so retuning `PIN_NEEDS_ME` / `PIN_URGENCY` / `UNCERTAIN_NEEDS_ME` re-ranks all history with no model calls and no migration.
+- Bands: `pinned` (Important chip, sorts first), `top` (sorts high, silent), `current` (urgent but not yours), `unclassified` (model torn or unavailable — the legacy DM/mention rule decides, byte-for-byte the old board), `quiet`.
+- Rows with null probabilities are legacy or undecided and fall back to `notif_importance.classify_importance`.
+- Every decision is appended to the `decisions` table: probabilities, model snapshot, band, thresholds applied, and the user's eventual `action` (`read` / `dismissed`) — that pairing is the label to tune thresholds against. No message text is stored there, and it is kept 90 days versus the notifications' 7.
+- Classification is fire-and-forget: the row is broadcast immediately, the ranking re-broadcasts ~1s later. A duplicate sender+room inside 120s is skipped.
+- Optional overrides live in `server/.env` (gitignored, loaded by the `birdeye.service.d/env.conf` drop-in). No `cmd` and no key = unchanged behavior. Message content goes in `state`, never in `instructions`, and Jev returns a typed answer rather than text, so a notification cannot issue commands.
+- `model=typesafe/jev` (headless) / `typesafe/jev-1.14` (HTTP), ~480 input tokens per notification = ~$0.00002 at `$0.042`/M.
+
 ## Notes
 
 - **CorgiBar**: a pixel corgi (`public/corgi/`, community Codex pet from codex-pet.org/pets/corgi/) patrols an absolute overlay strip just above the bottom bar — no layout space reserved, `pointer-events-none`, respects `prefers-reduced-motion`. Behaviors: walk (40px/s, bounces at edges), plus random breaks — idle, wait, review, wave (first break after boot), and jump. Its sprite sheet's run rows are swapped vs the Codex convention ("runRight" faces left) — CorgiBar compensates.

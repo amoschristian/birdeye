@@ -62,6 +62,12 @@ def has_direct_mention(summary: str, body: str) -> bool:
     return bool(_ALL_MENTION_PATTERN.search(combined))
 
 
+def has_handle_mention(summary: str, body: str) -> bool:
+    """A mention of one of the user's own handles — not @all / @everyone."""
+    combined = f"{summary} {body}"
+    return any(pattern.search(combined) for pattern in _HANDLE_PATTERNS)
+
+
 def is_dm_notification(app_id: str, summary: str) -> bool:
     """
     Determine if a notification is a direct message (not a group/channel message).

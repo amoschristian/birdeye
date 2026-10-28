@@ -30,6 +30,14 @@ export interface Notification {
   notif_id: number | null;
   x_shell_sender: string;
   is_important: boolean;
+  // Decision facts as stored, plus the band/score derived from them on the
+  // server. Null probabilities mean unclassified — the legacy rule decided.
+  needs_me: number | null;
+  urgency: number | null;
+  jev_model: string | null;
+  decided_at: number | null;
+  attention_score: number;
+  attention_band: 'pinned' | 'top' | 'current' | 'unclassified' | 'quiet';
 }
 
 export interface ServerStateMessage {

@@ -10,6 +10,7 @@ from config_loader import config
 from monitor import system_monitor
 from spotify import spotify_listener
 from cal_listener import calendar_listener
+import jev
 from notif_importance import classify_importance
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,7 @@ async def _broadcast(conns: set[WebSocket], payload: dict):
 async def broadcast_state():
     """Send full state snapshot to all dashboard connections."""
     tabs_list = [t.model_dump() for t in state.get_all()]
-    notif_list = [n.__dict__ for n in db.get_all()]
+    notif_list = [jev.notification_payload(n) for n in db.get_all()]
     apps_list = config.to_dict()
     payload = {
         "type": "state",
@@ -75,7 +76,7 @@ async def broadcast_notification(notification):
     """Broadcast a single new notification to all dashboards."""
     payload = {
         "type": "notification",
-        "notification": notification.__dict__,
+        "notification": jev.notification_payload(notification),
     }
     await _broadcast(_dashboard_conns, payload)
 
@@ -424,7 +425,7 @@ async def ws_extension(websocket: WebSocket):
                 summary = data.get("title", "")
                 body = data.get("body", "")
                 is_important = classify_importance(app_id, app_name, summary, body)
-                db.create_notification(
+                notification = db.create_notification(
                     app_id=app_id,
                     app_name=app_name,
                     summary=summary,
@@ -432,6 +433,10 @@ async def ws_extension(websocket: WebSocket):
                     is_important=is_important,
                 )
                 await broadcast_state()
+                # Ranking arrives later and re-broadcasts; the row is on screen
+                # immediately either way.
+                if notification:
+                    jev.start(notification, config.get(app_id))
             elif msg_type == "update":
                 state.update_tab(data)
                 await broadcast_tabs()
@@ -490,6 +495,7 @@ async def ws_dashboard(websocket: WebSocket):
                     if ok:
                         if notif and notif.notif_id is not None:
                             close_notification_sync(notif.notif_id)
+                        db.record_decision_action(row_id, "read")
                         await broadcast_notification_read(row_id)
 
             elif action == "notification_delete":
@@ -502,6 +508,7 @@ async def ws_dashboard(websocket: WebSocket):
                         if notif and notif.notif_id is not None:
                             from action_invoker import close_notification_sync
                             close_notification_sync(notif.notif_id)
+                        db.record_decision_action(row_id, "dismissed")
                         await broadcast_notification_deleted(row_id)
 
             elif action == "mark_all_read":

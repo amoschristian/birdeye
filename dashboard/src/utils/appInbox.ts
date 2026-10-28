@@ -29,9 +29,14 @@ export function orderApps(apps: AppConfig[]): AppConfig[] {
   });
 }
 
-/** Unread leads with important messages, then newest first. */
-function byImportanceThenRecency(a: Notification, b: Notification): number {
-  if (a.is_important !== b.is_important) return a.is_important ? -1 : 1;
+/**
+ * Unread leads with whatever needs the user most, then newest first.
+ * attention_score is derived server-side from the decision probabilities
+ * (or from the legacy rule when a row is unclassified), so the ranking
+ * changes only when the notification set does — never on a re-render.
+ */
+function byAttentionThenRecency(a: Notification, b: Notification): number {
+  if (a.attention_score !== b.attention_score) return b.attention_score - a.attention_score;
   return b.created_at - a.created_at;
 }
 
@@ -46,7 +51,7 @@ export function buildAppInboxes(notifications: Notification[], apps: AppConfig[]
       else unread.push(notification);
     }
 
-    unread.sort(byImportanceThenRecency);
+    unread.sort(byAttentionThenRecency);
     read.sort((a, b) => b.created_at - a.created_at);
 
     return {
