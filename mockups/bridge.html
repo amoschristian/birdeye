@@ -1,0 +1,1415 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Birdeye — bridge console mockup</title>
+<!--
+  BIRDEYE / BRIDGE — static mockup, 1024 x 600.
+
+  The ship's alert condition is the attention state (green / yellow / red).
+  The main viewer is the product: one ranked transmission log with every
+  channel merged. Channels sit in a signal rack below it. The calendar is
+  reduced to a single next-event readout in the status rail.
+-->
+<style>
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-600-normal.woff2") format("woff2");
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  :root {
+    --void: #04060a;
+    --hull: #080c12;
+    --panel: #0e141c;
+    --glass: #05090f;
+    --edge: #1b2836;
+    --edge-hi: #2c4257;
+
+    --ink: #dde8f2;
+    --dim: #93a8ba;
+    --faint: #6b8296;
+
+    --alert: #ff4433;
+    --warn: #ffb648;
+    --ok: #5fe0a0;
+
+    --sans: "Space Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+  body {
+    background: var(--void);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  button, input { font: inherit; color: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+
+  :focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
+  }
+
+  .spacer { flex: 1; }
+
+  /* ── Mockup stage ─────────────────────────────────────────── */
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+  }
+
+  .stage__meta {
+    width: 100%;
+    max-width: 1024px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+
+  .slot {
+    position: relative;
+    width: 1024px;
+    height: 600px;
+  }
+
+  .console {
+    position: absolute;
+    inset: 0;
+    transform-origin: top left;
+    display: grid;
+    grid-template-rows: 56px 1fr 46px;
+    background: var(--hull);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--alert);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Status rail ──────────────────────────────────────────── */
+
+  .rail {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    background: var(--hull);
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .condition {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+
+  .condition__label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--faint);
+  }
+
+  .condition__flag {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    background: var(--alert);
+    color: #0a0e14;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+
+  .rail__seam {
+    width: 1px;
+    height: 22px;
+    flex: none;
+    background: var(--edge);
+  }
+
+  .rail__time {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .rail__link {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--ok);
+  }
+
+  .rail__next {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--dim);
+  }
+
+  .rail__next b { color: var(--ink); font-weight: 500; }
+
+  .selector {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--glass);
+    border: 1px solid var(--edge);
+  }
+
+  .selector__pos {
+    height: 44px;
+    padding: 0 11px;
+    background: transparent;
+    border: 0;
+    color: var(--faint);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .selector__pos:hover { color: var(--ink); }
+  .selector__pos:active { background: var(--panel); }
+
+  .selector__pos[aria-selected="true"] {
+    background: var(--ink);
+    color: #0a0e14;
+  }
+
+  .switch {
+    height: 44px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .switch:hover { color: var(--ink); border-color: var(--edge-hi); }
+  .switch:active { background: var(--hull); transform: scale(0.98); }
+
+  .lamp {
+    width: 7px;
+    height: 7px;
+    flex: none;
+    background: var(--edge);
+  }
+  .lamp--ok { background: var(--ok); }
+  .lamp--warn { background: var(--warn); }
+  .lamp--alert { background: var(--alert); }
+
+  /* ── Deck ─────────────────────────────────────────────────── */
+
+  .deck {
+    display: grid;
+    grid-template-rows: 1fr 98px;
+    min-height: 0;
+  }
+
+  .console[data-view="tasks"] .deck {
+    grid-template-rows: 1fr 0;
+  }
+
+  /* ── Main viewer ──────────────────────────────────────────── */
+
+  .viewer {
+    min-height: 0;
+    margin: 5px 10px;
+    padding: 5px 6px;
+    display: flex;
+    flex-direction: column;
+    background: var(--hull);
+    border: 1px solid var(--edge);
+  }
+
+  .viewer[hidden] { display: none; }
+
+  .bezel__tag {
+    height: 14px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--faint);
+    text-transform: uppercase;
+  }
+
+  .glass {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--glass);
+    border: 1px solid var(--edge);
+    clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%, 0 12px);
+    overflow: hidden;
+  }
+
+  .glass__head {
+    height: 52px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .glass__title {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  .glass__count {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+  }
+
+  .glass__prio {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--alert);
+  }
+
+  .filters {
+    display: flex;
+    height: 46px;
+    border: 1px solid var(--edge);
+  }
+
+  .filter {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background: transparent;
+    border: 0;
+    border-right: 1px solid var(--edge);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--faint);
+    cursor: pointer;
+  }
+
+  .filter:last-child { border-right: 0; }
+  .filter:hover { color: var(--ink); }
+  .filter:active { background: var(--panel); }
+
+  .filter.is-active {
+    background: var(--ink);
+    color: #0a0e14;
+  }
+
+  .filter b { font-weight: 500; }
+
+  .glass__prio--clear { color: var(--faint); }
+
+  .chip {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    background: transparent;
+    border: 1px solid var(--edge);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .chip:hover { color: var(--ink); border-color: var(--edge-hi); }
+  .chip:active { background: var(--panel); transform: scale(0.98); }
+
+  .chip--ack {
+    color: var(--ok);
+    border-color: color-mix(in srgb, var(--ok) 40%, transparent);
+  }
+
+  .chip--ack:hover {
+    color: var(--ok);
+    background: color-mix(in srgb, var(--ok) 8%, transparent);
+    border-color: var(--ok);
+  }
+
+  /* Transmission rows */
+
+  .tx-list {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tx-list::-webkit-scrollbar { display: none; }
+
+  .tx {
+    width: 100%;
+    height: 48px;
+    display: grid;
+    grid-template-columns: 26px 150px 128px minmax(0, 1fr) 108px 14px;
+    gap: 12px;
+    align-items: center;
+    padding: 0 14px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--edge);
+    border-left: 2px solid transparent;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .tx[hidden] { display: none; }
+  .tx:last-child { border-bottom: 0; }
+  .tx:hover { background: var(--panel); }
+  .tx:active { background: var(--edge); }
+
+  .tx--priority {
+    border-left-color: var(--alert);
+    background: color-mix(in srgb, var(--alert) 5%, transparent);
+  }
+
+  .tx--priority:hover {
+    background: color-mix(in srgb, var(--alert) 9%, transparent);
+  }
+
+  .tx__index {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tx--priority .tx__index { color: var(--alert); }
+
+  .tx__sender {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .tx__channel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+
+  .tx__message {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    color: var(--ink);
+  }
+
+  .tx__meta {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .tx__tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    color: var(--alert);
+  }
+
+  .tx__time {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tx__go {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--faint);
+    text-align: right;
+  }
+
+  .glass__foot {
+    height: 18px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 14px;
+    border-top: 1px solid var(--edge);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+    text-transform: uppercase;
+  }
+
+  /* Task rows */
+
+  .task-list {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .task {
+    width: 100%;
+    height: 48px;
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 70px 100px 14px;
+    gap: 12px;
+    align-items: center;
+    padding: 0 14px;
+    background: transparent;
+    border: 0;
+    border-bottom: 1px solid var(--edge);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .task:hover { background: var(--panel); }
+  .task:active { background: var(--edge); }
+
+  .task__check {
+    width: 14px;
+    height: 14px;
+    border: 2px solid var(--edge-hi);
+  }
+
+  .task__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 16px;
+    color: var(--ink);
+  }
+
+  .task__prio {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+  }
+
+  .task__due {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    text-align: right;
+  }
+
+  .task__due--alert { color: var(--alert); }
+  .task__due--warn { color: var(--warn); }
+  .task__due--later { color: var(--faint); }
+
+  .task__go {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--faint);
+    text-align: right;
+  }
+
+  .capture {
+    width: 300px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 9px;
+    background: var(--glass);
+    border: 1px solid var(--edge);
+  }
+
+  .capture:focus-within { border-color: var(--ok); }
+
+  .capture__caret {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--ok);
+  }
+
+  .capture input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    font-size: 13px;
+  }
+
+  .capture input::placeholder { color: var(--faint); }
+
+  /* ── Channel rack ─────────────────────────────────────────── */
+
+  .rack {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 0;
+    border-top: 1px solid var(--edge);
+  }
+
+  .rack[hidden] { display: none; }
+
+  .group {
+    min-width: 0;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: 18px 1fr;
+  }
+
+  .group + .group { border-left: 1px solid var(--edge); }
+
+  .group__head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .group__name {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  .group__rule {
+    flex: 1;
+    height: 1px;
+    background: var(--edge);
+  }
+
+  .group__count {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .group__chans {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 0;
+  }
+
+  .chan {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--hull);
+    border: 0;
+    border-right: 1px solid var(--edge);
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .chan:last-child { border-right: 0; }
+  .chan:hover { background: var(--panel); }
+  .chan:active { background: var(--edge); }
+
+  .chan__top {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .chan__code {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+  }
+
+  .chan__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--dim);
+  }
+
+  .chan__count {
+    margin-left: auto;
+    flex: none;
+    font-family: var(--mono);
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 0.8;
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .chan--quiet .chan__count { color: var(--faint); }
+
+  .chan__bars {
+    display: flex;
+    gap: 3px;
+    height: 12px;
+    align-items: flex-end;
+  }
+
+  .chan__bars i {
+    width: 4px;
+    height: 12px;
+    background: var(--edge);
+  }
+
+  .chan__bars i.is-alert { background: var(--alert); }
+  .chan__bars i.is-warn { background: var(--warn); }
+  .chan__bars i.is-ok { background: var(--ok); }
+
+  .chan__last {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .chan--quiet .chan__last { color: var(--faint); }
+
+  /* ── Ops strip ────────────────────────────────────────────── */
+
+  .ops {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 12px;
+    background: var(--hull);
+    border-top: 1px solid var(--edge);
+  }
+
+  .ops__label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--faint);
+    flex: none;
+  }
+
+  .gauges {
+    display: flex;
+    gap: 16px;
+    flex: none;
+  }
+
+  .gauge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ring {
+    width: 28px;
+    height: 28px;
+    flex: none;
+    transform: rotate(-90deg);
+  }
+
+  .ring__track {
+    fill: none;
+    stroke: var(--edge);
+    stroke-width: 3;
+  }
+
+  .ring__fill {
+    fill: none;
+    stroke: var(--ok);
+    stroke-width: 3;
+    stroke-linecap: butt;
+  }
+
+  .gauge__text {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .gauge__label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--faint);
+  }
+
+  .gauge__value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+
+  .net {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+
+  .net b { color: var(--ink); font-weight: 500; }
+
+  .vrule {
+    width: 1px;
+    height: 26px;
+    flex: none;
+    background: var(--edge);
+  }
+
+  .audio {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+
+  .audio__art {
+    width: 26px;
+    height: 26px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    border: 1px solid var(--edge);
+    color: var(--dim);
+  }
+
+  .audio__meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .audio__line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .audio__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .audio__artist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    color: var(--faint);
+  }
+
+  .audio__prog {
+    position: relative;
+    height: 2px;
+    background: var(--edge);
+  }
+
+  .audio__prog b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 54%;
+    background: var(--ok);
+  }
+
+  .tasks-ind {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+
+  .tasks-ind b {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--ink);
+  }
+
+  .mascot {
+    width: 34px;
+    height: 38px;
+    flex: none;
+    background-image: url("../dashboard/public/corgi/spritesheet.webp");
+    background-size: 274px 334px;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage__meta">
+    <span>BIRDEYE / BRIDGE CONSOLE</span>
+    <span>1024 × 600 / TOUCH</span>
+  </div>
+
+  <div class="slot" id="slot">
+    <div class="console" id="console" data-view="feed">
+
+      <!-- ── Status rail ───────────────────────────────────── -->
+      <header class="rail">
+        <div class="condition">
+          <span class="condition__label">CONDITION</span>
+          <span class="condition__flag">RED</span>
+        </div>
+
+        <span class="rail__seam"></span>
+
+        <span class="rail__time" id="clock">22:41:07</span>
+        <span class="rail__link">LINK 4/4</span>
+
+        <span class="spacer"></span>
+
+        <span class="rail__next">NEXT <b>1:1 THEO</b> 15:20</span>
+
+        <div class="selector" role="tablist" aria-label="Decks">
+          <button type="button" class="selector__pos" role="tab" aria-selected="true" data-view-target="feed">Feed</button>
+          <button type="button" class="selector__pos" role="tab" aria-selected="false" data-view-target="tasks">Tasks</button>
+        </div>
+
+        <button type="button" class="switch" aria-pressed="false">
+          <span class="lamp lamp--ok"></span>Sound
+        </button>
+      </header>
+
+      <!-- ── Deck ──────────────────────────────────────────── -->
+      <div class="deck">
+
+        <!-- Main viewer: transmissions -->
+        <section class="viewer" data-deck="feed" aria-label="Incoming transmissions">
+          <div class="bezel__tag">
+            <span>MAIN VIEWER</span>
+            <span>4 CHANNELS LINKED</span>
+          </div>
+
+          <div class="glass">
+            <header class="glass__head">
+              <span class="glass__title">Incoming transmissions</span>
+              <span class="glass__prio" id="tx-prio">2 priority</span>
+              <span class="spacer"></span>
+              <div class="filters" role="group" aria-label="Filter by group">
+                <button type="button" class="filter is-active" data-filter="all">All <b>7</b></button>
+                <button type="button" class="filter" data-filter="work">Work <b>6</b></button>
+                <button type="button" class="filter" data-filter="personal">Personal <b>1</b></button>
+              </div>
+              <button type="button" class="chip chip--ack">Mark all read</button>
+            </header>
+
+            <div class="tx-list">
+
+              <button type="button" class="tx tx--priority" data-group="work" aria-label="Priority, Alice, Discord Work: check the deploy log">
+                <span class="tx__index">01</span>
+                <span class="tx__sender">Alice</span>
+                <span class="tx__channel">DISCORD WORK</span>
+                <span class="tx__message">check the deploy log</span>
+                <span class="tx__meta">
+                  <span class="tx__tag">Priority</span>
+                  <span class="tx__time">2m</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx tx--priority" data-group="work" aria-label="Priority, Sam, Google Chat: review notes are up">
+                <span class="tx__index">02</span>
+                <span class="tx__sender">Sam</span>
+                <span class="tx__channel">GOOGLE CHAT</span>
+                <span class="tx__message">review notes are up</span>
+                <span class="tx__meta">
+                  <span class="tx__tag">Priority</span>
+                  <span class="tx__time">12m</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx" data-group="work" aria-label="Sam, Discord Work: can you look at PR 412">
+                <span class="tx__index">03</span>
+                <span class="tx__sender">Sam</span>
+                <span class="tx__channel">DISCORD WORK</span>
+                <span class="tx__message">can you look at PR 412</span>
+                <span class="tx__meta">
+                  <span class="tx__time">18m</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx" data-group="work" aria-label="Marcus, Discord Work: staging is back">
+                <span class="tx__index">04</span>
+                <span class="tx__sender">Marcus</span>
+                <span class="tx__channel">DISCORD WORK</span>
+                <span class="tx__message">staging is back</span>
+                <span class="tx__meta">
+                  <span class="tx__time">31m</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx" data-group="personal" aria-label="Mum, WhatsApp: dinner on sunday">
+                <span class="tx__index">05</span>
+                <span class="tx__sender">Mum</span>
+                <span class="tx__channel">WHATSAPP</span>
+                <span class="tx__message">dinner on sunday?</span>
+                <span class="tx__meta">
+                  <span class="tx__time">48m</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx" data-group="work" aria-label="Priya, Google Chat: empty state check">
+                <span class="tx__index">06</span>
+                <span class="tx__sender">Priya</span>
+                <span class="tx__channel">GOOGLE CHAT</span>
+                <span class="tx__message">empty state check</span>
+                <span class="tx__meta">
+                  <span class="tx__time">1h</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+              <button type="button" class="tx" data-group="work" aria-label="Alice, Discord Work: merged the hotfix">
+                <span class="tx__index">07</span>
+                <span class="tx__sender">Alice</span>
+                <span class="tx__channel">DISCORD WORK</span>
+                <span class="tx__message">merged the hotfix</span>
+                <span class="tx__meta">
+                  <span class="tx__time">1h</span>
+                </span>
+                <span class="tx__go">›</span>
+              </button>
+
+            </div>
+
+            <footer class="glass__foot">
+              <span id="tx-shown">6 of 7 shown</span>
+              <span>Ranked by attention</span>
+            </footer>
+          </div>
+        </section>
+
+        <!-- Main viewer: tasks -->
+        <section class="viewer" data-deck="tasks" aria-label="Task board" hidden>
+          <div class="bezel__tag">
+            <span>AUX CONSOLE</span>
+            <span>2 OVERDUE</span>
+          </div>
+
+          <div class="glass">
+            <header class="glass__head">
+              <span class="glass__title">Flight plan</span>
+              <span class="glass__count">8 open</span>
+              <span class="glass__prio">2 overdue</span>
+              <span class="spacer"></span>
+              <label class="capture">
+                <span class="capture__caret">›</span>
+                <input type="text" placeholder="Add a task" aria-label="Add a task">
+              </label>
+            </header>
+
+            <div class="task-list">
+              <button type="button" class="task" aria-label="Fix login redirect, high, overdue">
+                <span class="task__check"></span>
+                <span class="task__text">Fix login redirect</span>
+                <span class="task__prio">HIGH</span>
+                <span class="task__due task__due--alert">Overdue</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Deploy staging build, high, today">
+                <span class="task__check"></span>
+                <span class="task__text">Deploy staging build</span>
+                <span class="task__prio">HIGH</span>
+                <span class="task__due task__due--warn">Today</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Review PR 412, medium, today">
+                <span class="task__check"></span>
+                <span class="task__text">Review PR 412</span>
+                <span class="task__prio">MED</span>
+                <span class="task__due task__due--warn">Today</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Rotate API keys, medium, tomorrow">
+                <span class="task__check"></span>
+                <span class="task__text">Rotate API keys</span>
+                <span class="task__prio">MED</span>
+                <span class="task__due task__due--later">Tmrw</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Vendor quote reply, low, friday">
+                <span class="task__check"></span>
+                <span class="task__text">Vendor quote reply</span>
+                <span class="task__prio">LOW</span>
+                <span class="task__due task__due--later">Fri</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Clean stale branches, low">
+                <span class="task__check"></span>
+                <span class="task__text">Clean stale branches</span>
+                <span class="task__prio">LOW</span>
+                <span class="task__due task__due--later">—</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Update deploy docs, low">
+                <span class="task__check"></span>
+                <span class="task__text">Update deploy docs</span>
+                <span class="task__prio">LOW</span>
+                <span class="task__due task__due--later">—</span>
+                <span class="task__go">›</span>
+              </button>
+              <button type="button" class="task" aria-label="Archive Q3 invoices, low, friday">
+                <span class="task__check"></span>
+                <span class="task__text">Archive Q3 invoices</span>
+                <span class="task__prio">LOW</span>
+                <span class="task__due task__due--later">Fri</span>
+                <span class="task__go">›</span>
+              </button>
+            </div>
+
+            <footer class="glass__foot">
+              <span>Showing 8 of 8</span>
+              <span>2 overdue</span>
+            </footer>
+          </div>
+        </section>
+
+        <!-- Signal rack -->
+        <section class="rack" data-deck="feed" aria-label="Channel rack">
+
+          <div class="group">
+            <div class="group__head">
+              <span class="lamp lamp--alert"></span>
+              <span class="group__name">Work</span>
+              <span class="group__rule"></span>
+              <span class="group__count">6 unread</span>
+            </div>
+            <div class="group__chans">
+
+              <button type="button" class="chan" aria-label="Channel 01, Discord Work, 4 unread, 1 priority">
+                <span class="chan__top">
+                  <span class="chan__code">CH 01</span>
+                  <span class="chan__name">Discord Work</span>
+                  <span class="chan__count">4</span>
+                </span>
+                <span class="chan__bars" aria-hidden="true">
+                  <i class="is-alert"></i><i class="is-alert"></i><i class="is-alert"></i><i class="is-alert"></i><i></i>
+                </span>
+                <span class="chan__last">check the deploy log</span>
+              </button>
+
+              <button type="button" class="chan" aria-label="Channel 02, Google Chat, 2 unread, 1 priority">
+                <span class="chan__top">
+                  <span class="chan__code">CH 02</span>
+                  <span class="chan__name">Google Chat</span>
+                  <span class="chan__count">2</span>
+                </span>
+                <span class="chan__bars" aria-hidden="true">
+                  <i class="is-alert"></i><i class="is-alert"></i><i></i><i></i><i></i>
+                </span>
+                <span class="chan__last">review notes are up</span>
+              </button>
+
+            </div>
+          </div>
+
+          <div class="group">
+            <div class="group__head">
+              <span class="lamp lamp--warn"></span>
+              <span class="group__name">Personal</span>
+              <span class="group__rule"></span>
+              <span class="group__count">1 unread</span>
+            </div>
+            <div class="group__chans">
+
+              <button type="button" class="chan" aria-label="Channel 03, WhatsApp, 1 unread">
+                <span class="chan__top">
+                  <span class="chan__code">CH 03</span>
+                  <span class="chan__name">WhatsApp</span>
+                  <span class="chan__count">1</span>
+                </span>
+                <span class="chan__bars" aria-hidden="true">
+                  <i class="is-warn"></i><i></i><i></i><i></i><i></i>
+                </span>
+                <span class="chan__last">dinner on sunday?</span>
+              </button>
+
+              <button type="button" class="chan chan--quiet" aria-label="Channel 04, Discord Personal, clear">
+                <span class="chan__top">
+                  <span class="chan__code">CH 04</span>
+                  <span class="chan__name">Personal</span>
+                  <span class="chan__count">—</span>
+                </span>
+                <span class="chan__bars" aria-hidden="true">
+                  <i></i><i></i><i></i><i></i><i></i>
+                </span>
+                <span class="chan__last">all quiet</span>
+              </button>
+
+            </div>
+          </div>
+
+        </section>
+      </div>
+
+      <!-- ── Ops strip ─────────────────────────────────────── -->
+      <footer class="ops">
+        <span class="ops__label">OPS</span>
+
+        <div class="gauges">
+          <div class="gauge">
+            <svg class="ring" viewBox="0 0 34 34" aria-hidden="true">
+              <circle class="ring__track" cx="17" cy="17" r="14"></circle>
+              <circle class="ring__fill" cx="17" cy="17" r="14" stroke-dasharray="87.96" stroke-dashoffset="77.4"></circle>
+            </svg>
+            <span class="gauge__text">
+              <span class="gauge__label">CPU</span>
+              <span class="gauge__value">12%</span>
+            </span>
+          </div>
+
+          <div class="gauge">
+            <svg class="ring" viewBox="0 0 34 34" aria-hidden="true">
+              <circle class="ring__track" cx="17" cy="17" r="14"></circle>
+              <circle class="ring__fill" cx="17" cy="17" r="14" stroke-dasharray="87.96" stroke-dashoffset="54.5"></circle>
+            </svg>
+            <span class="gauge__text">
+              <span class="gauge__label">RAM</span>
+              <span class="gauge__value">38%</span>
+            </span>
+          </div>
+
+          <div class="gauge">
+            <svg class="ring" viewBox="0 0 34 34" aria-hidden="true">
+              <circle class="ring__track" cx="17" cy="17" r="14"></circle>
+              <circle class="ring__fill" cx="17" cy="17" r="14" stroke-dasharray="87.96" stroke-dashoffset="43.1"></circle>
+            </svg>
+            <span class="gauge__text">
+              <span class="gauge__label">DISK</span>
+              <span class="gauge__value">51%</span>
+            </span>
+          </div>
+        </div>
+
+        <div class="net">
+          <span>NET ↓ <b>1.2M</b></span>
+          <span>NET ↑ <b>84K</b></span>
+        </div>
+
+        <span class="vrule"></span>
+
+        <div class="audio">
+          <span class="audio__art">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M9 18V5l12-2v13"></path>
+              <circle cx="6" cy="18" r="3"></circle>
+              <circle cx="18" cy="16" r="3"></circle>
+            </svg>
+          </span>
+          <span class="audio__meta">
+            <span class="audio__line">
+              <span class="audio__title">Weightless</span>
+              <span class="audio__artist">Marconi Union</span>
+            </span>
+            <span class="audio__prog"><b></b></span>
+          </span>
+        </div>
+
+        <span class="vrule"></span>
+
+        <div class="tasks-ind">
+          <span>TASKS</span>
+          <b>5</b>
+        </div>
+
+        <span class="mascot" aria-hidden="true"></span>
+      </footer>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const consoleEl = document.getElementById('console');
+  const slot = document.getElementById('slot');
+  const clockEl = document.getElementById('clock');
+  const pad = (value) => String(value).padStart(2, '0');
+
+  function tick() {
+    const now = new Date();
+    clockEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  }
+
+  function fit() {
+    const scale = Math.min(1, (window.innerWidth - 64) / 1024, (window.innerHeight - 110) / 600);
+    consoleEl.style.transform = 'scale(' + scale + ')';
+    slot.style.width = 1024 * scale + 'px';
+    slot.style.height = 600 * scale + 'px';
+  }
+
+  const viewButtons = document.querySelectorAll('[data-view-target]');
+  for (const button of viewButtons) {
+    button.addEventListener('click', () => {
+      const target = button.dataset.viewTarget;
+      consoleEl.dataset.view = target;
+
+      for (const other of viewButtons) {
+        other.setAttribute('aria-selected', other === button ? 'true' : 'false');
+      }
+      for (const deck of document.querySelectorAll('[data-deck]')) {
+        deck.hidden = deck.dataset.deck !== target;
+      }
+    });
+  }
+
+  const txRows = Array.from(document.querySelectorAll('.tx'));
+  const txShown = document.getElementById('tx-shown');
+  const txPrio = document.getElementById('tx-prio');
+  const filterButtons = document.querySelectorAll('[data-filter]');
+
+  for (const button of filterButtons) {
+    button.addEventListener('click', () => {
+      const group = button.dataset.filter;
+      let shown = 0;
+      let priority = 0;
+
+      for (const row of txRows) {
+        const visible = group === 'all' || row.dataset.group === group;
+        row.hidden = !visible;
+        if (!visible) continue;
+        shown += 1;
+        if (row.classList.contains('tx--priority')) priority += 1;
+      }
+
+      for (const other of filterButtons) {
+        other.classList.toggle('is-active', other === button);
+      }
+
+      txShown.textContent = group === 'all'
+        ? Math.min(shown, 6) + ' of ' + shown + ' shown'
+        : shown + ' in ' + group;
+      txPrio.textContent = priority === 0 ? 'No priority' : priority + ' priority';
+      txPrio.classList.toggle('glass__prio--clear', priority === 0);
+    });
+  }
+
+  window.addEventListener('resize', fit);
+  fit();
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

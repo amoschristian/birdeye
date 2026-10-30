@@ -1,0 +1,1606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Birdeye — MCC console mockup</title>
+<!--
+  BIRDEYE / MCC CONSOLE — static mockup, 1024 x 600.
+
+  The composition is the room, not the app: a front wall display over a
+  continuous bank of flush console bays, on warm console metal. Green is the
+  phosphor of the screens; amber and red are hardware lamps, not decoration.
+
+  Positions map to real functions: FDO = flight plan, CAPCOM = comms traffic,
+  FLIGHT = priority, EECOM = systems, PAO = audio.
+-->
+<style>
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-600-normal.woff2") format("woff2");
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  :root {
+    /* Room and hardware */
+    --room: #0a0a08;
+    --chassis: #1b1b17;
+    --chassis-hi: #24241f;
+    --seam: #34342c;
+    --seam-dark: #0b0b08;
+
+    /* Phosphor screens */
+    --screen: #060c08;
+    --screen-line: #15261a;
+
+    /* Ink */
+    --type: #e7e5da;
+    --muted: #a9ae9c;
+    --faint: #868b7a;
+
+    /* Lamps */
+    --go: #6be39b;
+    --caution: #f3b442;
+    --abort: #ff4b36;
+
+    --sans: "Space Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+  body {
+    background: var(--room);
+    color: var(--type);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  button, input { font: inherit; color: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+
+  :focus-visible {
+    outline: 2px solid var(--type);
+    outline-offset: -2px;
+  }
+
+  .spacer { flex: 1; }
+
+  /* ── Mockup stage ─────────────────────────────────────────── */
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+  }
+
+  .stage__meta {
+    width: 100%;
+    max-width: 1024px;
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.08em;
+    color: var(--faint);
+  }
+
+  .slot {
+    position: relative;
+    width: 1024px;
+    height: 600px;
+  }
+
+  .console {
+    position: absolute;
+    inset: 0;
+    transform-origin: top left;
+    display: grid;
+    grid-template-rows: 46px 190px 1fr 76px;
+    background: var(--chassis);
+    border: 1px solid var(--seam);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Hardware primitives ──────────────────────────────────── */
+
+  .lamp {
+    width: 9px;
+    height: 9px;
+    flex: none;
+    background: #3a3a31;
+  }
+  .lamp--go { background: var(--go); }
+  .lamp--caution { background: var(--caution); }
+  .lamp--abort { background: var(--abort); }
+
+  .seam-v {
+    width: 1px;
+    height: 24px;
+    flex: none;
+    background: var(--seam);
+  }
+
+  .plate {
+    height: 26px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    background: var(--chassis-hi);
+    border-bottom: 1px solid var(--seam);
+  }
+
+  .plate__code {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--type);
+  }
+
+  .plate__name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .plate__meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .screen {
+    background: var(--screen);
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
+    border-right: 1px solid #3a3a30;
+    border-bottom: 1px solid #3a3a30;
+  }
+
+  .screen-label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  /* ── Status strip ─────────────────────────────────────────── */
+
+  .strip {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    background: var(--chassis);
+    border-bottom: 1px solid var(--seam-dark);
+  }
+
+  .verdict-mini {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: none;
+  }
+
+  .verdict-mini__word {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    color: var(--abort);
+  }
+
+  .verdict-mini__link {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--faint);
+  }
+
+  .readout {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex: none;
+  }
+
+  .readout__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--faint);
+  }
+
+  .readout__value {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+    color: var(--type);
+  }
+
+  .readout__value--data { color: var(--go); }
+  .readout__value--caution { color: var(--caution); }
+
+  .readout__event {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+  }
+
+  .selector {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: var(--screen);
+    border: 1px solid var(--seam);
+  }
+
+  .selector__pos {
+    height: 30px;
+    padding: 0 12px;
+    background: transparent;
+    border: 0;
+    color: var(--faint);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .selector__pos:hover { color: var(--type); }
+
+  .selector__pos[aria-selected="true"] {
+    background: var(--chassis-hi);
+    color: var(--type);
+    border-top: 1px solid #3f3f35;
+    border-bottom: 1px solid var(--seam-dark);
+  }
+
+  .switch {
+    height: 34px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 10px;
+    background: var(--chassis-hi);
+    border: 1px solid var(--seam);
+    border-top-color: #3f3f35;
+    border-bottom-color: var(--seam-dark);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    cursor: pointer;
+  }
+
+  .switch:hover { color: var(--type); }
+  .switch:active { border-top-color: var(--seam-dark); border-bottom-color: #3f3f35; }
+
+  /* ── Front wall ───────────────────────────────────────────── */
+
+  .wall {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border-bottom: 1px solid var(--seam-dark);
+  }
+
+  .wall__screen {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    margin: 6px;
+    overflow: hidden;
+  }
+
+  .verdict {
+    width: 208px;
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 10px 14px;
+    border-right: 1px solid var(--screen-line);
+  }
+
+  .verdict__row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .verdict__value {
+    font-family: var(--mono);
+    font-size: 62px;
+    font-weight: 500;
+    line-height: 0.82;
+    letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums;
+    color: var(--go);
+  }
+
+  .verdict__unit {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .verdict__need {
+    margin-top: 2px;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--abort);
+  }
+
+  .poll {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--screen-line);
+  }
+
+  .poll__cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .track {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding: 0 14px;
+  }
+
+  .track__events {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    top: 26px;
+    height: 54px;
+  }
+
+  .track__event {
+    position: absolute;
+    top: 0;
+    height: 54px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 8px;
+    border: 1px solid var(--screen-line);
+    border-left-width: 3px;
+    overflow: hidden;
+  }
+
+  .track__event--current {
+    border-color: var(--go);
+    background: color-mix(in srgb, var(--go) 9%, transparent);
+  }
+
+  .track__event-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--type);
+  }
+
+  .track__event-time {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  .track__event--current .track__event-time { color: var(--go); }
+
+  .track__now {
+    position: absolute;
+    top: 0;
+    bottom: 22px;
+    width: 1px;
+    background: var(--type);
+    opacity: 0.85;
+  }
+
+  .track__now span {
+    position: absolute;
+    top: 0;
+    left: 6px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    color: var(--type);
+    text-transform: uppercase;
+  }
+
+  .track__now::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -3px;
+    width: 7px;
+    height: 7px;
+    background: var(--type);
+  }
+
+  .track__axis {
+    position: absolute;
+    left: 14px;
+    right: 14px;
+    bottom: 0;
+    height: 22px;
+    border-top: 1px solid var(--screen-line);
+  }
+
+  .track__tick {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 6px;
+    background: var(--screen-line);
+  }
+
+  .track__tick--hour { height: 9px; background: #2b4431; }
+
+  .track__label {
+    position: absolute;
+    top: 8px;
+    transform: translateX(-50%);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  /* ── Console bays ─────────────────────────────────────────── */
+
+  .bays {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 1.5fr;
+    min-height: 0;
+    background: var(--chassis);
+  }
+
+  .bays[hidden] { display: none; }
+
+  .bay {
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    background: var(--chassis);
+    border: 0;
+    border-right: 1px solid var(--seam-dark);
+    border-left: 1px solid var(--seam);
+    text-align: left;
+    color: inherit;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  .bay:first-child { border-left: 0; }
+  .bay:last-child { border-right: 0; }
+  .bay:hover { background: #1e1e19; }
+  .bay:active { background: #171712; }
+
+  .bay__screen {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    margin: 6px;
+    padding: 9px 10px;
+    overflow: hidden;
+  }
+
+  .count {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: none;
+    height: 48px;
+  }
+
+  .count__value {
+    font-family: var(--mono);
+    font-size: 52px;
+    font-weight: 500;
+    line-height: 0.82;
+    letter-spacing: -0.06em;
+    font-variant-numeric: tabular-nums;
+    color: var(--go);
+  }
+
+  .count__unit {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--faint);
+  }
+
+  .printout {
+    flex: 1;
+    min-height: 0;
+    margin-top: 6px;
+    border-top: 1px solid var(--screen-line);
+    overflow: hidden;
+  }
+
+  .line {
+    display: block;
+    padding: 5px 0 4px;
+    border-bottom: 1px solid var(--screen-line);
+  }
+
+  .line:last-child { border-bottom: 0; }
+
+  .line__head {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+
+  .line__who {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+  }
+
+  .line__when {
+    margin-left: auto;
+    flex: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .line__text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-top: 2px;
+    font-size: 15px;
+    line-height: 1.25;
+    color: var(--type);
+  }
+
+  .bay__foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 22px;
+    margin-top: 4px;
+  }
+
+  .flag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--abort);
+  }
+
+  .flag--muted { color: var(--faint); }
+
+  .bay__open {
+    margin-left: auto;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .bay--quiet .count__value { color: var(--faint); }
+  .bay--quiet .line__text { color: var(--muted); }
+
+  .flight-bay { cursor: default; }
+  .flight-bay:hover { background: var(--chassis); }
+
+  .tasks {
+    flex: 1;
+    min-height: 0;
+    margin-top: 6px;
+    border-top: 1px solid var(--screen-line);
+    overflow: hidden;
+  }
+
+  .task {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--screen-line);
+  }
+
+  .task:last-child { border-bottom: 0; }
+
+  .task__box {
+    width: 14px;
+    height: 14px;
+    flex: none;
+    border: 2px solid #3f4a3f;
+  }
+
+  .task__text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    color: var(--type);
+  }
+
+  .task__due {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .task__due--abort { color: var(--abort); }
+  .task__due--today { color: var(--caution); }
+  .task__due--next { color: var(--faint); }
+
+  /* ── Deck bar ─────────────────────────────────────────────── */
+
+  .deckbar {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 200px 60px;
+    min-height: 0;
+    border-top: 1px solid var(--seam);
+    background: var(--chassis);
+  }
+
+  .module {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-right: 1px solid var(--seam-dark);
+  }
+
+  .module--controls {
+    justify-content: center;
+    gap: 6px;
+    padding: 0 8px;
+  }
+
+  .module--mascot {
+    justify-content: center;
+    padding: 0;
+    border-right: 0;
+  }
+
+  .meters {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr) 1.2fr;
+    gap: 14px;
+  }
+
+  .meter {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .meter__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+  }
+
+  .meter__label {
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--faint);
+  }
+
+  .meter__value {
+    font-family: var(--mono);
+    font-size: 15px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    color: var(--go);
+  }
+
+  .ladder {
+    display: grid;
+    grid-template-columns: repeat(16, 1fr);
+    gap: 2px;
+    height: 6px;
+  }
+
+  .ladder i { background: #23351f; }
+  .ladder i.is-on { background: var(--go); }
+
+  .net {
+    display: flex;
+    gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    color: var(--go);
+    white-space: nowrap;
+    overflow: hidden;
+  }
+
+  .net__arrow { color: var(--faint); }
+
+  .audio {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .audio__art {
+    width: 34px;
+    height: 34px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: var(--screen);
+    border: 1px solid var(--seam);
+    color: var(--muted);
+  }
+
+  .audio__meta {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .audio__line {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .audio__title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--type);
+  }
+
+  .audio__artist {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--faint);
+  }
+
+  .audio__prog {
+    position: relative;
+    height: 3px;
+    background: #23351f;
+  }
+
+  .audio__prog b {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 54%;
+    background: var(--go);
+  }
+
+  .audio__time {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--faint);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .mascot {
+    width: 42px;
+    height: 46px;
+    background-image: url("../dashboard/public/corgi/spritesheet.webp");
+    background-size: 338px 412px;
+    background-position: 0 0;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  /* ── Todos deck ───────────────────────────────────────────── */
+
+  .bays--todos .bay { cursor: default; }
+  .bays--todos .bay:hover { background: var(--chassis); }
+
+  .quad-led { width: 8px; height: 8px; flex: none; background: var(--caution); }
+  .quad-led--abort { background: var(--abort); }
+  .quad-led--off { background: #3a3a31; }
+
+  .capture {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 34px;
+    margin-top: 8px;
+    padding: 0 8px;
+    background: var(--screen);
+    border: 1px solid var(--seam);
+  }
+
+  .capture:focus-within { border-color: var(--go); }
+
+  .capture__caret {
+    font-family: var(--mono);
+    font-size: 15px;
+    color: var(--go);
+  }
+
+  .capture input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    font-size: 14px;
+  }
+
+  .capture input::placeholder { color: var(--faint); }
+
+  .capture__cursor {
+    width: 7px;
+    height: 14px;
+    flex: none;
+    background: var(--go);
+  }
+
+  .totals {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+
+  .totals__open { color: var(--muted); }
+  .totals__over { color: var(--abort); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="stage__meta">
+    <span>BIRDEYE / MCC CONSOLE</span>
+    <span>1024 × 600 / TOUCH</span>
+  </div>
+
+  <div class="slot" id="slot">
+    <div class="console" id="console">
+
+      <!-- ── Status strip ───────────────────────────────────── -->
+      <header class="strip">
+        <div class="verdict-mini">
+          <span class="lamp lamp--abort"></span>
+          <span class="verdict-mini__word">ATTN</span>
+          <span class="verdict-mini__link">LINK 4/4</span>
+        </div>
+
+        <span class="seam-v"></span>
+
+        <div class="readout">
+          <span class="readout__label">MET</span>
+          <span class="readout__value readout__value--data" id="met">002:14:37</span>
+        </div>
+        <div class="readout">
+          <span class="readout__label">LOCAL</span>
+          <span class="readout__value" id="local">22:41:07</span>
+        </div>
+
+        <span class="seam-v"></span>
+
+        <div class="readout">
+          <span class="readout__label">T−</span>
+          <span class="readout__value readout__value--caution" id="tminus">00:38:12</span>
+          <span class="readout__event">1:1 THEO</span>
+        </div>
+
+        <span class="spacer"></span>
+
+        <div class="selector" role="tablist" aria-label="Views">
+          <button type="button" class="selector__pos" role="tab" aria-selected="true" data-view-target="home">Home</button>
+          <button type="button" class="selector__pos" role="tab" aria-selected="false" data-view-target="todos">Todos</button>
+        </div>
+      </header>
+
+      <!-- ── Front wall ─────────────────────────────────────── -->
+      <section class="wall" aria-label="Flight plan">
+        <div class="plate">
+          <span class="lamp lamp--go"></span>
+          <span class="plate__code">FDO</span>
+          <span class="plate__name">Flight plan</span>
+          <span class="spacer"></span>
+          <span class="plate__meta">−2H / +2H</span>
+          <span class="plate__meta">DAY 2 / 3 EVENTS</span>
+        </div>
+
+        <div class="wall__screen screen">
+          <div class="verdict">
+            <span class="screen-label">Attention</span>
+            <div class="verdict__row">
+              <span class="verdict__value">7</span>
+              <span class="verdict__unit">unread</span>
+            </div>
+            <span class="verdict__need">2 need you</span>
+            <div class="poll" aria-label="Station poll">
+              <span class="poll__cell"><i class="lamp lamp--abort"></i>01</span>
+              <span class="poll__cell"><i class="lamp lamp--abort"></i>02</span>
+              <span class="poll__cell"><i class="lamp lamp--caution"></i>03</span>
+              <span class="poll__cell"><i class="lamp lamp--go"></i>04</span>
+            </div>
+          </div>
+
+          <div class="track">
+            <div class="track__events" id="track-events"></div>
+            <div class="track__now" id="track-now"><span>Now</span></div>
+            <div class="track__axis" id="track-axis"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Home bays ──────────────────────────────────────── -->
+      <section class="bays" data-deck="home">
+
+        <button type="button" class="bay" aria-label="CAPCOM 01, Discord Work, 4 unread, 1 important">
+          <span class="plate">
+            <span class="lamp lamp--abort"></span>
+            <span class="plate__code">CAPCOM</span>
+            <span class="plate__name">Discord</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">01</span>
+          </span>
+          <span class="bay__screen screen">
+            <span class="count">
+              <span class="count__value">4</span>
+              <span class="count__unit">unread</span>
+            </span>
+            <span class="printout">
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">ALICE / GENERAL</span>
+                  <span class="line__when">2M</span>
+                </span>
+                <span class="line__text">check deploy log</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">SAM / GENERAL</span>
+                  <span class="line__when">18M</span>
+                </span>
+                <span class="line__text">look at PR 412</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">MARCUS / OPS</span>
+                  <span class="line__when">31M</span>
+                </span>
+                <span class="line__text">staging is back</span>
+              </span>
+            </span>
+            <span class="bay__foot">
+              <span class="flag">▲ 1 important</span>
+              <span class="bay__open">Open ›</span>
+            </span>
+          </span>
+        </button>
+
+        <button type="button" class="bay" aria-label="CAPCOM 02, Google Chat, 2 unread, 1 important">
+          <span class="plate">
+            <span class="lamp lamp--abort"></span>
+            <span class="plate__code">CAPCOM</span>
+            <span class="plate__name">Chat</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">02</span>
+          </span>
+          <span class="bay__screen screen">
+            <span class="count">
+              <span class="count__value">2</span>
+              <span class="count__unit">unread</span>
+            </span>
+            <span class="printout">
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">SAM / DESIGN</span>
+                  <span class="line__when">12M</span>
+                </span>
+                <span class="line__text">review notes are up</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">PRIYA / DESIGN</span>
+                  <span class="line__when">47M</span>
+                </span>
+                <span class="line__text">empty state check</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">SAM / DESIGN</span>
+                  <span class="line__when">1H</span>
+                </span>
+                <span class="line__text">updated flows sent</span>
+              </span>
+            </span>
+            <span class="bay__foot">
+              <span class="flag">▲ 1 important</span>
+              <span class="bay__open">Open ›</span>
+            </span>
+          </span>
+        </button>
+
+        <button type="button" class="bay" aria-label="CAPCOM 03, WhatsApp, 1 unread">
+          <span class="plate">
+            <span class="lamp lamp--caution"></span>
+            <span class="plate__code">CAPCOM</span>
+            <span class="plate__name">WhatsApp</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">03</span>
+          </span>
+          <span class="bay__screen screen">
+            <span class="count">
+              <span class="count__value">1</span>
+              <span class="count__unit">unread</span>
+            </span>
+            <span class="printout">
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">MUM / FAMILY</span>
+                  <span class="line__when">48M</span>
+                </span>
+                <span class="line__text">dinner on sunday?</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">DAD / FAMILY</span>
+                  <span class="line__when">3H</span>
+                </span>
+                <span class="line__text">photos from the trip</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">MUM / FAMILY</span>
+                  <span class="line__when">5H</span>
+                </span>
+                <span class="line__text">call when you can</span>
+              </span>
+            </span>
+            <span class="bay__foot">
+              <span class="flag flag--muted">routine</span>
+              <span class="bay__open">Open ›</span>
+            </span>
+          </span>
+        </button>
+
+        <button type="button" class="bay bay--quiet" aria-label="CAPCOM 04, Discord Personal, no unread">
+          <span class="plate">
+            <span class="lamp lamp--go"></span>
+            <span class="plate__code">CAPCOM</span>
+            <span class="plate__name">Personal</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">04</span>
+          </span>
+          <span class="bay__screen screen">
+            <span class="count">
+              <span class="count__value">—</span>
+              <span class="count__unit">clear</span>
+            </span>
+            <span class="printout">
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">LAST / JONAS</span>
+                  <span class="line__when">3H</span>
+                </span>
+                <span class="line__text">build is green</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">TIMO / GENERAL</span>
+                  <span class="line__when">5H</span>
+                </span>
+                <span class="line__text">gg</span>
+              </span>
+              <span class="line">
+                <span class="line__head">
+                  <span class="line__who">JONAS / GENERAL</span>
+                  <span class="line__when">1D</span>
+                </span>
+                <span class="line__text">see you monday</span>
+              </span>
+            </span>
+            <span class="bay__foot">
+              <span class="flag flag--muted">0 unread</span>
+              <span class="bay__open">Open ›</span>
+            </span>
+          </span>
+        </button>
+
+        <article class="bay flight-bay" aria-label="Flight priority">
+          <div class="plate">
+            <span class="lamp lamp--caution"></span>
+            <span class="plate__code">FLIGHT</span>
+            <span class="plate__name">Priority</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">5</span>
+          </div>
+          <div class="bay__screen screen">
+            <div class="tasks">
+              <div class="task">
+                <span class="task__box"></span>
+                <span class="task__text">Fix login redirect</span>
+                <span class="task__due task__due--abort">Overdue</span>
+              </div>
+              <div class="task">
+                <span class="task__box"></span>
+                <span class="task__text">Deploy staging build</span>
+                <span class="task__due task__due--today">Today</span>
+              </div>
+              <div class="task">
+                <span class="task__box"></span>
+                <span class="task__text">Review PR 412</span>
+                <span class="task__due task__due--today">Today</span>
+              </div>
+              <div class="task">
+                <span class="task__box"></span>
+                <span class="task__text">Rotate API keys</span>
+                <span class="task__due task__due--next">Tmrw</span>
+              </div>
+              <div class="task">
+                <span class="task__box"></span>
+                <span class="task__text">Vendor quote reply</span>
+                <span class="task__due task__due--next">Fri</span>
+              </div>
+            </div>
+            <div class="bay__foot">
+              <span class="flag flag--muted">2 overdue / 5 steps</span>
+              <span class="bay__open">All tasks ›</span>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ── Todos bays ─────────────────────────────────────── -->
+      <section class="bays bays--todos" data-deck="todos" hidden>
+
+        <article class="bay" aria-label="Do first">
+          <div class="plate">
+            <span class="quad-led quad-led--abort"></span>
+            <span class="plate__code">PLAN</span>
+            <span class="plate__name">Do first</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">2</span>
+          </div>
+          <div class="bay__screen screen">
+            <div class="printout">
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">OVERDUE / HIGH</span>
+                  <span class="line__when">2/5</span>
+                </span>
+                <span class="line__text">Fix login redirect</span>
+              </div>
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">TODAY / HIGH</span>
+                  <span class="line__when">—</span>
+                </span>
+                <span class="line__text">Deploy staging build</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="bay" aria-label="Schedule">
+          <div class="plate">
+            <span class="quad-led"></span>
+            <span class="plate__code">PLAN</span>
+            <span class="plate__name">Schedule</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">2</span>
+          </div>
+          <div class="bay__screen screen">
+            <div class="printout">
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">TOMORROW / MEDIUM</span>
+                  <span class="line__when">—</span>
+                </span>
+                <span class="line__text">Rotate API keys</span>
+              </div>
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">FRIDAY / MEDIUM</span>
+                  <span class="line__when">—</span>
+                </span>
+                <span class="line__text">Rewrite payroll exporter</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="bay" aria-label="Decide">
+          <div class="plate">
+            <span class="quad-led quad-led--off"></span>
+            <span class="plate__code">PLAN</span>
+            <span class="plate__name">Decide</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">1</span>
+          </div>
+          <div class="bay__screen screen">
+            <div class="printout">
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">NO DATE / LOW</span>
+                  <span class="line__when">—</span>
+                </span>
+                <span class="line__text">Vendor quote reply</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="bay" aria-label="Eliminate">
+          <div class="plate">
+            <span class="quad-led quad-led--off"></span>
+            <span class="plate__code">PLAN</span>
+            <span class="plate__name">Eliminate</span>
+            <span class="spacer"></span>
+            <span class="plate__meta">1</span>
+          </div>
+          <div class="bay__screen screen">
+            <div class="printout">
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">NO DATE / LOW</span>
+                  <span class="line__when">—</span>
+                </span>
+                <span class="line__text">Clean stale branches</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="bay" aria-label="New task">
+          <div class="plate">
+            <span class="lamp lamp--go"></span>
+            <span class="plate__code">FLIGHT</span>
+            <span class="plate__name">Priority</span>
+          </div>
+          <div class="bay__screen screen">
+            <span class="screen-label">Log a task</span>
+            <label class="capture">
+              <span class="capture__caret">›</span>
+              <input type="text" placeholder="Add a task" aria-label="Add a task">
+              <span class="capture__cursor"></span>
+            </label>
+            <div class="totals">
+              <span class="totals__open">8 open</span>
+              <span class="totals__over">2 overdue</span>
+            </div>
+            <div class="printout">
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">NEXT DUE</span>
+                  <span class="line__when">TODAY</span>
+                </span>
+                <span class="line__text">Deploy staging build</span>
+              </div>
+              <div class="line">
+                <span class="line__head">
+                  <span class="line__who">FLIGHT PLAN</span>
+                  <span class="line__when">22:41</span>
+                </span>
+                <span class="line__text">Design review until 23:00</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </section>
+
+      <!-- ── Deck bar ───────────────────────────────────────── -->
+      <footer class="deckbar">
+        <div class="module">
+          <span class="plate__code">EECOM</span>
+          <div class="meters">
+            <div class="meter">
+              <div class="meter__top">
+                <span class="meter__label">CPU</span>
+                <span class="meter__value">12%</span>
+              </div>
+              <div class="ladder" aria-hidden="true">
+                <i class="is-on"></i><i></i><i></i><i></i><i></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+            <div class="meter">
+              <div class="meter__top">
+                <span class="meter__label">RAM</span>
+                <span class="meter__value">38%</span>
+              </div>
+              <div class="ladder" aria-hidden="true">
+                <i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+            <div class="meter">
+              <div class="meter__top">
+                <span class="meter__label">DISK</span>
+                <span class="meter__value">51%</span>
+              </div>
+              <div class="ladder" aria-hidden="true">
+                <i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i><i class="is-on"></i>
+                <i></i><i></i><i></i><i></i><i></i><i></i>
+              </div>
+            </div>
+            <div class="meter">
+              <div class="meter__top">
+                <span class="meter__label">NET</span>
+              </div>
+              <div class="net">
+                <span><span class="net__arrow">↓</span> 1.2M</span>
+                <span><span class="net__arrow">↑</span> 84K</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="module">
+          <span class="plate__code">PAO</span>
+          <div class="audio">
+            <span class="audio__art">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 18V5l12-2v13"></path>
+                <circle cx="6" cy="18" r="3"></circle>
+                <circle cx="18" cy="16" r="3"></circle>
+              </svg>
+            </span>
+            <span class="audio__meta">
+              <span class="audio__line">
+                <span class="audio__title">Weightless</span>
+                <span class="audio__artist">Marconi Union</span>
+              </span>
+              <span class="audio__prog"><b></b></span>
+            </span>
+            <span class="audio__time">2:14 / 4:06</span>
+          </div>
+        </div>
+
+        <div class="module module--controls">
+          <button type="button" class="switch" aria-pressed="false">
+            <span class="lamp lamp--go"></span>Sound
+          </button>
+          <button type="button" class="switch">Bus 1</button>
+        </div>
+
+        <div class="module module--mascot" aria-hidden="true">
+          <span class="mascot"></span>
+        </div>
+      </footer>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const LOAD_MS = Date.now();
+  const MET_BASE_MS = (2 * 3600 + 14 * 60 + 37) * 1000;
+  const WINDOW_MIN = 120;
+  const pad = (value) => String(value).padStart(2, '0');
+
+  const consoleEl = document.getElementById('console');
+  const slot = document.getElementById('slot');
+  const metEl = document.getElementById('met');
+  const localEl = document.getElementById('local');
+  const tminusEl = document.getElementById('tminus');
+  const trackEvents = document.getElementById('track-events');
+  const trackNow = document.getElementById('track-now');
+  const trackAxis = document.getElementById('track-axis');
+
+  const events = [
+    { name: 'Design review', offset: -42, duration: 60 },
+    { name: '1:1 Theo', offset: 38, duration: 30 },
+    { name: 'Standup', offset: 96, duration: 25 },
+  ];
+
+  const windowStartMs = LOAD_MS - WINDOW_MIN * 60000;
+  const windowMs = WINDOW_MIN * 2 * 60000;
+
+  function clockLabel(timestamp) {
+    const date = new Date(timestamp);
+    return pad(date.getHours()) + ':' + pad(date.getMinutes());
+  }
+
+  function durationLabel(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    return pad(Math.floor(total / 3600)) + ':' + pad(Math.floor((total % 3600) / 60)) + ':' + pad(total % 60);
+  }
+
+  function metLabel(ms) {
+    const total = Math.floor(ms / 1000);
+    return pad(Math.floor(total / 86400)) + ':' + pad(Math.floor((total % 86400) / 3600)) + ':' + pad(Math.floor((total % 3600) / 60)) + ':' + pad(total % 60);
+  }
+
+  function positionPercent(ms) {
+    return ((ms - windowStartMs) / windowMs) * 100;
+  }
+
+  // Timeline is built once; only the now cursor moves after that.
+  for (const event of events) {
+    const startMs = LOAD_MS + event.offset * 60000;
+    const block = document.createElement('div');
+    block.className = 'track__event' + (event.offset < 0 ? ' track__event--current' : '');
+    const widthPercent = (event.duration / (WINDOW_MIN * 2)) * 100;
+    block.style.left = positionPercent(startMs) + '%';
+    block.style.width = widthPercent + '%';
+
+    const name = document.createElement('span');
+    name.className = 'track__event-name';
+    name.textContent = event.name;
+
+    const time = document.createElement('span');
+    time.className = 'track__event-time';
+    time.textContent = widthPercent >= 18
+      ? clockLabel(startMs) + '–' + clockLabel(startMs + event.duration * 60000)
+      : clockLabel(startMs);
+
+    block.appendChild(name);
+    block.appendChild(time);
+    trackEvents.appendChild(block);
+  }
+
+  for (let index = 0; index <= 8; index++) {
+    const tick = document.createElement('span');
+    tick.className = 'track__tick' + (index % 2 === 0 ? ' track__tick--hour' : '');
+    tick.style.left = (index / 8) * 100 + '%';
+    trackAxis.appendChild(tick);
+
+    if (index % 2 === 0) {
+      const label = document.createElement('span');
+      label.className = 'track__label';
+      label.style.left = (index / 8) * 100 + '%';
+      label.textContent = clockLabel(windowStartMs + index * 30 * 60000);
+      trackAxis.appendChild(label);
+    }
+  }
+
+  const nextEvent = events.find((event) => event.offset > 0);
+
+  function tick() {
+    const now = Date.now();
+    const date = new Date(now);
+
+    metEl.textContent = metLabel(MET_BASE_MS + (now - LOAD_MS));
+    localEl.textContent = pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+    tminusEl.textContent = durationLabel(LOAD_MS + nextEvent.offset * 60000 - now);
+
+    const nowPercent = Math.max(0, Math.min(100, positionPercent(now)));
+    trackNow.style.left = 'calc(14px + (100% - 28px) * ' + nowPercent / 100 + ')';
+  }
+
+  function fit() {
+    const scale = Math.min(1, (window.innerWidth - 64) / 1024, (window.innerHeight - 110) / 600);
+    consoleEl.style.transform = 'scale(' + scale + ')';
+    slot.style.width = 1024 * scale + 'px';
+    slot.style.height = 600 * scale + 'px';
+  }
+
+  const viewButtons = document.querySelectorAll('[data-view-target]');
+  for (const button of viewButtons) {
+    button.addEventListener('click', () => {
+      const target = button.dataset.viewTarget;
+      for (const other of viewButtons) {
+        other.setAttribute('aria-selected', other === button ? 'true' : 'false');
+      }
+      for (const deck of document.querySelectorAll('[data-deck]')) {
+        deck.hidden = deck.dataset.deck !== target;
+      }
+    });
+  }
+
+  window.addEventListener('resize', fit);
+  fit();
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>

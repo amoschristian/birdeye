@@ -16,6 +16,13 @@ _RETENTION_SECONDS = 7 * 24 * 60 * 60  # 7 days
 # history the attention thresholds get tuned against.
 _DECISION_RETENTION_SECONDS = 90 * 24 * 60 * 60
 
+_TIME_PATTERN = re.compile(
+    r'(\d{1,2}:\d{2})'
+    r'|\b(\d{1,2})\s*(am|pm)\b'
+    r'|\b(noon|midnight)\b',
+    re.IGNORECASE,
+)
+
 
 @dataclass
 class Notification:
@@ -530,6 +537,7 @@ class Database:
         'july', 'august', 'september', 'october', 'november', 'december',
         'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
         'next', 'last', 'this',
+        'day', 'days', 'week', 'weeks', 'month', 'months', 'year', 'years',
     }
 
     @staticmethod
@@ -540,12 +548,7 @@ class Database:
         Done with our own regex because dateparser.search_dates v1.4.1
         mangles am/pm without a colon ('tomorrow 10am' → current wall-clock).
         """
-        m = re.search(
-            r'(\d{1,2}:\d{2})'                    # 14:00 / 9:30
-            r'|\b(\d{1,2})\s*(am|pm)\b'           # 10am / 10 pm / 2:30pm (half handled above)
-            r'|\b(noon|midnight)\b',
-            text, re.IGNORECASE,
-        )
+        m = _TIME_PATTERN.search(text)
         if not m:
             return None
         if m.group(1):
@@ -558,18 +561,113 @@ class Database:
             h += 12
         return f'{h:02d}:00'
 
+    _DATE_SHAPE = re.compile(r'\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}')
+
     @staticmethod
     def _is_date_candidate(substr: str) -> bool:
         """True when a search_dates hit is a genuine date expression.
 
-        Requires a date-indicator word (today/tomorrow/day/month/next…)
-        or a digit ("in 3 days", "Apr 15", "15/04"), and at least 3 chars
-        to reject Indonesian/English false positives like "di", "to", "nya".
+        A hit must carry a date word (today/tomorrow/weekday/month/next…)
+        or a date-shaped number ("2026-10-31", "31/10"). A bare month and a
+        time-only hit ("oct", "2pm") are rejected: dateparser returns both
+        when task text confuses its tokenizer.
         """
-        words_set = set(substr.lower().split())
-        has_date_word = bool(words_set & Database._DATE_WORDS)
-        has_digit = bool(re.search(r'\d', substr))
-        return len(substr.strip()) >= 3 and (has_date_word or has_digit)
+        stripped = substr.strip().lower().rstrip('.')
+        if len(stripped) < 3:
+            return False
+        if stripped in Database._MONTHS:
+            return False
+        if _TIME_PATTERN.fullmatch(stripped):
+            return False
+
+        words = set(re.findall(r'[a-z]+', stripped))
+        return bool(words & Database._DATE_WORDS) or bool(Database._DATE_SHAPE.search(stripped))
+
+    _WEEKDAYS = {
+        'monday': 0, 'tuesday': 1, 'wednesday': 2, 'thursday': 3,
+        'friday': 4, 'saturday': 5, 'sunday': 6,
+    }
+
+    _MONTHS = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4, 'may': 5, 'june': 6,
+        'july': 7, 'august': 8, 'september': 9, 'october': 10, 'november': 11,
+        'december': 12, 'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'jun': 6,
+        'jul': 7, 'aug': 8, 'sep': 9, 'sept': 9, 'oct': 10, 'nov': 11, 'dec': 12,
+    }
+
+    @staticmethod
+    def _month_day(month: int, day: int, matched: str, today: datetime.date):
+        try:
+            date = datetime.date(today.year, month, day)
+        except ValueError:
+            return None
+        if date < today:
+            try:
+                date = datetime.date(today.year + 1, month, day)
+            except ValueError:
+                return None
+        return date, matched
+
+    @staticmethod
+    def _find_relative_date(text: str, explicit_time: str | None):
+        """Fallback for dateparser: it returns None when the text holds tokens
+        like "test2", so common relative phrases are parsed here instead."""
+        lower = text.lower()
+        today = datetime.date.today()
+
+        if 'day after tomorrow' in lower:
+            return today + datetime.timedelta(days=2), 'day after tomorrow'
+
+        for word in ('tomorrow', 'tmrw', 'tmr', 'tomorow'):
+            if re.search(r'\b' + word + r'\b', lower):
+                return today + datetime.timedelta(days=1), word
+
+        for word in ('today', 'tonight'):
+            if re.search(r'\b' + word + r'\b', lower):
+                return today, word
+
+        if re.search(r'\bnext week\b', lower):
+            return today + datetime.timedelta(days=7), 'next week'
+
+        match = re.search(r'\bin\s+(\d+)\s+(days?|weeks?)\b', lower)
+        if match:
+            days = int(match.group(1)) * (7 if match.group(2).startswith('week') else 1)
+            return today + datetime.timedelta(days=days), match.group(0)
+
+        weekdays = '|'.join(Database._WEEKDAYS)
+        match = re.search(r'\b(?:next\s+)?(' + weekdays + r')\b', lower)
+        if match:
+            ahead = (Database._WEEKDAYS[match.group(1)] - today.weekday()) % 7
+            if ahead == 0:
+                if explicit_time is None:
+                    ahead = 7
+                else:
+                    hour, minute = map(int, explicit_time.split(':'))
+                    if datetime.time(hour, minute) <= datetime.datetime.now().time():
+                        ahead = 7
+            return today + datetime.timedelta(days=ahead), match.group(0)
+
+        match = re.search(r'\b(\d{4})-(\d{2})-(\d{2})\b', text)
+        if match:
+            try:
+                return datetime.date.fromisoformat(match.group(0)), match.group(0)
+            except ValueError:
+                pass
+
+        months = '|'.join(Database._MONTHS)
+        match = re.search(r'\b(' + months + r')\.?\s+(\d{1,2})\b', lower)
+        if match:
+            return Database._month_day(
+                Database._MONTHS[match.group(1)], int(match.group(2)), match.group(0), today
+            )
+
+        match = re.search(r'\b(\d{1,2})\s+(' + months + r')\b', lower)
+        if match:
+            return Database._month_day(
+                Database._MONTHS[match.group(2)], int(match.group(1)), match.group(0), today
+            )
+
+        return None
 
     @staticmethod
     def _parse_todo_meta(text: str) -> tuple[str, str | None, str, str | None, str | None, float | None]:
@@ -577,8 +675,10 @@ class Database:
 
         Returns (clean_text, due_date, priority, scheduled_date, scheduled_time, reminder_at).
         Priority tags: !high/!h, !medium/!m, !low/!l (case-insensitive, last win).
-        Date: parsed via dateparser.search_dates; time extracted by our own
-        regex (search_dates drops am/pm without a colon, see _parse_explicit_time).
+        Date: dateparser.search_dates first, then a relative-day fallback because
+        it returns nothing for text containing tokens like "test2". Time is
+        extracted by our own regex (search_dates drops am/pm without a colon,
+        see _parse_explicit_time).
         An explicit time schedules the task at that datetime but does NOT
         auto-set a reminder — schedule and reminder are deliberately
         independent controls (set the reminder separately, e.g. 10 min before).
@@ -601,27 +701,40 @@ class Database:
         # Collapse multiple spaces
         clean = re.sub(r'\s+', ' ', clean).strip()
 
+        time_match = _TIME_PATTERN.search(clean)
         explicit_time = Database._parse_explicit_time(clean) if clean else None
 
-        # Parse date from clean text using search_dates
         due_date = None
         scheduled_date = scheduled_time = None
         reminder_at = None
+        matched_date = None
+
         if clean:
             results = search_dates(clean, settings={'PREFER_DATES_FROM': 'future'})
             if results:
                 for substr, dt in results:
                     if Database._is_date_candidate(substr):
                         due_date = dt.strftime('%Y-%m-%d')
-                        # Combine date from search_dates with our own explicit time:
-                        # search_dates itself gives wrong times for am/pm without colon
-                        if explicit_time:
-                            scheduled_date = due_date
-                            scheduled_time = explicit_time
-                        # Remove the matched date substring from the text
-                        clean = clean.replace(substr, '', 1).strip()
-                        clean = re.sub(r'\s+', ' ', clean).strip()
+                        matched_date = substr
                         break
+
+            if due_date is None:
+                relative = Database._find_relative_date(clean, explicit_time)
+                if relative:
+                    due_date, matched_date = relative[0].strftime('%Y-%m-%d'), relative[1]
+
+        if matched_date:
+            clean = re.sub(
+                re.escape(matched_date), '', clean, count=1, flags=re.IGNORECASE
+            ).strip()
+            if explicit_time:
+                scheduled_date = due_date
+                scheduled_time = explicit_time
+                if time_match:
+                    clean = re.sub(
+                        re.escape(time_match.group(0)), '', clean, count=1, flags=re.IGNORECASE
+                    ).strip()
+            clean = re.sub(r'\s+', ' ', clean).strip()
 
         return clean, due_date, priority, scheduled_date, scheduled_time, reminder_at
 
@@ -644,6 +757,28 @@ class Database:
             logger.error(f"create_todo failed: {e}")
             return None
 
+    @staticmethod
+    def _reminder_for(date: str | None, time: str | None) -> float | None:
+        """The reminder is always five minutes before the due datetime."""
+        if not date or not time:
+            return None
+        try:
+            due = datetime.datetime.strptime(f"{date} {time}", "%Y-%m-%d %H:%M")
+        except ValueError:
+            return None
+        return (due - datetime.timedelta(minutes=5)).timestamp()
+
+    def _sync_reminder(self, conn: sqlite3.Connection, todo_id: int) -> None:
+        todo = self._fetch_todo(conn, todo_id)
+        if not todo:
+            return
+        reminder = self._reminder_for(todo.scheduled_date or todo.due_date, todo.scheduled_time)
+        conn.execute(
+            "UPDATE todos SET reminder_at = ?, last_reminded_at = NULL WHERE id = ?",
+            (reminder, todo_id),
+        )
+        conn.commit()
+
     def _insert_todo(self, conn: sqlite3.Connection, *, text: str, order_index: int | None = None,
                      due_date: str | None = None, priority: str = "medium", status: str = "inbox",
                      notes: str = "",
@@ -659,6 +794,8 @@ class Database:
             ).fetchone()
             order_index = (row["mx"] if row else -1) + 1
         now = time.time()
+        if reminder_at is None:
+            reminder_at = self._reminder_for(scheduled_date or due_date, scheduled_time)
         cur = conn.execute(
             "INSERT INTO todos (text, order_index, created_at, due_date, priority, status, "
             "notes, scheduled_date, scheduled_time, reminder_at, "
@@ -803,6 +940,7 @@ class Database:
                 (scheduled_date, scheduled_time, todo_id),
             )
             conn.commit()
+            self._sync_reminder(conn, todo_id)
             return self._fetch_todo(conn, todo_id)
         except sqlite3.Error as e:
             logger.error(f"update_todo_schedule failed: {e}")
@@ -913,6 +1051,7 @@ class Database:
             conn = self._connect()
             conn.execute("UPDATE todos SET due_date = ? WHERE id = ?", (due_date, todo_id))
             conn.commit()
+            self._sync_reminder(conn, todo_id)
             return self._fetch_todo(conn, todo_id)
         except sqlite3.Error as e:
             logger.error(f"update_todo_due_date failed: {e}")

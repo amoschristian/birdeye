@@ -86,7 +86,8 @@ export type ServerMessage =
   | ServerCalendarMessage
   | ServerTodosMessage
   | ServerTodoAckMessage
-  | ServerTodoReminderMessage;
+  | ServerTodoReminderMessage
+  | ServerProcessAckMessage;
 
 export interface ClientFocusAction {
   action: 'focus';
@@ -119,7 +120,7 @@ export interface ServerWorkspaceAckMessage {
   success: boolean;
 }
 
-export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientNotificationDeleteAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction;
+export type ClientMessage = ClientFocusAction | ClientMarkReadAction | ClientNotificationDeleteAction | ClientClearReadAction | ClientMarkAllReadAction | ClientSwitchWorkspaceAction | ClientSpotifyAction | ClientTodoAddAction | ClientTodoToggleAction | ClientTodoEditAction | ClientTodoDeleteAction | ClientTodoPriorityAction | ClientTodoDateAction | ClientTodoReorderAction | ClientTodoStatusAction | ClientTodoNotesAction | ClientTodoScheduleAction | ClientTodoReminderAction | ClientTodoAttachContextAction | ClientSubtaskAddAction | ClientSubtaskToggleAction | ClientSubtaskEditAction | ClientSubtaskDeleteAction | ClientSubtaskReorderAction | ClientKillProcessAction;
 
 // ── Monitor types ─────────────────────────────────────────────────
 
@@ -139,7 +140,16 @@ export interface MonitorData {
     dl: number;
     ul: number;
   };
+  processes: ProcessInfo[];
   ts: number;
+}
+
+export interface ProcessInfo {
+  pid: number;
+  name: string;
+  cpu: number;
+  mem: number;
+  user: string;
 }
 
 export interface ServerMonitorMessage {
@@ -148,7 +158,15 @@ export interface ServerMonitorMessage {
   ram: { used: number; total: number; percent: number };
   disk: { used: number; total: number; percent: number };
   net: { dl: number; ul: number };
+  processes: ProcessInfo[];
   ts: number;
+}
+
+export interface ServerProcessAckMessage {
+  type: 'process_ack';
+  pid: number;
+  success: boolean;
+  error: string | null;
 }
 
 // ── Spotify types ─────────────────────────────────────────────────
@@ -185,6 +203,11 @@ export interface ClientSpotifyAction {
   action: 'spotify';
   command: 'play_pause' | 'next' | 'previous' | 'seek';
   position_ms?: number;
+}
+
+export interface ClientKillProcessAction {
+  action: 'kill_process';
+  pid: number;
 }
 
 // ── Calendar types ────────────────────────────────────────────────

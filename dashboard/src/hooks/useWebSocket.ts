@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import type {
   AppConfig, TabState, Notification, MonitorData, SpotifyState,
   CalendarEvent, TodoItem, TodoStatus, ServerMessage, ClientMessage,
+  ServerProcessAckMessage,
 } from '../types';
 import { useSound } from './useSound';
 
@@ -13,6 +14,7 @@ interface UseWebSocketReturn {
   todos: TodoItem[];
   todoReminders: TodoItem[];
   monitorData: MonitorData | null;
+  processAck: ServerProcessAckMessage | null;
   spotifyData: SpotifyState | null;
   calendarEvents: CalendarEvent[];
   connected: boolean;
@@ -25,6 +27,7 @@ interface UseWebSocketReturn {
   markAllRead: (appId?: string) => void;
   clearRead: () => void;
   focusApp: (appId: string, notifId?: number) => void;
+  killProcess: (pid: number) => void;
   switchWorkspace: (workspace: number) => void;
   addTodo: (text: string) => void;
   toggleTodo: (id: number) => void;
@@ -61,6 +64,7 @@ export function useWebSocket(host: string): UseWebSocketReturn {
   const [tabs, setTabs] = useState<TabState[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [monitorData, setMonitorData] = useState<MonitorData | null>(null);
+  const [processAck, setProcessAck] = useState<ServerProcessAckMessage | null>(null);
   const [spotifyData, setSpotifyData] = useState<SpotifyState | null>(null);
   const [calendarEvents, setCalendarEvents] = useState<CalendarEvent[]>([]);
   const [todos, setTodos] = useState<TodoItem[]>([]);
@@ -138,7 +142,16 @@ export function useWebSocket(host: string): UseWebSocketReturn {
         } else if (data.type === 'focus_ack') {
           console.log(`Focus ${data.appId}: ${data.success ? '✓' : '✗'}`);
         } else if (data.type === 'monitor') {
-          setMonitorData({ cpu: data.cpu, ram: data.ram, disk: data.disk, net: data.net, ts: data.ts });
+          setMonitorData({
+            cpu: data.cpu,
+            ram: data.ram,
+            disk: data.disk,
+            net: data.net,
+            processes: data.processes ?? [],
+            ts: data.ts,
+          });
+        } else if (data.type === 'process_ack') {
+          setProcessAck(data);
         } else if (data.type === 'spotify') {
           setSpotifyData({
             available: data.available,
@@ -260,6 +273,10 @@ export function useWebSocket(host: string): UseWebSocketReturn {
 
   const focusApp = useCallback((appId: string, notifId?: number) => {
     sendMessage({ action: 'focus', appId, ...(notifId ? { notifId } : {}) });
+  }, [sendMessage]);
+
+  const killProcess = useCallback((pid: number) => {
+    sendMessage({ action: 'kill_process', pid });
   }, [sendMessage]);
 
   const addTodo = useCallback((text: string) => {
@@ -410,5 +427,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, switchWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, processAck, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, killProcess, switchWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

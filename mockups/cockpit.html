@@ -1,0 +1,1519 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Birdeye — cockpit console mockup</title>
+<!--
+  BIRDEYE / COCKPIT — static mockup, 1024 x 600, touch first.
+
+  One function per screen, selected from the dock: Home, Traffic, Channels,
+  Tasks, Systems. Home shows only the single most important transmission and
+  two full-width actions. Every press target is at least 56px; most are 76-92px.
+
+  Amber is the readout colour, cyan is structure, red is the alert condition.
+  Modules are separate slabs with a machined top edge, not cards on a page.
+-->
+<style>
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "Space Grotesk";
+    src: url("../dashboard/public/fonts/space-grotesk-latin-600-normal.woff2") format("woff2");
+    font-weight: 600;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");
+    font-weight: 400;
+    font-display: swap;
+  }
+  @font-face {
+    font-family: "JetBrains Mono";
+    src: url("../dashboard/public/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");
+    font-weight: 500;
+    font-display: swap;
+  }
+
+  :root {
+    --hull: #050910;
+    --panel: #0b1420;
+    --panel-hi: #132133;
+    --edge: #1e3448;
+    --edge-hi: #3b5876;
+    --edge-low: #02060b;
+
+    --ink: #e9f2f8;
+    --dim: #93afc4;
+    --faint: #6b879f;
+
+    --amber: #ffa23a;
+    --amber-hi: #ffc177;
+    --amber-low: #7a4400;
+    --cyan: #58d2f0;
+    --alert: #ff4b3b;
+    --ok: #5be0a5;
+
+    --sans: "Space Grotesk", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+  body {
+    background: var(--hull);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  button, input { font: inherit; color: inherit; }
+  button { -webkit-tap-highlight-color: transparent; }
+
+  :focus-visible {
+    outline: 3px solid var(--cyan);
+    outline-offset: 2px;
+  }
+
+  .spacer { flex: 1; }
+
+  /* ── Stage ────────────────────────────────────────────────── */
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+  }
+
+  .slot {
+    position: relative;
+    width: 1024px;
+    height: 600px;
+  }
+
+  .console {
+    position: absolute;
+    inset: 0;
+    transform-origin: top left;
+    display: grid;
+    grid-template-rows: 64px 1fr 104px;
+    gap: 8px;
+    padding: 8px;
+    background: var(--hull);
+    border: 1px solid var(--edge);
+    border-top: 3px solid var(--alert);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── Physical panel ───────────────────────────────────────── */
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 2px solid var(--edge-low);
+    border-radius: 4px;
+  }
+
+  .label {
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+
+  .mono {
+    font-family: var(--mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .btn {
+    height: 84px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 0 24px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    color: var(--ink);
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .btn:hover { background: var(--panel-hi); }
+  .btn:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .btn--primary {
+    background: var(--amber);
+    color: #06101a;
+    border-color: var(--amber-hi);
+    border-bottom-color: var(--amber-low);
+  }
+
+  .btn--primary:hover { background: #ffae52; }
+  .btn--primary:active { background: #e08a24; transform: translateY(3px); filter: brightness(0.94); }
+
+  .btn--outline {
+    color: var(--amber);
+    border-color: color-mix(in srgb, var(--amber) 45%, transparent);
+    border-top-color: color-mix(in srgb, var(--amber) 70%, transparent);
+  }
+
+  .btn--outline:hover {
+    background: color-mix(in srgb, var(--amber) 9%, transparent);
+  }
+
+  .btn--sm {
+    height: 56px;
+    padding: 0 18px;
+    font-size: 14px;
+  }
+
+  .btn svg { flex: none; }
+
+  /* ── Status strip ─────────────────────────────────────────── */
+
+  .status {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 2px solid var(--edge-low);
+    border-radius: 4px;
+  }
+
+  .status__seam {
+    width: 1px;
+    height: 28px;
+    flex: none;
+    background: var(--edge);
+  }
+
+  .condition__flag {
+    height: 30px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    background: var(--alert);
+    color: #0a0e14;
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+  }
+
+  .status__clock {
+    font-family: var(--mono);
+    font-size: 30px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    color: var(--amber);
+  }
+
+  .status__item {
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: var(--cyan);
+    white-space: nowrap;
+  }
+
+  .status__item--muted { color: var(--dim); }
+  .status__item--ok { color: var(--ok); }
+
+  .monitor {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex: none;
+  }
+
+  .mini {
+    width: 84px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+
+  .mini--net { width: 118px; }
+
+  .mini__top {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 6px;
+  }
+
+  .mini__label {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--faint);
+  }
+
+  .mini__value {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--amber);
+  }
+
+  .mini__bar {
+    display: flex;
+    gap: 2px;
+    height: 5px;
+  }
+
+  .mini__bar i {
+    flex: 1;
+    background: var(--edge);
+  }
+
+  .mini__bar i.on { background: var(--amber); }
+
+  .mini__rates {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--cyan);
+    white-space: nowrap;
+  }
+
+  /* ── Screens ──────────────────────────────────────────────── */
+
+  .screens {
+    position: relative;
+    min-height: 0;
+  }
+
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 0;
+  }
+
+  .screen[hidden] { display: none; }
+
+  .screen__head {
+    height: 60px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 4px 0 6px;
+  }
+
+  .screen__title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--ink);
+  }
+
+  .screen__count {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--amber);
+    white-space: nowrap;
+  }
+
+  .screen__sub {
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--faint);
+    white-space: nowrap;
+  }
+
+  /* ── Home ─────────────────────────────────────────────────── */
+
+  .priority {
+    height: 232px;
+    flex: none;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 0 26px 0 30px;
+    overflow: hidden;
+  }
+
+  .priority::before {
+    content: "";
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 5px;
+    background: var(--amber);
+  }
+
+  .priority__head {
+    height: 44px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--edge);
+  }
+
+  .priority__head .label { color: var(--amber); }
+  .priority__head .label--dim { color: var(--faint); }
+
+  .priority__body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .priority__from {
+    margin: 0;
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--dim);
+  }
+
+  .priority__msg {
+    margin: 0;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    font-size: 40px;
+    font-weight: 600;
+    line-height: 1.12;
+    letter-spacing: -0.01em;
+    color: var(--ink);
+  }
+
+  .actions {
+    height: 84px;
+    flex: none;
+    display: flex;
+    gap: 10px;
+  }
+
+  .actions .btn { flex: 1; height: 84px; }
+
+  .home__foot {
+    height: 64px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .home__counts {
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.04em;
+    color: var(--dim);
+  }
+
+  .home__counts b { color: var(--amber); font-weight: 500; }
+
+  .home__foot .btn {
+    height: 64px;
+    min-width: 320px;
+    font-size: 14px;
+  }
+
+  /* ── Traffic rows ─────────────────────────────────────────── */
+
+  .seg {
+    height: 56px;
+    display: flex;
+    padding: 3px;
+    background: var(--hull);
+    border: 1px solid var(--edge);
+    border-radius: 4px;
+  }
+
+  .seg__opt {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 0 14px;
+    background: transparent;
+    border: 0;
+    border-radius: 3px;
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .seg__opt b { color: var(--amber); font-weight: 500; }
+
+  .seg__opt.is-active {
+    background: var(--amber);
+    color: #06101a;
+  }
+
+  .seg__opt.is-active b { color: #06101a; }
+
+  .seg__opt:active { transform: translateY(2px); filter: brightness(1.1); }
+
+  .rows {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .rows::-webkit-scrollbar { display: none; }
+
+  .row {
+    height: 76px;
+    flex: none;
+    display: flex;
+    gap: 8px;
+  }
+
+  .row__main {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px 40px 180px minmax(0, 1fr) 60px;
+    gap: 12px;
+    align-items: center;
+    padding: 0 20px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 2px solid var(--edge-low);
+    border-left: 4px solid transparent;
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .row__main:hover { background: var(--panel-hi); }
+  .row__main:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .row--priority .row__main {
+    border-left-color: var(--amber);
+  }
+
+  .row__index {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--faint);
+  }
+
+  .row--priority .row__index { color: var(--amber); }
+
+  .row__icon {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    background: var(--hull);
+    border: 1px solid var(--edge);
+    border-radius: 3px;
+  }
+
+  .row__icon img {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+  }
+
+  .row__who {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+  }
+
+  .row__sender {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .row__channel {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--mono);
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    color: var(--cyan);
+  }
+
+  .row__msg {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 20px;
+    color: var(--ink);
+  }
+
+  .row__time {
+    font-family: var(--mono);
+    font-size: 14px;
+    color: var(--dim);
+    text-align: right;
+  }
+
+  .row__check {
+    width: 76px;
+    height: 76px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    color: var(--ok);
+    cursor: pointer;
+  }
+
+  .row__check:hover { background: var(--panel-hi); }
+  .row__check:active { transform: translateY(3px); filter: brightness(1.1); }
+
+  .row[hidden] { display: none; }
+
+  .row.is-read .row__main { opacity: 0.35; }
+
+  .row.is-read .row__check {
+    color: #06101a;
+    background: var(--ok);
+    border-color: var(--ok);
+  }
+
+  /* ── Tasks ────────────────────────────────────────────────── */
+
+  .task {
+    height: 76px;
+    flex: none;
+    display: flex;
+    gap: 8px;
+  }
+
+  .task__check {
+    width: 76px;
+    height: 76px;
+    flex: none;
+    display: grid;
+    place-items: center;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  .task__check:hover { background: var(--panel-hi); }
+  .task__check:active { transform: translateY(3px); filter: brightness(1.1); }
+
+  .task__box {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--edge-hi);
+    border-radius: 3px;
+  }
+
+  .task.is-done .task__main { opacity: 0.35; }
+  .task.is-done .task__box { background: var(--ok); border-color: var(--ok); }
+
+  .task__main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 20px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 2px solid var(--edge-low);
+    border-radius: 4px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .task__main:hover { background: var(--panel-hi); }
+  .task__main:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .task__text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 20px;
+    color: var(--ink);
+  }
+
+  .task__due {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .task__due--alert { color: var(--alert); }
+  .task__due--warn { color: var(--amber); }
+  .task__due--later { color: var(--faint); }
+
+  /* ── Processes ────────────────────────────────────────────── */
+
+  .rows[hidden] { display: none; }
+
+  .proc {
+    height: 76px;
+    flex: none;
+    display: flex;
+    gap: 8px;
+  }
+
+  .proc__main {
+    flex: 1;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 250px minmax(0, 1fr) 96px;
+    gap: 18px;
+    align-items: center;
+    padding: 0 20px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 2px solid var(--edge-low);
+    border-radius: 4px;
+  }
+
+  .proc__id {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+
+  .proc__name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .proc__meta {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+    white-space: nowrap;
+  }
+
+  .proc__value {
+    font-family: var(--mono);
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--amber);
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .ladder {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    gap: 3px;
+    height: 10px;
+  }
+
+  .ladder i { background: var(--edge); }
+  .ladder i.is-on { background: var(--amber); }
+
+  .proc__kill {
+    width: 104px;
+    height: 76px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid color-mix(in srgb, var(--alert) 45%, transparent);
+    border-top-color: color-mix(in srgb, var(--alert) 70%, transparent);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    color: var(--alert);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .proc__kill:hover { background: color-mix(in srgb, var(--alert) 10%, var(--panel)); }
+  .proc__kill:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .proc__kill.is-armed {
+    background: var(--alert);
+    color: #0a0e14;
+    border-color: #ff8a7e;
+    border-bottom-color: #7a1a12;
+  }
+
+  .proc__kill.is-killed {
+    color: var(--faint);
+    border-color: var(--edge);
+  }
+
+  .proc.is-killed { opacity: 0.35; }
+
+  /* ── Dock ─────────────────────────────────────────────────── */
+
+  .dock {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr) 92px;
+    gap: 8px;
+    padding: 6px 0;
+    min-height: 0;
+  }
+
+  .dock__btn {
+    height: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    color: var(--dim);
+    cursor: pointer;
+  }
+
+  .dock__btn:hover { background: var(--panel-hi); color: var(--ink); }
+  .dock__btn:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .dock__label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+  }
+
+  .dock__count {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--amber);
+  }
+
+  .dock__btn.is-active {
+    background: var(--amber);
+    color: #06101a;
+    border-color: var(--amber-hi);
+    border-bottom-color: var(--amber-low);
+  }
+
+  .dock__btn.is-active .dock__count { color: #06101a; }
+
+  .dock__mute {
+    height: 92px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: var(--panel);
+    border: 1px solid var(--edge);
+    border-top-color: var(--edge-hi);
+    border-bottom: 3px solid var(--edge-low);
+    border-radius: 4px;
+    color: var(--dim);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+
+  .dock__mute:hover { background: var(--panel-hi); color: var(--ink); }
+  .dock__mute:active { transform: translateY(3px); filter: brightness(1.08); }
+
+  .dock__mute.is-muted {
+    color: var(--alert);
+    border-color: color-mix(in srgb, var(--alert) 55%, transparent);
+  }
+
+  .toast {
+    position: absolute;
+    left: 50%;
+    bottom: 124px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border: 1px solid var(--ok);
+    border-left: 5px solid var(--ok);
+    border-radius: 4px;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    color: var(--ink);
+    opacity: 0;
+    transform: translate(-50%, 12px);
+    pointer-events: none;
+    transition: opacity 140ms ease-out, transform 140ms ease-out;
+  }
+
+  .toast.is-on {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+
+  @keyframes screen-in {
+    from { opacity: 0; transform: translateY(5px); }
+    to { opacity: 1; transform: none; }
+  }
+
+  .screen:not([hidden]) {
+    animation: screen-in 130ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="slot" id="slot">
+    <div class="console" id="console">
+
+      <!-- ── Status strip ───────────────────────────────────── -->
+      <header class="status">
+        <span class="condition__flag">RED</span>
+        <span class="status__clock mono" id="clock">22:41</span>
+
+        <span class="status__seam"></span>
+
+        <div class="monitor" aria-label="System monitor">
+          <span class="mini">
+            <span class="mini__top">
+              <span class="mini__label">CPU</span>
+              <span class="mini__value">12%</span>
+            </span>
+            <span class="mini__bar" aria-hidden="true">
+              <i class="on"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+          </span>
+
+          <span class="mini">
+            <span class="mini__top">
+              <span class="mini__label">RAM</span>
+              <span class="mini__value">38%</span>
+            </span>
+            <span class="mini__bar" aria-hidden="true">
+              <i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i><i></i>
+            </span>
+          </span>
+
+          <span class="mini">
+            <span class="mini__top">
+              <span class="mini__label">DISK</span>
+              <span class="mini__value">51%</span>
+            </span>
+            <span class="mini__bar" aria-hidden="true">
+              <i class="on"></i><i class="on"></i><i class="on"></i><i class="on"></i><i></i><i></i><i></i><i></i>
+            </span>
+          </span>
+
+          <span class="mini mini--net">
+            <span class="mini__top">
+              <span class="mini__label">NET</span>
+            </span>
+            <span class="mini__rates">↓ 1.2M · ↑ 84K</span>
+          </span>
+        </div>
+
+        <span class="spacer"></span>
+
+        <span class="status__item status__item--ok">LINK 4/4</span>
+        <span class="status__seam"></span>
+        <span class="status__item status__item--muted">NEXT 15:20 · 1:1 THEO</span>
+      </header>
+
+      <!-- ── Screens ────────────────────────────────────────── -->
+      <main class="screens">
+
+        <!-- HOME -->
+        <section class="screen" data-screen="home" aria-label="Home">
+          <article class="priority panel">
+            <header class="priority__head">
+              <span class="label">Priority 1 of 2</span>
+              <span class="spacer"></span>
+              <span class="label label--dim">Discord Work</span>
+              <span class="label label--dim">2m ago</span>
+            </header>
+
+            <div class="priority__body">
+              <p class="priority__from">Alice · general</p>
+              <p class="priority__msg">check the deploy log</p>
+            </div>
+          </article>
+
+          <div class="actions">
+            <button type="button" class="btn btn--primary" id="home-open">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>
+              </svg>
+              Open transmission
+            </button>
+            <button type="button" class="btn" id="home-read">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Mark read
+            </button>
+          </div>
+
+          <div class="home__foot">
+            <span class="home__counts"><b>1</b> more priority · <b>5</b> routine</span>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn--outline" id="see-all">
+              See all 7 transmissions
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 12h14"></path><path d="m13 6 6 6-6 6"></path>
+              </svg>
+            </button>
+          </div>
+        </section>
+
+        <!-- TRAFFIC -->
+        <section class="screen" data-screen="traffic" aria-label="Traffic" hidden>
+          <header class="screen__head">
+            <span class="screen__title">Traffic</span>
+            <span class="screen__count">7 unread</span>
+
+            <span class="spacer"></span>
+
+            <div class="seg" role="group" aria-label="Filter by group">
+              <button type="button" class="seg__opt is-active" data-filter="all">All <b>7</b></button>
+              <button type="button" class="seg__opt" data-filter="work">Work <b>6</b></button>
+              <button type="button" class="seg__opt" data-filter="personal">Personal <b>1</b></button>
+            </div>
+
+            <button type="button" class="btn btn--sm" id="mark-all">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+              Mark all read
+            </button>
+          </header>
+
+          <div class="rows">
+
+            <div class="row row--priority" data-group="work">
+              <button type="button" class="row__main" aria-label="Alice, Discord Work: check the deploy log">
+                <span class="row__index">01</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/discord.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Alice</span>
+                  <span class="row__channel">Discord Work</span>
+                </span>
+                <span class="row__msg">check the deploy log</span>
+                <span class="row__time">2m</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark check the deploy log as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row row--priority" data-group="work">
+              <button type="button" class="row__main" aria-label="Sam, Google Chat: review notes are up">
+                <span class="row__index">02</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/google-chat.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Sam</span>
+                  <span class="row__channel">Google Chat</span>
+                </span>
+                <span class="row__msg">review notes are up</span>
+                <span class="row__time">12m</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark review notes are up as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row" data-group="work">
+              <button type="button" class="row__main" aria-label="Sam, Discord Work: can you look at PR 412">
+                <span class="row__index">03</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/discord.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Sam</span>
+                  <span class="row__channel">Discord Work</span>
+                </span>
+                <span class="row__msg">can you look at PR 412</span>
+                <span class="row__time">18m</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark can you look at PR 412 as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row" data-group="work">
+              <button type="button" class="row__main" aria-label="Marcus, Discord Work: staging is back">
+                <span class="row__index">04</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/discord.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Marcus</span>
+                  <span class="row__channel">Discord Work</span>
+                </span>
+                <span class="row__msg">staging is back</span>
+                <span class="row__time">31m</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark staging is back as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row" data-group="personal">
+              <button type="button" class="row__main" aria-label="Mum, WhatsApp: dinner on sunday">
+                <span class="row__index">05</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/whatsapp.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Mum</span>
+                  <span class="row__channel">WhatsApp</span>
+                </span>
+                <span class="row__msg">dinner on sunday?</span>
+                <span class="row__time">48m</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark dinner on sunday as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row" data-group="work">
+              <button type="button" class="row__main" aria-label="Priya, Google Chat: empty state check">
+                <span class="row__index">06</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/google-chat.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Priya</span>
+                  <span class="row__channel">Google Chat</span>
+                </span>
+                <span class="row__msg">empty state check</span>
+                <span class="row__time">1h</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark empty state check as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+            <div class="row" data-group="work">
+              <button type="button" class="row__main" aria-label="Alice, Discord Work: merged the hotfix">
+                <span class="row__index">07</span>
+                <span class="row__icon"><img src="../dashboard/public/icons/discord.png" alt=""></span>
+                <span class="row__who">
+                  <span class="row__sender">Alice</span>
+                  <span class="row__channel">Discord Work</span>
+                </span>
+                <span class="row__msg">merged the hotfix</span>
+                <span class="row__time">1h</span>
+              </button>
+              <button type="button" class="row__check" aria-label="Mark merged the hotfix as read">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </button>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- TASKS -->
+        <section class="screen" data-screen="tasks" aria-label="Tasks" hidden>
+          <header class="screen__head">
+            <span class="screen__title">Tasks</span>
+            <span class="screen__count">8 open · 2 overdue</span>
+            <span class="spacer"></span>
+            <button type="button" class="btn btn--sm">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M12 5v14"></path><path d="M5 12h14"></path>
+              </svg>
+              Add task
+            </button>
+          </header>
+
+          <div class="rows">
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Fix login redirect complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Fix login redirect</span>
+                <span class="task__due task__due--alert">Overdue</span>
+              </button>
+            </div>
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Deploy staging build complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Deploy staging build</span>
+                <span class="task__due task__due--warn">Today</span>
+              </button>
+            </div>
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Review PR 412 complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Review PR 412</span>
+                <span class="task__due task__due--warn">Today</span>
+              </button>
+            </div>
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Rotate API keys complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Rotate API keys</span>
+                <span class="task__due task__due--later">Tmrw</span>
+              </button>
+            </div>
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Vendor quote reply complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Vendor quote reply</span>
+                <span class="task__due task__due--later">Fri</span>
+              </button>
+            </div>
+
+            <div class="task">
+              <button type="button" class="task__check" aria-label="Mark Clean stale branches complete">
+                <span class="task__box"></span>
+              </button>
+              <button type="button" class="task__main">
+                <span class="task__text">Clean stale branches</span>
+                <span class="task__due task__due--later">—</span>
+              </button>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- PROCESSES -->
+        <section class="screen" data-screen="processes" aria-label="Processes" hidden>
+          <header class="screen__head">
+            <span class="screen__title">Processes</span>
+            <span class="screen__sub" id="proc-mode">Top by CPU</span>
+            <span class="spacer"></span>
+            <div class="seg" role="group" aria-label="Sort processes">
+              <button type="button" class="seg__opt is-active" data-sort="cpu">CPU</button>
+              <button type="button" class="seg__opt" data-sort="mem">Memory</button>
+            </div>
+          </header>
+
+          <div class="rows" id="procs-cpu"></div>
+          <div class="rows" id="procs-mem" hidden></div>
+        </section>
+
+      </main>
+
+      <div class="toast" id="toast" role="status" aria-live="polite">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+        <span>Marked read</span>
+      </div>
+
+      <!-- ── Dock ───────────────────────────────────────────── -->
+      <nav class="dock" aria-label="Screens">
+        <button type="button" class="dock__btn is-active" data-target="home">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M3 10.5 12 3l9 7.5"></path><path d="M5 9.5V21h14V9.5"></path>
+          </svg>
+          <span class="dock__label">Home</span>
+        </button>
+
+        <button type="button" class="dock__btn" data-target="traffic">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+          </svg>
+          <span class="dock__label">Traffic <span class="dock__count">7</span></span>
+        </button>
+
+        <button type="button" class="dock__btn" data-target="tasks">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+          </svg>
+          <span class="dock__label">Tasks <span class="dock__count">5</span></span>
+        </button>
+
+        <button type="button" class="dock__btn" data-target="processes">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line>
+            <line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line>
+          </svg>
+          <span class="dock__label">Processes</span>
+        </button>
+
+        <button type="button" class="dock__mute" aria-pressed="false">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+            <line x1="22" y1="9" x2="16" y2="15"></line><line x1="16" y1="9" x2="22" y2="15"></line>
+          </svg>
+          <span class="dock__mute-label">Mute</span>
+        </button>
+      </nav>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const consoleEl = document.getElementById('console');
+  const slot = document.getElementById('slot');
+  const clockEl = document.getElementById('clock');
+  const pad = (value) => String(value).padStart(2, '0');
+
+  function tick() {
+    const now = new Date();
+    clockEl.textContent = pad(now.getHours()) + ':' + pad(now.getMinutes());
+  }
+
+  function fit() {
+    const scale = Math.min(1, (window.innerWidth - 64) / 1024, (window.innerHeight - 110) / 600);
+    consoleEl.style.transform = 'scale(' + scale + ')';
+    slot.style.width = 1024 * scale + 'px';
+    slot.style.height = 600 * scale + 'px';
+  }
+
+  const dockButtons = document.querySelectorAll('[data-target]');
+
+  function showScreen(target) {
+    for (const button of dockButtons) {
+      button.classList.toggle('is-active', button.dataset.target === target);
+    }
+    for (const screen of document.querySelectorAll('[data-screen]')) {
+      screen.hidden = screen.dataset.screen !== target;
+    }
+  }
+
+  for (const button of dockButtons) {
+    button.addEventListener('click', () => showScreen(button.dataset.target));
+  }
+
+  document.getElementById('see-all').addEventListener('click', () => showScreen('traffic'));
+
+  const toastEl = document.getElementById('toast');
+  const toastText = toastEl.querySelector('span');
+  let toastTimer;
+
+  function showToast(message) {
+    toastText.textContent = message;
+    toastEl.classList.add('is-on');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toastEl.classList.remove('is-on'), 1600);
+  }
+
+  document.getElementById('home-open').addEventListener('click', () => showToast('Opening Discord Work'));
+  document.getElementById('home-read').addEventListener('click', () => showToast('Marked read'));
+  document.getElementById('mark-all').addEventListener('click', () => showToast('All marked read'));
+
+  for (const button of document.querySelectorAll('.row__check')) {
+    button.addEventListener('click', () => {
+      button.closest('.row').classList.add('is-read');
+      showToast('Marked read');
+    });
+  }
+
+  for (const button of document.querySelectorAll('.task__check')) {
+    button.addEventListener('click', () => {
+      button.closest('.task').classList.toggle('is-done');
+      showToast('Task updated');
+    });
+  }
+
+  const muteButton = document.querySelector('.dock__mute');
+  muteButton.addEventListener('click', () => {
+    const muted = muteButton.getAttribute('aria-pressed') === 'true';
+    muteButton.setAttribute('aria-pressed', String(!muted));
+    muteButton.classList.toggle('is-muted', !muted);
+    muteButton.querySelector('.dock__mute-label').textContent = !muted ? 'Muted' : 'Mute';
+    showToast(!muted ? 'Sound muted' : 'Sound on');
+  });
+
+  const filterButtons = document.querySelectorAll('[data-filter]');
+  const trafficRows = Array.from(document.querySelectorAll('[data-group]'));
+
+  for (const button of filterButtons) {
+    button.addEventListener('click', () => {
+      const group = button.dataset.filter;
+
+      for (const other of filterButtons) {
+        other.classList.toggle('is-active', other === button);
+      }
+      for (const row of trafficRows) {
+        row.hidden = group !== 'all' && row.dataset.group !== group;
+      }
+    });
+  }
+
+  const processes = [
+    { name: 'firefox', pid: 4821, cpu: 12.4, mem: 1229, memText: '1.2 GB' },
+    { name: 'node', pid: 9014, cpu: 9.8, mem: 340, memText: '340 MB' },
+    { name: 'chrome', pid: 6390, cpu: 6.2, mem: 880, memText: '880 MB' },
+    { name: 'python', pid: 7712, cpu: 3.1, mem: 210, memText: '210 MB' },
+    { name: 'discord', pid: 5520, cpu: 2.4, mem: 512, memText: '512 MB' }
+  ];
+
+  function renderProcesses(container, metric) {
+    const sorted = [...processes].sort((a, b) => b[metric] - a[metric]);
+    const max = sorted[0][metric];
+
+    container.innerHTML = sorted.map((proc) => {
+      const lit = Math.max(1, Math.round((proc[metric] / max) * 20));
+      const bars = Array.from({ length: 20 }, (_, index) =>
+        '<i' + (index < lit ? ' class="is-on"' : '') + '></i>'
+      ).join('');
+      const value = metric === 'cpu' ? proc.cpu.toFixed(1) + '%' : proc.memText;
+      const meta = metric === 'cpu'
+        ? 'PID ' + proc.pid + ' · ' + proc.memText
+        : 'PID ' + proc.pid + ' · ' + proc.cpu.toFixed(1) + '% CPU';
+
+      return '<div class="proc" data-pid="' + proc.pid + '">' +
+        '<div class="proc__main">' +
+          '<span class="proc__id"><span class="proc__name">' + proc.name + '</span><span class="proc__meta">' + meta + '</span></span>' +
+          '<span class="ladder" aria-hidden="true">' + bars + '</span>' +
+          '<span class="proc__value">' + value + '</span>' +
+        '</div>' +
+        '<button type="button" class="proc__kill" aria-label="Kill ' + proc.name + '">' +
+          '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>' +
+          '<span>Kill</span>' +
+        '</button>' +
+      '</div>';
+    }).join('');
+  }
+
+  renderProcesses(document.getElementById('procs-cpu'), 'cpu');
+  renderProcesses(document.getElementById('procs-mem'), 'mem');
+
+  const sortButtons = document.querySelectorAll('[data-sort]');
+  for (const button of sortButtons) {
+    button.addEventListener('click', () => {
+      const sort = button.dataset.sort;
+      for (const other of sortButtons) {
+        other.classList.toggle('is-active', other === button);
+      }
+      document.getElementById('procs-cpu').hidden = sort !== 'cpu';
+      document.getElementById('procs-mem').hidden = sort !== 'mem';
+      document.getElementById('proc-mode').textContent = sort === 'cpu' ? 'Top by CPU' : 'Top by memory';
+    });
+  }
+
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.proc__kill');
+    if (!button || button.classList.contains('is-killed')) return;
+
+    const label = button.querySelector('span');
+
+    if (!button.classList.contains('is-armed')) {
+      button.classList.add('is-armed');
+      label.textContent = 'Sure?';
+      setTimeout(() => {
+        if (button.classList.contains('is-killed')) return;
+        button.classList.remove('is-armed');
+        label.textContent = 'Kill';
+      }, 3000);
+      return;
+    }
+
+    const pid = button.closest('.proc').dataset.pid;
+    for (const row of document.querySelectorAll('[data-pid="' + pid + '"]')) {
+      row.classList.add('is-killed');
+      const kill = row.querySelector('.proc__kill');
+      kill.classList.remove('is-armed');
+      kill.classList.add('is-killed');
+      kill.querySelector('span').textContent = 'Killed';
+    }
+    showToast('Process terminated');
+  });
+
+  window.addEventListener('resize', fit);
+  fit();
+  tick();
+  setInterval(tick, 10000);
+</script>
+</body>
+</html>

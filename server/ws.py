@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
@@ -535,6 +536,20 @@ async def ws_dashboard(websocket: WebSocket):
                 command = data.get("command", "")
                 if command in ("play_pause", "next", "previous", "seek"):
                     spotify_listener.send_command(command, data.get("position_ms"))
+
+            elif action == "kill_process":
+                pid = data.get("pid")
+                success, error = await asyncio.to_thread(
+                    system_monitor.kill_process, pid
+                )
+                await _send(websocket, {
+                    "type": "process_ack",
+                    "pid": pid,
+                    "success": success,
+                    "error": error,
+                })
+                if success:
+                    await broadcast_monitor()
 
             elif action.startswith("todo_") or action.startswith("subtask_"):
                 await _handle_todo_action(websocket, data)
