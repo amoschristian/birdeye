@@ -50,12 +50,12 @@ export function CockpitApp() {
     todoReminders,
     monitorData,
     calendarEvents,
-    connected,
     soundMuted,
     toggleSoundMuted,
     markRead,
     markAllRead,
     focusApp,
+    goToWorkspace,
     toggleTodo,
     addTodo,
     editTodo,
@@ -73,6 +73,7 @@ export function CockpitApp() {
 
   const [screen, setScreen] = useState<Screen>('home');
   const [filter, setFilter] = useState<GroupFilter>('all');
+  const [appFilter, setAppFilter] = useState<string | null>(null);
   const [trafficPage, setTrafficPage] = useState(0);
   const [taskPage, setTaskPage] = useState(0);
   const [planPage, setPlanPage] = useState(0);
@@ -133,7 +134,6 @@ export function CockpitApp() {
   );
   const ranked = useMemo(() => sortByAttention(unread), [unread]);
   const priority = useMemo(() => ranked.filter(isPriority), [ranked]);
-  const top = priority[0] ?? ranked[0] ?? null;
   const condition: Condition = priority.length > 0 ? 'red' : unread.length > 0 ? 'warn' : 'ok';
   const taskAttention = useMemo(() => taskAttentionCount(todos), [todos]);
   const planCount = useMemo(() => {
@@ -146,6 +146,7 @@ export function CockpitApp() {
 
   const handleOpen = (notification: Notification) => {
     focusApp(notification.app_id, notification.notif_id ?? undefined);
+    markRead(notification.id);
     showToast('Opening ' + (appOf(apps, notification.app_id)?.name ?? notification.app_name));
   };
 
@@ -155,7 +156,9 @@ export function CockpitApp() {
   };
 
   const handleMarkAll = () => {
-    if (filter === 'all') {
+    if (appFilter) {
+      markAllRead(appFilter);
+    } else if (filter === 'all') {
       markAllRead();
     } else {
       for (const app of apps) {
@@ -201,8 +204,14 @@ export function CockpitApp() {
     showToast('Task added');
   };
 
+  const handleTrafficEmpty = useCallback(() => {
+    setAppFilter(null);
+    setScreen('home');
+  }, []);
+
   const handleSelectScreen = (next: Screen) => {
     if (next !== 'tasks' || screen === 'tasks') setSelectedTaskId(null);
+    setAppFilter(null);
     setScreen(next);
   };
 
@@ -216,22 +225,32 @@ export function CockpitApp() {
         style={{ transform: `scale(${scale})` }}
       >
         <StatusBar
-          condition={condition}
-          connected={connected}
           monitor={monitorData}
           events={calendarEvents}
+          onWorkspace={goToWorkspace}
         />
 
         <main class="screens">
           {screen === 'home' && (
             <HomeScreen
-              top={top}
-              priorityCount={priority.length}
-              unreadCount={unread.length}
               apps={apps}
-              onOpen={handleOpen}
-              onMarkRead={(notification) => handleMarkRead(notification.id)}
-              onSeeAll={() => setScreen('traffic')}
+              notifications={notifications}
+              todos={todos}
+              onOpenChannel={(appId) => {
+                setAppFilter(appId);
+                setFilter('all');
+                setTrafficPage(0);
+                setScreen('traffic');
+              }}
+              onToggleTodo={toggleTodo}
+              onOpenTask={(todo) => {
+                setSelectedTaskId(todo.id);
+                setScreen('tasks');
+              }}
+              onOpenTasks={() => {
+                setSelectedTaskId(null);
+                setScreen('tasks');
+              }}
             />
           )}
 
@@ -244,11 +263,14 @@ export function CockpitApp() {
                 setFilter(next);
                 setTrafficPage(0);
               }}
+              appFilter={appFilter}
+              onClearApp={() => setAppFilter(null)}
               page={trafficPage}
               onPage={setTrafficPage}
               onOpen={handleOpen}
               onMarkRead={handleMarkRead}
               onMarkAll={handleMarkAll}
+              onEmpty={handleTrafficEmpty}
             />
           )}
 

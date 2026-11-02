@@ -196,7 +196,8 @@ export interface ServerSpotifyMessage {
 
 export interface ClientSwitchWorkspaceAction {
   action: 'switch_workspace';
-  workspace: number;
+  workspace?: number;
+  next?: boolean;
 }
 
 export interface ClientSpotifyAction {

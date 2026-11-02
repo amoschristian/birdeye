@@ -159,6 +159,56 @@ def _run(args: list[str], timeout: int = 3) -> bool:
 # ── GNOME Shell Extension: activate-window-by-title ────────────────
 
 
+def _gnome_activate(method: str, value: str) -> bool:
+    """Call an activate-window-by-title method. Returns whether a window matched.
+
+    The GNOME extension activates the matched window, which also switches to
+    the workspace that window lives on.
+    """
+    if not shutil.which("gdbus"):
+        return False
+    try:
+        result = subprocess.run(
+            [
+                "gdbus", "call", "--session",
+                "--dest", "org.gnome.Shell",
+                "--object-path", "/de/lucaswerkmeister/ActivateWindowByTitle",
+                "--method", f"de.lucaswerkmeister.ActivateWindowByTitle.{method}",
+                value,
+            ],
+            capture_output=True, text=True, timeout=3,
+        )
+        return "true" in result.stdout.lower()
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def focus_window_by_title_across_workspaces(title: str, attempts: int = 5) -> bool:
+    """Raise the window matching a tab title and switch to its workspace.
+
+    Called after the browser extension has activated the target tab: Chrome's
+    window title follows the active tab, so the title is how we pick the right
+    browser window without seeing Wayland-native windows through wmctrl. The
+    GNOME extension activates it, which switches to the workspace it lives on.
+    """
+    needle = title.strip()[:40]
+    if not needle:
+        return False
+
+    for attempt in range(attempts):
+        if _gnome_activate("activateByPrefix", needle):
+            logger.info(f"Focused window by title prefix '{needle}'")
+            return True
+        if _gnome_activate("activateBySubstring", needle):
+            logger.info(f"Focused window by title substring '{needle}'")
+            return True
+        if attempt < attempts - 1:
+            time.sleep(0.1)
+
+    logger.info(f"switch_to_window: no window matched title '{needle}'")
+    return False
+
+
 def _focus_via_gnome_extension(wm_class: str) -> bool:
     """Focus a window by WM_CLASS using the activate-window-by-title GNOME extension.
 
@@ -172,29 +222,13 @@ def _focus_via_gnome_extension(wm_class: str) -> bool:
     if not shutil.which("gdbus"):
         return False
 
-    def _try_call(method: str, arg: str) -> bool:
-        try:
-            result = subprocess.run(
-                [
-                    "gdbus", "call", "--session",
-                    "--dest", "org.gnome.Shell",
-                    "--object-path", "/de/lucaswerkmeister/ActivateWindowByTitle",
-                    "--method", f"de.lucaswerkmeister.ActivateWindowByTitle.{method}",
-                    arg,
-                ],
-                capture_output=True, text=True, timeout=3,
-            )
-            return "true" in result.stdout.lower()
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return False
-
     # 1. Exact WM_CLASS
-    if _try_call("activateByWmClass", wm_class):
+    if _gnome_activate("activateByWmClass", wm_class):
         logger.info(f"GNOME extension focused {wm_class}")
         return True
 
     # 2. Substring raw class
-    if _try_call("activateBySubstring", wm_class):
+    if _gnome_activate("activateBySubstring", wm_class):
         logger.info(f"GNOME extension focused {wm_class} (by substring)")
         return True
 
@@ -202,13 +236,13 @@ def _focus_via_gnome_extension(wm_class: str) -> bool:
     import re
     stripped = re.sub(r'(?i)(desktop|chat|client|app|web|beta|alpha)$', '', wm_class).strip()
     if stripped and stripped != wm_class:
-        if _try_call("activateBySubstring", stripped):
+        if _gnome_activate("activateBySubstring", stripped):
             logger.info(f"GNOME extension focused {stripped} (stripped from {wm_class})")
             return True
         # Also try title-case
         title_case = stripped.title()
         if title_case != stripped and title_case != wm_class:
-            if _try_call("activateBySubstring", title_case):
+            if _gnome_activate("activateBySubstring", title_case):
                 logger.info(f"GNOME extension focused {title_case} (title-case)")
                 return True
 
@@ -217,7 +251,7 @@ def _focus_via_gnome_extension(wm_class: str) -> bool:
     if words:
         first_word = words[0]
         if first_word != wm_class and first_word != stripped:
-            if _try_call("activateBySubstring", first_word):
+            if _gnome_activate("activateBySubstring", first_word):
                 logger.info(f"GNOME extension focused {first_word} (first word of {wm_class})")
                 return True
 
@@ -509,6 +543,33 @@ def get_current_workspace() -> int | None:
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError, ValueError):
         pass
     return None
+
+
+def get_workspace_count() -> int:
+    """Number of workspaces, from GNOME settings with a wmctrl fallback."""
+    if shutil.which("gsettings"):
+        try:
+            result = subprocess.run(
+                ["gsettings", "get",
+                 "org.gnome.desktop.wm.preferences", "num-workspaces"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if result.returncode == 0:
+                return max(1, int(result.stdout.strip()))
+        except (subprocess.TimeoutExpired, FileNotFoundError, ValueError):
+            pass
+
+    if shutil.which("wmctrl"):
+        try:
+            result = subprocess.run(
+                ["wmctrl", "-d"],
+                capture_output=True, text=True, timeout=3,
+            )
+            if result.returncode == 0:
+                return max(1, len(result.stdout.splitlines()))
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+    return 1
 
 
 def focus_window_by_class_and_switch(wm_class: str, desktop_id: str | None = None) -> bool:

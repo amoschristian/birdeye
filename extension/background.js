@@ -17,6 +17,7 @@ function sendUpdate(tabEntry) {
     appName: tabEntry.provider.name,
     tabId: tabEntry.id,
     windowId: tabEntry.windowId,
+    title: tabEntry.title,
   });
 }
 
@@ -42,7 +43,7 @@ ws.onMessage((msg) => {
       if (!err && msg.windowId) {
         chrome.windows.update(msg.windowId, { focused: true });
       }
-      ws.send({ type: 'focus_ack', tabId: msg.tabId, appId: msg.appId, success: !err });
+      ws.send({ type: 'focus_ack', tabId: msg.tabId, appId: msg.appId, success: !err, title: msg.title });
     });
   }
 });
@@ -57,6 +58,9 @@ function stopKeepaliveAlarm() {
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === 'keepalive') {
+    // The worker may have been terminated with a reconnect timer pending;
+    // connect() is a no-op while the socket is open or connecting.
+    ws.connect();
     ws.send({ type: 'ping' });
   }
 });

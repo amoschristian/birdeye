@@ -1,14 +1,13 @@
 import { useEffect, useState } from 'preact/hooks';
 import type { CalendarEvent, MonitorData } from '../../types';
-import { formatRate, nextEventLabel, pad } from '../helpers';
+import { clockTime, formatRate, pad } from '../helpers';
 
 export type Condition = 'red' | 'warn' | 'ok';
 
 interface Props {
-  condition: Condition;
-  connected: boolean;
   monitor: MonitorData | null;
   events: CalendarEvent[];
+  onWorkspace: (workspace: number) => void;
 }
 
 function Mini({ label, value }: { label: string; value?: number }) {
@@ -30,7 +29,7 @@ function Mini({ label, value }: { label: string; value?: number }) {
   );
 }
 
-export function StatusBar({ condition, connected, monitor, events }: Props) {
+export function StatusBar({ monitor, events, onWorkspace }: Props) {
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -38,18 +37,23 @@ export function StatusBar({ condition, connected, monitor, events }: Props) {
     return () => clearInterval(interval);
   }, []);
 
-  const flagClass =
-    condition === 'warn'
-      ? 'condition__flag condition__flag--warn'
-      : condition === 'ok'
-      ? 'condition__flag condition__flag--ok'
-      : 'condition__flag';
-
-  const flagText = condition === 'red' ? 'RED' : condition === 'warn' ? 'AMBER' : 'GREEN';
+  const nowMs = now.getTime();
+  const next = events
+    .filter((event) => event.end * 1000 > nowMs)
+    .sort((a, b) => a.start - b.start)[0];
+  const isNow = next ? next.start * 1000 <= nowMs : false;
 
   return (
     <header class="status">
-      <span class={flagClass}>{flagText}</span>
+      <button
+        type="button"
+        class="ws__btn"
+        onClick={() => onWorkspace(1)}
+        title="Switch to workspace 1"
+        aria-label="Switch to workspace 1"
+      >
+        WORK
+      </button>
 
       <span class="status__clock mono">
         {pad(now.getHours())}:{pad(now.getMinutes())}
@@ -73,13 +77,17 @@ export function StatusBar({ condition, connected, monitor, events }: Props) {
 
       <span class="spacer" />
 
-      <span class={connected ? 'status__item status__item--ok' : 'status__item status__item--bad'}>
-        {connected ? 'LINK OK' : 'NO LINK'}
-      </span>
-      <span class="status__seam" />
-      <span class="status__item status__item--muted">
-        {nextEventLabel(events, now.getTime())}
-      </span>
+      {next ? (
+        <span class={'next-event' + (isNow ? ' is-now' : '')}>
+          <span class="next-event__label">{isNow ? 'Now' : 'Next'}</span>
+          <span class="next-event__time">
+            {isNow ? 'until ' + clockTime(next.end) : clockTime(next.start)}
+          </span>
+          <span class="next-event__name">{next.summary}</span>
+        </span>
+      ) : (
+        <span class="status__item status__item--muted">No upcoming</span>
+      )}
     </header>
   );
 }

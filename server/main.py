@@ -127,9 +127,6 @@ async def lifespan(app: FastAPI):
                         app = best_app
                         logger.info(f"D-Bus browser notif attributed to {app.id} via tab heuristic (unread={best_has_unread})")
 
-            app_id = app.id if app else app_name.lower().replace(" ", "-")
-            app_name_display = app.name if app else app_name
-
             # Last resort: unmatched browser notification — attribute to the most
             # recently active browser app instead of dropping.
             if app is None and is_browser:
@@ -148,11 +145,22 @@ async def lifespan(app: FastAPI):
                     best_app = browser_apps[0]
                 if best_app:
                     app = best_app
-                    app_id = app.id
-                    app_name_display = app.name
                     logger.info(f"D-Bus browser notif fallback → {app.id}")
-                else:
-                    continue
+
+            # Only track apps that exist in config.json. A native app with no
+            # matching entry (for example one removed from the config while it
+            # keeps running) has no app_id to assign, and inventing one from its
+            # D-Bus name would keep writing rows for an app the dashboard no
+            # longer knows about.
+            if app is None:
+                logger.info(
+                    f"D-Bus notif ignored, no configured app: {app_name} "
+                    f"\"{summary[:40]}\""
+                )
+                continue
+
+            app_id = app.id
+            app_name_display = app.name
 
             # Persist to SQLite
             summary = notif.get("summary", "")

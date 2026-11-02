@@ -423,6 +423,9 @@ async def ws_extension(websocket: WebSocket):
                 # don't go through D-Bus, so we store them directly in the DB)
                 app_id = data.get("appId", "")
                 app_name = data.get("appName", "")
+                if config.get(app_id) is None:
+                    logger.info(f"Extension notif ignored, no configured app: {app_id}")
+                    continue
                 summary = data.get("title", "")
                 body = data.get("body", "")
                 is_important = classify_importance(app_id, app_name, summary, body)
@@ -453,6 +456,14 @@ async def ws_extension(websocket: WebSocket):
                     "success": data.get("success", False),
                 }
                 await _broadcast(_dashboard_conns, payload)
+
+                # The tab is active now, so the browser window title matches the
+                # tab. Activating that window switches to the workspace it is on.
+                title = data.get("title", "")
+                if data.get("success") and title:
+                    await asyncio.to_thread(
+                        wm.focus_window_by_title_across_workspaces, title
+                    )
 
             elif msg_type == "ping":
                 # Keepalive — no action needed
@@ -524,7 +535,12 @@ async def ws_dashboard(websocket: WebSocket):
                     await broadcast_state()
 
             elif action == "switch_workspace":
-                ws_num = data.get("workspace", 1)
+                if data.get("next"):
+                    current = wm.get_current_workspace()
+                    count = wm.get_workspace_count()
+                    ws_num = (current + 1) % count + 1 if current is not None else 1
+                else:
+                    ws_num = data.get("workspace", 1)
                 success = wm.switch_to_workspace(ws_num)
                 await _send(websocket, {
                     "type": "workspace_ack",
@@ -583,11 +599,12 @@ async def ws_dashboard(websocket: WebSocket):
                             "appId": app_id,
                             "tabId": tab.tab_id,
                             "windowId": tab.window_id,
+                            "title": tab.title,
                         }
                         await _broadcast(_extension_conns, focus_msg)
-                        # Extension handles window focus via chrome.windows.update
-                        # (xdg-activation on Wayland). No need for a blind fallback
-                        # that finds the wrong browser window.
+                        # The extension switches the tab and window. The
+                        # workspace jump happens on focus_ack, once the browser
+                        # window title follows the newly active tab.
 
                     await _send(websocket, {
                         "type": "focus_ack",

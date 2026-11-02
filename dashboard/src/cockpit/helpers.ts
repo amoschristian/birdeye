@@ -110,15 +110,3 @@ export function taskAttentionCount(todos: TodoItem[]): number {
   }).length;
 }
 
-export function nextEventLabel(events: CalendarEvent[], nowMs: number): string {
-  const now = nowMs / 1000;
-  const upcoming = events
-    .filter((event) => event.end > now)
-    .sort((a, b) => a.start - b.start)[0];
-
-  if (!upcoming) return 'NO UPCOMING';
-  if (upcoming.start <= now) {
-    return 'NOW ' + upcoming.summary + ' · UNTIL ' + clockTime(upcoming.end);
-  }
-  return 'NEXT ' + clockTime(upcoming.start) + ' · ' + upcoming.summary;
-}

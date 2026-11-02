@@ -8,6 +8,7 @@ class TabState(BaseModel):
     app_id: str
     app_name: str
     unread: int
+    title: str = ""
     last_message: str | None = None
     last_time: float
 
@@ -22,6 +23,10 @@ def update_tab(data: dict) -> TabState:
     existing = _tabs.get(key)
     if existing:
         existing.unread = data.get("unread", existing.unread)
+        # "title" in an update is the tab title; in a notification it is the
+        # notification text, which is not what identifies the browser window.
+        if data.get("type") != "notification":
+            existing.title = data.get("title", existing.title)
         existing.last_time = now
         if data.get("type") == "notification":
             existing.last_message = data.get("body", data.get("title", existing.last_message))
@@ -41,6 +46,7 @@ def update_tab(data: dict) -> TabState:
         app_id=data["appId"],
         app_name=data.get("appName", ""),
         unread=data.get("unread", 0),
+        title="" if data.get("type") == "notification" else data.get("title", ""),
         last_message=data.get("body", data.get("title", "")),
         last_time=now,
     )

@@ -28,7 +28,8 @@ interface UseWebSocketReturn {
   clearRead: () => void;
   focusApp: (appId: string, notifId?: number) => void;
   killProcess: (pid: number) => void;
-  switchWorkspace: (workspace: number) => void;
+  switchWorkspace: () => void;
+  goToWorkspace: (workspace: number) => void;
   addTodo: (text: string) => void;
   toggleTodo: (id: number) => void;
   deleteTodo: (id: number) => void;
@@ -267,7 +268,11 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     );
   }, [sendMessage]);
 
-  const switchWorkspace = useCallback((workspace: number) => {
+  const switchWorkspace = useCallback(() => {
+    sendMessage({ action: 'switch_workspace', next: true });
+  }, [sendMessage]);
+
+  const goToWorkspace = useCallback((workspace: number) => {
     sendMessage({ action: 'switch_workspace', workspace });
   }, [sendMessage]);
 
@@ -427,5 +432,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, processAck, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, killProcess, switchWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, processAck, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, killProcess, switchWorkspace, goToWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

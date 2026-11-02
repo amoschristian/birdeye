@@ -58,7 +58,7 @@ export function App() {
   const {
     apps, notifications, todos, todoReminders, monitorData, spotifyData, calendarEvents, connected,
     soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted,
-    markRead, deleteNotification, markAllRead, clearRead, focusApp, switchWorkspace,
+    markRead, deleteNotification, markAllRead, clearRead, focusApp, switchWorkspace, goToWorkspace,
     addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, reorderTodo,
     setStatus, setNotes, setSchedule, setReminder,
     addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder,
@@ -326,14 +326,27 @@ export function App() {
           {soundMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
         </button>
 
-        <button
-          type="button"
-          onClick={() => switchWorkspace(1)}
-          title="Switch to workspace 1"
-          class="flex h-11 items-center rounded-[9px] bg-action px-4 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
-        >
-          Workspace
-        </button>
+        <div class="flex h-11 items-center overflow-hidden rounded-[9px] bg-action">
+          <button
+            type="button"
+            onClick={() => goToWorkspace(1)}
+            title="Switch to workspace 1"
+            aria-label="Switch to workspace 1"
+            class="h-11 px-3.5 text-[16px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
+          >
+            WS 1
+          </button>
+          <span class="h-6 w-px bg-ink/20" aria-hidden="true" />
+          <button
+            type="button"
+            onClick={() => switchWorkspace()}
+            title="Switch to the next workspace"
+            aria-label="Switch to the next workspace"
+            class="flex h-11 w-11 items-center justify-center text-[20px] font-semibold text-ink transition-all hover:brightness-110 active:scale-[0.98]"
+          >
+            ›
+          </button>
+        </div>
       </header>
 
       {/* ── Calendar ticker ────────────────────────────────── */}
@@ -400,9 +413,10 @@ export function App() {
               onReadAll={handleReadAllForApp}
               onOpenArchive={() => setArchiveOpen(true)}
               onOpenApp={handleOpenAppSource}
-              onOpenNotification={(notification) =>
-                focusApp(notification.app_id, notification.notif_id ?? undefined)
-              }
+              onOpenNotification={(notification) => {
+                focusApp(notification.app_id, notification.notif_id ?? undefined);
+                handleMarkRead(notification.id);
+              }}
             />
           ) : (
             <main class="flex flex-1 flex-col overflow-hidden bg-ink">

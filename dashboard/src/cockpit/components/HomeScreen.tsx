@@ -1,85 +1,161 @@
-import type { AppConfig, Notification } from '../../types';
+import type { AppConfig, Notification, TodoItem } from '../../types';
+import { buildAppInboxes } from '../../utils/appInbox';
+import { appBrandColor } from '../../utils/appVisuals';
 import { messageText, notificationLabel, notificationSender } from '../../utils/conversations';
 import { formatRelativeTime } from '../../utils/time';
-import { appOf } from '../helpers';
+import { dueLabel, openTasks, todayKey } from '../helpers';
+import { ChannelIcon } from './ChannelIcon';
 
 interface Props {
-  top: Notification | null;
-  priorityCount: number;
-  unreadCount: number;
   apps: AppConfig[];
-  onOpen: (notification: Notification) => void;
-  onMarkRead: (notification: Notification) => void;
-  onSeeAll: () => void;
+  notifications: Notification[];
+  todos: TodoItem[];
+  onOpenChannel: (appId: string) => void;
+  onToggleTodo: (id: number) => void;
+  onOpenTask: (todo: TodoItem) => void;
+  onOpenTasks: () => void;
 }
 
-export function HomeScreen({ top, priorityCount, unreadCount, apps, onOpen, onMarkRead, onSeeAll }: Props) {
-  const app = top ? appOf(apps, top.app_id) : undefined;
-  const sender = top ? notificationSender(top) : '';
-  const label = top ? notificationLabel(top) : '';
-  const from = sender && sender !== label ? `${sender} · ${label}` : label;
-  const age = top ? formatRelativeTime(top.created_at) : '';
-  const routine = Math.max(0, unreadCount - priorityCount);
+export function HomeScreen({
+  apps,
+  notifications,
+  todos,
+  onOpenChannel,
+  onToggleTodo,
+  onOpenTask,
+  onOpenTasks,
+}: Props) {
+  const channels = buildAppInboxes(
+    notifications,
+    apps.filter((app) => app.id !== 'calendar')
+  );
+
+  const today = todayKey();
+  const dueNow = openTasks(todos).filter((todo) => {
+    const date = todo.due_date || todo.scheduled_date;
+    return date !== null && date <= today;
+  });
 
   return (
     <section class="screen" aria-label="Home">
-      <article class="priority panel">
-        <header class="priority__head">
-          <span class="label">
-            {top ? (priorityCount > 0 ? `Priority 1 of ${priorityCount}` : 'Latest') : 'Standing by'}
-          </span>
-          <span class="spacer" />
-          <span class="label label--dim">{app?.name ?? top?.app_name ?? '—'}</span>
-          <span class="label label--dim">
-            {top ? (age === 'now' ? 'now' : `${age} ago`) : '—'}
-          </span>
-        </header>
+      <div class="home">
+        <div class="channels">
+          {channels.map((inbox) => {
+            const app = apps.find((candidate) => candidate.id === inbox.appId);
+            if (!app) return null;
 
-        <div class="priority__body">
-          <p class="priority__from">{top ? from : 'No unread traffic'}</p>
-          <p class="priority__msg">{top ? messageText(top) : 'All quiet'}</p>
+            const latest = inbox.unread[0] ?? null;
+            const quiet = inbox.unreadCount === 0;
+            const important = inbox.importantCount > 0;
+            const sender = latest ? notificationSender(latest) : '';
+            const room = latest ? notificationLabel(latest) : '';
+            const where = sender && sender !== room ? `${sender} / ${room}` : room;
+            const brand = appBrandColor(app.id);
+
+            return (
+              <button
+                type="button"
+                class={
+                  'channel' +
+                  (quiet ? ' channel--quiet' : '') +
+                  (important ? ' channel--alert' : '')
+                }
+                key={app.id}
+                disabled={quiet}
+                onClick={() => onOpenChannel(app.id)}
+                aria-label={`${app.name}, ${inbox.unreadCount} unread${
+                  important ? `, ${inbox.importantCount} important` : ''
+                }`}
+              >
+                <span
+                  class="channel__edge"
+                  style={{ backgroundColor: important ? 'var(--alert)' : brand }}
+                />
+
+                <span class="channel__head">
+                  <span class="channel__icon">
+                    <ChannelIcon app={app} />
+                  </span>
+                  <span class="channel__name">{app.name}</span>
+                  <span class="channel__time">
+                    {latest ? formatRelativeTime(latest.created_at) : '—'}
+                  </span>
+                </span>
+
+                <span class="channel__body">
+                  <span class="channel__figure">
+                    <span class="channel__count">{quiet ? '—' : inbox.unreadCount}</span>
+                    <span class="channel__unit">{quiet ? 'clear' : 'unread'}</span>
+                  </span>
+
+                  <span class="channel__preview">
+                    <span class="channel__where">
+                      {latest ? where || app.name : 'No messages'}
+                    </span>
+                    <span class="channel__msg">
+                      {latest ? messageText(latest) : 'All quiet'}
+                    </span>
+                  </span>
+                </span>
+
+                <span class="channel__foot">
+                  {important ? (
+                    <span class="channel__flag">▲ {inbox.importantCount} important</span>
+                  ) : (
+                    <span class="channel__flag channel__flag--muted">
+                      {quiet ? '0 unread' : `${inbox.unreadCount} new`}
+                    </span>
+                  )}
+                  {!quiet && <span class="channel__open">Open ›</span>}
+                </span>
+              </button>
+            );
+          })}
         </div>
-      </article>
 
-      <div class="actions">
-        <button
-          type="button"
-          class="btn btn--primary"
-          disabled={!top}
-          onClick={() => top && onOpen(top)}
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-          Open transmission
-        </button>
+        <aside class="today" aria-label="Today">
+          <header class="today__head">
+            <span class="today__lamp" />
+            <span class="today__title">Today</span>
+            <span class="today__count">{dueNow.length}</span>
+            <span class="spacer" />
+            <button type="button" class="today__all" onClick={onOpenTasks}>
+              All tasks ›
+            </button>
+          </header>
 
-        <button type="button" class="btn" disabled={!top} onClick={() => top && onMarkRead(top)}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Mark read
-        </button>
-      </div>
+          <div class="today__list">
+            {dueNow.length === 0 ? (
+              <div class="empty">Nothing due today</div>
+            ) : (
+              dueNow.map((todo) => {
+                const due = dueLabel(todo);
 
-      <div class="home__foot">
-        <span class="home__counts">
-          <b>{Math.max(0, priorityCount - 1)}</b> more priority · <b>{routine}</b> routine
-        </span>
-        <span class="spacer" />
-        <button
-          type="button"
-          class="btn btn--outline"
-          disabled={unreadCount === 0}
-          onClick={onSeeAll}
-        >
-          See all {unreadCount} {unreadCount === 1 ? 'transmission' : 'transmissions'}
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M5 12h14" />
-            <path d="m13 6 6 6-6 6" />
-          </svg>
-        </button>
+                return (
+                  <div class="today__row" key={todo.id}>
+                    <button
+                      type="button"
+                      class="today__check"
+                      aria-label={`Complete ${todo.text}`}
+                      onClick={() => onToggleTodo(todo.id)}
+                    >
+                      <span class="today__box" />
+                    </button>
+
+                    <button
+                      type="button"
+                      class="today__main"
+                      onClick={() => onOpenTask(todo)}
+                    >
+                      <span class="today__text">{todo.text}</span>
+                      <span class={'task__due ' + due.tone}>{due.text}</span>
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </aside>
       </div>
     </section>
   );

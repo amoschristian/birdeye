@@ -1,3 +1,4 @@
+import { useEffect } from 'preact/hooks';
 import type { AppConfig, Notification } from '../../types';
 import { messageText, notificationSender } from '../../utils/conversations';
 import { formatRelativeTime } from '../../utils/time';
@@ -10,11 +11,14 @@ interface Props {
   apps: AppConfig[];
   filter: GroupFilter;
   onFilter: (filter: GroupFilter) => void;
+  appFilter: string | null;
+  onClearApp: () => void;
   page: number;
   onPage: (page: number) => void;
   onOpen: (notification: Notification) => void;
   onMarkRead: (id: number) => void;
   onMarkAll: () => void;
+  onEmpty: () => void;
 }
 
 export function TrafficScreen({
@@ -22,55 +26,75 @@ export function TrafficScreen({
   apps,
   filter,
   onFilter,
+  appFilter,
+  onClearApp,
   page,
   onPage,
   onOpen,
   onMarkRead,
   onMarkAll,
+  onEmpty,
 }: Props) {
   const work = unread.filter((notification) => groupOf(apps, notification.app_id) === 'work').length;
   const personal = unread.filter(
     (notification) => groupOf(apps, notification.app_id) === 'personal'
   ).length;
 
-  const filtered =
+  let filtered =
     filter === 'all'
       ? unread
       : unread.filter((notification) => groupOf(apps, notification.app_id) === filter);
 
+  if (appFilter) {
+    filtered = filtered.filter((notification) => notification.app_id === appFilter);
+  }
+
   const slice = pageSlice(filtered, page);
+  const activeApp = appFilter ? appOf(apps, appFilter) : undefined;
+
+  useEffect(() => {
+    if (unread.length === 0 || (appFilter && filtered.length === 0)) onEmpty();
+  }, [unread.length, appFilter, filtered.length, onEmpty]);
 
   return (
     <section class="screen" aria-label="Traffic">
       <header class="screen__head">
         <span class="screen__title">Traffic</span>
-        <span class="screen__count">{unread.length} unread</span>
+        <span class="screen__count">{filtered.length} unread</span>
 
         <span class="spacer" />
 
-        <div class="seg" role="group" aria-label="Filter by group">
-          <button
-            type="button"
-            class={'seg__opt ' + (filter === 'all' ? 'is-active' : '')}
-            onClick={() => onFilter('all')}
-          >
-            All <b>{unread.length}</b>
+        {appFilter ? (
+          <button type="button" class="app-chip" onClick={onClearApp}>
+            <ChannelIcon app={activeApp} />
+            <span>{activeApp?.name ?? 'Channel'}</span>
+            <span class="app-chip__x">×</span>
           </button>
-          <button
-            type="button"
-            class={'seg__opt ' + (filter === 'work' ? 'is-active' : '')}
-            onClick={() => onFilter('work')}
-          >
-            Work <b>{work}</b>
-          </button>
-          <button
-            type="button"
-            class={'seg__opt ' + (filter === 'personal' ? 'is-active' : '')}
-            onClick={() => onFilter('personal')}
-          >
-            Personal <b>{personal}</b>
-          </button>
-        </div>
+        ) : (
+          <div class="seg" role="group" aria-label="Filter by group">
+            <button
+              type="button"
+              class={'seg__opt ' + (filter === 'all' ? 'is-active' : '')}
+              onClick={() => onFilter('all')}
+            >
+              All <b>{unread.length}</b>
+            </button>
+            <button
+              type="button"
+              class={'seg__opt ' + (filter === 'work' ? 'is-active' : '')}
+              onClick={() => onFilter('work')}
+            >
+              Work <b>{work}</b>
+            </button>
+            <button
+              type="button"
+              class={'seg__opt ' + (filter === 'personal' ? 'is-active' : '')}
+              onClick={() => onFilter('personal')}
+            >
+              Personal <b>{personal}</b>
+            </button>
+          </div>
+        )}
 
         <Pager page={slice.page} pages={slice.pages} onChange={onPage} />
 
@@ -83,7 +107,7 @@ export function TrafficScreen({
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <polyline points="20 6 9 17 4 12" />
           </svg>
-          {filter === 'all' ? 'Mark all read' : `Mark ${filter} read`}
+          {appFilter || filter === 'all' ? 'Mark all read' : `Mark ${filter} read`}
         </button>
       </header>
 
