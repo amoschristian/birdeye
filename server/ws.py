@@ -550,8 +550,10 @@ async def ws_dashboard(websocket: WebSocket):
 
             elif action == "spotify":
                 command = data.get("command", "")
-                if command in ("play_pause", "next", "previous", "seek"):
-                    spotify_listener.send_command(command, data.get("position_ms"))
+                if command in ("play_pause", "next", "previous", "seek", "shuffle", "loop"):
+                    spotify_listener.send_command(
+                        command, data.get("position_ms"), data.get("value")
+                    )
 
             elif action == "kill_process":
                 pid = data.get("pid")

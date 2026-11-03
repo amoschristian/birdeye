@@ -2,9 +2,14 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import type {
   AppConfig, TabState, Notification, MonitorData, SpotifyState,
   CalendarEvent, TodoItem, TodoStatus, ServerMessage, ClientMessage,
-  ServerProcessAckMessage,
+  ServerProcessAckMessage, SpotifyLoopMode,
 } from '../types';
 import { useSound } from './useSound';
+
+export type SpotifyCommand =
+  | { command: 'play_pause' | 'next' | 'previous' }
+  | { command: 'shuffle'; value: boolean }
+  | { command: 'loop'; value: SpotifyLoopMode };
 
 
 interface UseWebSocketReturn {
@@ -28,6 +33,7 @@ interface UseWebSocketReturn {
   clearRead: () => void;
   focusApp: (appId: string, notifId?: number) => void;
   killProcess: (pid: number) => void;
+  spotifyCommand: (command: SpotifyCommand) => void;
   switchWorkspace: () => void;
   goToWorkspace: (workspace: number) => void;
   addTodo: (text: string) => void;
@@ -163,6 +169,8 @@ export function useWebSocket(host: string): UseWebSocketReturn {
             artUrl: data.artUrl,
             duration: data.duration,
             position: data.position,
+            shuffle: data.shuffle,
+            loop: data.loop,
           });
         } else if (data.type === 'calendar') {
           setCalendarEvents(data.events);
@@ -282,6 +290,10 @@ export function useWebSocket(host: string): UseWebSocketReturn {
 
   const killProcess = useCallback((pid: number) => {
     sendMessage({ action: 'kill_process', pid });
+  }, [sendMessage]);
+
+  const spotifyCommand = useCallback((command: SpotifyCommand) => {
+    sendMessage({ action: 'spotify', ...command });
   }, [sendMessage]);
 
   const addTodo = useCallback((text: string) => {
@@ -432,5 +444,5 @@ export function useWebSocket(host: string): UseWebSocketReturn {
     });
   }, [sendTodoMutation]);
 
-  return { apps, tabs, notifications, todos, todoReminders, monitorData, processAck, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, killProcess, switchWorkspace, goToWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
+  return { apps, tabs, notifications, todos, todoReminders, monitorData, processAck, spotifyData, calendarEvents, connected, soundMuted, manualSoundMuted, toggleSoundMuted, setEventSoundMuted, markRead, deleteNotification, markAllRead, clearRead, focusApp, killProcess, spotifyCommand, switchWorkspace, goToWorkspace, addTodo, toggleTodo, deleteTodo, editTodo, setPriority, setDueDate, setStatus, setNotes, setSchedule, setReminder, attachContext, reorderTodo, addSubtask, toggleSubtask, editSubtask, deleteSubtask, reorderSubtask, dismissReminder };
 }

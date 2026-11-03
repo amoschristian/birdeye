@@ -1,4 +1,5 @@
 import type { AppConfig, CalendarEvent, Notification, TodoItem } from '../types';
+import { parseGroupKey } from '../utils/groupKey';
 
 export type GroupFilter = 'all' | 'work' | 'personal';
 export type ProcessSort = 'cpu' | 'mem';
@@ -10,6 +11,11 @@ export function pad(value: number): string {
 export function clockTime(timestampSeconds: number): string {
   const date = new Date(timestampSeconds * 1000);
   return pad(date.getHours()) + ':' + pad(date.getMinutes());
+}
+
+export function mediaClock(milliseconds: number): string {
+  const total = Math.max(0, Math.floor((milliseconds || 0) / 1000));
+  return Math.floor(total / 60) + ':' + pad(total % 60);
 }
 
 export function formatBytes(value: number): string {
@@ -41,6 +47,24 @@ export function appOf(apps: AppConfig[], appId: string): AppConfig | undefined {
 
 export function groupOf(apps: AppConfig[], appId: string): string {
   return appOf(apps, appId)?.group ?? '';
+}
+
+/**
+ * Room, or the person for a DM — opening one message means the whole
+ * conversation was on screen, so its unread messages go together.
+ */
+function conversationKey(notification: Notification): string {
+  return parseGroupKey(notification.app_id, notification.summary).key;
+}
+
+export function unreadInConversation(
+  notifications: Notification[],
+  target: Notification
+): Notification[] {
+  const key = conversationKey(target);
+  return notifications.filter(
+    (notification) => !notification.is_read && conversationKey(notification) === key
+  );
 }
 
 export function pageSlice<T>(items: T[], page: number, perPage = 4) {

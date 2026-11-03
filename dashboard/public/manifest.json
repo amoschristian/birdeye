@@ -3,7 +3,7 @@
   "short_name": "Birdeye",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#121021",
-  "theme_color": "#121021",
+  "background_color": "#050910",
+  "theme_color": "#050910",
   "orientation": "landscape"
 }

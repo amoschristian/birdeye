@@ -171,6 +171,8 @@ export interface ServerProcessAckMessage {
 
 // ── Spotify types ─────────────────────────────────────────────────
 
+export type SpotifyLoopMode = 'None' | 'Track' | 'Playlist';
+
 export interface SpotifyState {
   available: boolean;
   playing: boolean;
@@ -180,6 +182,8 @@ export interface SpotifyState {
   artUrl: string;
   duration: number;
   position: number;
+  shuffle: boolean;
+  loop: SpotifyLoopMode;
 }
 
 export interface ServerSpotifyMessage {
@@ -192,6 +196,8 @@ export interface ServerSpotifyMessage {
   artUrl: string;
   duration: number;
   position: number;
+  shuffle: boolean;
+  loop: SpotifyLoopMode;
 }
 
 export interface ClientSwitchWorkspaceAction {
@@ -202,8 +208,9 @@ export interface ClientSwitchWorkspaceAction {
 
 export interface ClientSpotifyAction {
   action: 'spotify';
-  command: 'play_pause' | 'next' | 'previous' | 'seek';
+  command: 'play_pause' | 'next' | 'previous' | 'seek' | 'shuffle' | 'loop';
   position_ms?: number;
+  value?: boolean | SpotifyLoopMode;
 }
 
 export interface ClientKillProcessAction {

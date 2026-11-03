@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from config_loader import config
@@ -333,6 +333,12 @@ async def control(request: Request):
         return {"ok": True, "action": "focus", "tabId": tab_id, "windowId": window_id}
 
     return JSONResponse({"ok": False, "error": "unknown_action"}, status_code=400)
+
+
+# The cockpit is the only dashboard now; keep old bookmarks working.
+@app.get("/cockpit.html")
+async def cockpit_redirect():
+    return RedirectResponse(url="/")
 
 
 # Serve dashboard static files

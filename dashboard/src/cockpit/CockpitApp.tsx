@@ -7,6 +7,7 @@ import {
   sortByAttention,
   taskAttentionCount,
   todayKey,
+  unreadInConversation,
   type GroupFilter,
   type ProcessSort,
 } from './helpers';
@@ -18,6 +19,7 @@ import { ProcessesScreen } from './components/ProcessesScreen';
 import { CalendarScreen } from './components/CalendarScreen';
 import { TaskDetailScreen } from './components/TaskDetailScreen';
 import { StatusBar, type Condition } from './components/StatusBar';
+import { MediaDrawer } from './components/MediaDrawer';
 import { Composer } from './components/Composer';
 import { TimePicker } from './components/TimePicker';
 import { Toast } from './components/Toast';
@@ -49,6 +51,7 @@ export function CockpitApp() {
     todos,
     todoReminders,
     monitorData,
+    spotifyData,
     calendarEvents,
     soundMuted,
     toggleSoundMuted,
@@ -68,6 +71,7 @@ export function CockpitApp() {
     deleteSubtask,
     deleteTodo,
     killProcess,
+    spotifyCommand,
     processAck,
   } = useWebSocket(window.location.host);
 
@@ -79,6 +83,7 @@ export function CockpitApp() {
   const [planPage, setPlanPage] = useState(0);
   const [procPage, setProcPage] = useState(0);
   const [sort, setSort] = useState<ProcessSort>('cpu');
+  const [mediaOpen, setMediaOpen] = useState(false);
   const [armedPid, setArmedPid] = useState<number | null>(null);
   const [killedPids, setKilledPids] = useState<Set<number>>(new Set());
   const [composerOpen, setComposerOpen] = useState(false);
@@ -132,8 +137,8 @@ export function CockpitApp() {
     () => notifications.filter((notification) => !notification.is_read),
     [notifications]
   );
+  const priority = useMemo(() => sortByAttention(unread).filter(isPriority), [unread]);
   const ranked = useMemo(() => sortByAttention(unread), [unread]);
-  const priority = useMemo(() => ranked.filter(isPriority), [ranked]);
   const condition: Condition = priority.length > 0 ? 'red' : unread.length > 0 ? 'warn' : 'ok';
   const taskAttention = useMemo(() => taskAttentionCount(todos), [todos]);
   const planCount = useMemo(() => {
@@ -144,15 +149,24 @@ export function CockpitApp() {
   const selectedTask =
     selectedTaskId === null ? null : todos.find((todo) => todo.id === selectedTaskId) ?? null;
 
+  const markConversationRead = (notification: Notification): number => {
+    const siblings = unreadInConversation(notifications, notification);
+    for (const sibling of siblings) markRead(sibling.id);
+    return siblings.length;
+  };
+
   const handleOpen = (notification: Notification) => {
     focusApp(notification.app_id, notification.notif_id ?? undefined);
-    markRead(notification.id);
+    markConversationRead(notification);
     showToast('Opening ' + (appOf(apps, notification.app_id)?.name ?? notification.app_name));
   };
 
   const handleMarkRead = (id: number) => {
-    markRead(id);
-    showToast('Marked read');
+    const notification = notifications.find((candidate) => candidate.id === id);
+    if (!notification) return;
+
+    const count = markConversationRead(notification);
+    showToast(count > 1 ? `${count} messages marked read` : 'Marked read');
   };
 
   const handleMarkAll = () => {
@@ -167,6 +181,18 @@ export function CockpitApp() {
     }
     showToast('All marked read');
   };
+
+  const handleOpenChannel = (appId: string) => {
+    setAppFilter(appId);
+    setFilter('all');
+    setTrafficPage(0);
+    setScreen('traffic');
+  };
+
+  const handleTrafficEmpty = useCallback(() => {
+    setAppFilter(null);
+    setScreen('home');
+  }, []);
 
   const handleKill = (pid: number) => {
     if (killedPids.has(pid)) return;
@@ -204,14 +230,10 @@ export function CockpitApp() {
     showToast('Task added');
   };
 
-  const handleTrafficEmpty = useCallback(() => {
-    setAppFilter(null);
-    setScreen('home');
-  }, []);
-
   const handleSelectScreen = (next: Screen) => {
     if (next !== 'tasks' || screen === 'tasks') setSelectedTaskId(null);
     setAppFilter(null);
+    setMediaOpen(false);
     setScreen(next);
   };
 
@@ -236,12 +258,7 @@ export function CockpitApp() {
               apps={apps}
               notifications={notifications}
               todos={todos}
-              onOpenChannel={(appId) => {
-                setAppFilter(appId);
-                setFilter('all');
-                setTrafficPage(0);
-                setScreen('traffic');
-              }}
+              onOpenChannel={handleOpenChannel}
               onToggleTodo={toggleTodo}
               onOpenTask={(todo) => {
                 setSelectedTaskId(todo.id);
@@ -327,14 +344,23 @@ export function CockpitApp() {
           )}
         </main>
 
+        <MediaDrawer
+          open={mediaOpen}
+          spotify={spotifyData}
+          onClose={() => setMediaOpen(false)}
+          onCommand={spotifyCommand}
+        />
+
         <Dock
           screen={screen}
           onSelect={handleSelectScreen}
-          trafficCount={unread.length}
           planCount={planCount}
           taskCount={taskAttention}
           muted={soundMuted}
           onToggleMute={toggleSoundMuted}
+          spotify={spotifyData}
+          mediaOpen={mediaOpen}
+          onMedia={() => setMediaOpen((open) => !open)}
         />
 
         <Toast message={toast} />

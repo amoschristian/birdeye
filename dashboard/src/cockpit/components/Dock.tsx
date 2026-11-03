@@ -1,24 +1,37 @@
+import type { SpotifyState } from '../../types';
+import { Marquee } from './Marquee';
+import { SpotifyArt } from './SpotifyArt';
+
 export type Screen = 'home' | 'traffic' | 'plan' | 'tasks' | 'processes';
 
 interface Props {
   screen: Screen;
   onSelect: (screen: Screen) => void;
-  trafficCount: number;
   planCount: number;
   taskCount: number;
   muted: boolean;
   onToggleMute: () => void;
+  spotify: SpotifyState | null;
+  mediaOpen: boolean;
+  onMedia: () => void;
 }
 
 export function Dock({
   screen,
   onSelect,
-  trafficCount,
   planCount,
   taskCount,
   muted,
   onToggleMute,
+  spotify,
+  mediaOpen,
+  onMedia,
 }: Props) {
+  const nowPlaying = spotify && spotify.available && spotify.title ? spotify : null;
+  const nowLabel = nowPlaying
+    ? [nowPlaying.artist, nowPlaying.title].filter(Boolean).join(' — ')
+    : '';
+
   return (
     <nav class="dock" aria-label="Screens">
       <button
@@ -31,20 +44,6 @@ export function Dock({
           <path d="M5 9.5V21h14V9.5" />
         </svg>
         <span class="dock__label">Home</span>
-      </button>
-
-      <button
-        type="button"
-        class={'dock__btn ' + (screen === 'traffic' ? 'is-active' : '')}
-        onClick={() => onSelect('traffic')}
-      >
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-          <path d="M13.7 21a2 2 0 0 1-3.4 0" />
-        </svg>
-        <span class="dock__label">
-          Traffic {trafficCount > 0 && <span class="dock__count">{trafficCount}</span>}
-        </span>
       </button>
 
       <button
@@ -91,6 +90,21 @@ export function Dock({
           <line x1="3" y1="18" x2="3.01" y2="18" />
         </svg>
         <span class="dock__label">Processes</span>
+      </button>
+
+      <button
+        type="button"
+        class={'dock__btn dock__media ' + (mediaOpen ? 'is-open' : '')}
+        aria-expanded={mediaOpen}
+        aria-controls="media-popup"
+        onClick={onMedia}
+      >
+        <span class="dock__thumb">
+          <SpotifyArt url={nowPlaying ? nowPlaying.artUrl : ''} size="thumb" />
+        </span>
+        <span class="dock__label dock__label--track">
+          {nowLabel ? <Marquee text={nowLabel} /> : 'Media'}
+        </span>
       </button>
 
       <button

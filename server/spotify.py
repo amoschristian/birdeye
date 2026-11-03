@@ -34,7 +34,11 @@ _EMPTY_STATE = {
     "artUrl": "",
     "duration": 0,
     "position": 0,
+    "shuffle": False,
+    "loop": "None",
 }
+
+LOOP_MODES = ("None", "Track", "Playlist")
 
 
 def _micros_to_seconds(micros: int) -> int:
@@ -158,7 +162,7 @@ class SpotifyListener:
         self._bus = None
         logger.info("Spotify listener stopped")
 
-    def send_command(self, command: str, position_ms: Optional[int] = None):
+    def send_command(self, command: str, position_ms: Optional[int] = None, value=None):
         """Send a control command to Spotify via MPRIS."""
         if not self._available:
             return
@@ -173,8 +177,41 @@ class SpotifyListener:
                 iface.Previous()
             elif command == "seek" and position_ms is not None:
                 self._seek(iface, position_ms)
+            elif command == "shuffle":
+                self._set_property(obj, "Shuffle", dbus.Boolean(bool(value)))
+            elif command == "loop" and str(value) in LOOP_MODES:
+                self._set_property(obj, "LoopStatus", dbus.String(str(value)))
         except Exception as e:
             logger.warning(f"Spotify command '{command}' failed: {e}")
+
+    def _set_property(self, obj, name: str, value):
+        """Write an MPRIS property and mirror it locally right away.
+
+        Spotify applies Shuffle/LoopStatus roughly a second after Set() returns,
+        so re-reading immediately still reports the old value and would flip the
+        dashboard toggle back. Mirror the requested value, then let the
+        PropertiesChanged signal — or the follow-up read — reconcile.
+        """
+        props = dbus.Interface(obj, PROPERTIES_IFACE)
+        props.Set(SPOTIFY_IFACE, name, value)
+
+        with self._lock:
+            if name == "Shuffle":
+                self._state["shuffle"] = bool(value)
+            elif name == "LoopStatus":
+                self._state["loop"] = str(value)
+
+        self._signal_update()
+        self._schedule_refresh()
+
+    def _schedule_refresh(self, seconds: int = 3):
+        """One-shot re-read in the GLib thread, in case Spotify drops the write."""
+        GLib.timeout_add_seconds(seconds, self._refresh_from_glib)
+
+    def _refresh_from_glib(self) -> bool:
+        self._fetch_state()
+        self._signal_update()
+        return False
 
     def _seek(self, iface, position_ms: int):
         """Scrub to an absolute position using MPRIS SetPosition."""
@@ -237,7 +274,7 @@ class SpotifyListener:
         """Called when any MPRIS property changes (from signal thread)."""
         if interface != SPOTIFY_IFACE:
             return
-        if "PlaybackStatus" in changed or "Metadata" in changed:
+        if "PlaybackStatus" in changed or "Metadata" in changed or "Shuffle" in changed or "LoopStatus" in changed:
             self._fetch_state()
             self._signal_update()
         elif "Position" in changed:
@@ -284,6 +321,8 @@ class SpotifyListener:
             "artUrl": art_url,
             "duration": _micros_to_seconds(duration),
             "position": _micros_to_seconds(position),
+            "shuffle": bool(props.get("Shuffle", False)),
+            "loop": str(props.get("LoopStatus", "None")),
             "_metadata": metadata,
         }
 

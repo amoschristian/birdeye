@@ -9,6 +9,6 @@ const ICONS: Record<string, string> = {
 
 export function ChannelIcon({ app }: { app?: AppConfig }) {
   const source = app ? ICONS[app.id] : undefined;
-  if (source) return <img class="row__icon-img" src={source} alt="" />;
-  return <span class="row__icon-emoji">{app?.icon ?? '•'}</span>;
+  if (source) return <img class="channel__icon-img" src={source} alt="" />;
+  return <span class="channel__icon-emoji">{app?.icon ?? '•'}</span>;
 }

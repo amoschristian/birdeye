@@ -144,7 +144,7 @@ export function TrafficScreen({
                 <button
                   type="button"
                   class="row__check"
-                  aria-label="Mark as read"
+                  aria-label="Mark conversation as read"
                   onClick={() => onMarkRead(notification.id)}
                 >
                   <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

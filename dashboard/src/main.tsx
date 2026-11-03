@@ -1,7 +1,7 @@
 import { render } from 'preact';
-import { App } from './App';
+import { CockpitApp } from './cockpit/CockpitApp';
 import './fonts.css';
-import './style.css';
+import './cockpit/cockpit.css';
 
 const root = document.getElementById('app');
-if (root) render(<App />, root);
+if (root) render(<CockpitApp />, root);
